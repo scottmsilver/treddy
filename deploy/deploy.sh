@@ -4,6 +4,9 @@ set -euo pipefail
 # cd to project root (parent of deploy/)
 cd "$(dirname "$0")/.."
 
+SCRIPT_DIR="$(pwd)"
+LOCK_SCRIPT="$SCRIPT_DIR/scripts/pi-lock.sh"
+
 PI_HOST="${PI_HOST:-rpi}"
 PI_DIR="${PI_DIR:-treadmill}"
 PI_USER="${PI_USER:-$(ssh "$PI_HOST" whoami)}"
@@ -62,6 +65,13 @@ stage() {
 
 deploy_full() {
     stage
+
+    # Acquire Pi lock (blocks if another worktree is deploying).
+    # Uses `source` (not subprocess) so fd 9 stays open in this shell,
+    # holding the flock for the duration of the deploy.
+    if [ -x "$LOCK_SCRIPT" ]; then
+        source "$LOCK_SCRIPT" acquire "deploy from $(basename "$SCRIPT_DIR")"
+    fi
 
     echo "=== Deploying to $PI_HOST:~/$PI_DIR ==="
     ssh "$PI_HOST" "mkdir -p ~/$PI_DIR"

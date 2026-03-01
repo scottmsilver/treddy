@@ -26,6 +26,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
+from pydantic import BaseModel, Field, field_validator
+
 from hrm_client import HrmClient
 from program_engine import (
     CHAT_SYSTEM_PROMPT,
@@ -41,7 +43,6 @@ from program_engine import (
     read_api_key,
     validate_interval,
 )
-from pydantic import BaseModel, Field, field_validator
 from treadmill_client import MAX_INCLINE, MAX_SPEED_TENTHS, TreadmillClient
 from workout_session import WorkoutSession
 
@@ -66,8 +67,16 @@ async def lifespan(application):
     msg_queue = asyncio.Queue(maxsize=500)
     sess = WorkoutSession()
 
-    # Connect to treadmill_io C binary
-    client = TreadmillClient()
+    # Connect to treadmill_io C binary (or mock for UI-only dev)
+    mock_mode = os.environ.get("TREADMILL_MOCK")
+    if mock_mode:
+        from mock_treadmill_client import MockTreadmillClient
+
+        client = MockTreadmillClient()
+        log.info("Mock mode — no Pi connection")
+    else:
+        sock = os.environ.get("TREADMILL_SOCK", "/tmp/treadmill_io.sock")
+        client = TreadmillClient(sock_path=sock)
 
     def on_message(msg):
         def _apply():
@@ -147,7 +156,14 @@ async def lifespan(application):
         raise RuntimeError("treadmill_io not running. Start: sudo ./treadmill_io")
 
     # Connect to hrm-daemon (optional — server works without it)
-    hrm = HrmClient()
+    if mock_mode:
+        from mock_hrm_client import MockHrmClient
+
+        hrm = MockHrmClient()
+        log.info("Mock HRM active")
+    else:
+        hrm_sock = os.environ.get("HRM_SOCK", "/tmp/hrm.sock")
+        hrm = HrmClient(sock_path=hrm_sock)
 
     def on_hrm_message(msg):
         def _apply():
@@ -206,10 +222,10 @@ async def lifespan(application):
 
 app = FastAPI(title="Treadmill Controller", lifespan=lifespan)
 
-# CORS for Vite dev server
+# CORS — wide open in mock mode (Caddy handles same-origin), restricted otherwise
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"] if os.environ.get("TREADMILL_MOCK") else ["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1396,4 +1412,5 @@ if __name__ == "__main__":
     if os.path.isfile(cert) and os.path.isfile(key):
         ssl_args = {"ssl_keyfile": key, "ssl_certfile": cert}
         log.info("HTTPS enabled (cert.pem + key.pem)")
-    uvicorn.run(app, host="0.0.0.0", port=8000, **ssl_args)
+    port = int(os.environ.get("TREADMILL_SERVER_PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port, **ssl_args)

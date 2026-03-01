@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
+import ErrorBoundary from './components/ErrorBoundary';
 import TabBar from './components/TabBar';
 import Toast from './components/Toast';
 import DisconnectBanner from './components/DisconnectBanner';
@@ -40,7 +41,7 @@ export default function App({ children }: { children: React.ReactNode }) {
   const [toastMsg, setToastMsg] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { voiceState, toggle: toggleVoice } = useVoiceContext();
 
   useWakeLock();
@@ -61,19 +62,21 @@ export default function App({ children }: { children: React.ReactNode }) {
   }, [showToast]);
 
   return (
-    <ToastContext.Provider value={showToast}>
-      <DisconnectBanner />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: isRun ? 0 : 60 }}>
-        {children}
-      </div>
-      <TabBar
-        voiceState={voiceState}
-        onVoiceToggle={toggleVoice}
-        onSettingsToggle={() => setSettingsOpen(s => !s)}
-      />
-      <VoiceOverlay voiceState={voiceState} />
-      <Toast message={toastMsg} visible={toastVisible} />
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-    </ToastContext.Provider>
+    <ErrorBoundary>
+      <ToastContext.Provider value={showToast}>
+        <DisconnectBanner />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: isRun ? 0 : 60 }}>
+          {children}
+        </div>
+        <TabBar
+          voiceState={voiceState}
+          onVoiceToggle={toggleVoice}
+          onSettingsToggle={() => setSettingsOpen(s => !s)}
+        />
+        <VoiceOverlay voiceState={voiceState} />
+        <Toast message={toastMsg} visible={toastVisible} />
+        <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      </ToastContext.Provider>
+    </ErrorBoundary>
   );
 }

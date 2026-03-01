@@ -219,51 +219,54 @@ async fn connect_and_run(
 }
 
 /// Send a speed command to treadmill_io (mph float).
-/// Opens a short-lived connection, sends the command, and closes.
 pub async fn send_speed(
     socket_path: &str,
     mph: f64,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cmd = format!("{{\"cmd\":\"speed\",\"value\":{:.1}}}\n", mph);
-    send_oneshot(socket_path, &cmd).await
+    send_commands(socket_path, &[&cmd]).await
 }
 
 /// Send an incline command to treadmill_io (float percent, 0.5 resolution).
-/// Opens a short-lived connection, sends the command, and closes.
 pub async fn send_incline(
     socket_path: &str,
     incline: f64,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cmd = format!("{{\"cmd\":\"incline\",\"value\":{:.1}}}\n", incline);
-    send_oneshot(socket_path, &cmd).await
+    send_commands(socket_path, &[&cmd]).await
 }
 
 /// Send start (emulate mode) command.
 pub async fn send_start(
     socket_path: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    send_oneshot(socket_path, "{\"cmd\":\"emulate\",\"enabled\":true}\n").await
+    send_commands(socket_path, &["{\"cmd\":\"emulate\",\"enabled\":true}\n"]).await
 }
 
-/// Send stop command (speed 0, incline 0).
+/// Send stop command (speed 0, incline 0) atomically over a single connection.
 pub async fn send_stop(
     socket_path: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Set speed to 0 first, then incline
-    send_oneshot(socket_path, "{\"cmd\":\"speed\",\"value\":0.0}\n").await?;
-    send_oneshot(socket_path, "{\"cmd\":\"incline\",\"value\":0.0}\n").await
+    send_commands(socket_path, &[
+        "{\"cmd\":\"speed\",\"value\":0.0}\n",
+        "{\"cmd\":\"incline\",\"value\":0.0}\n",
+    ]).await
 }
 
-/// Open a short-lived connection, send one command line, then close.
-async fn send_oneshot(
+/// Open a short-lived connection, send one or more commands, then close.
+/// Batching multiple commands on a single connection avoids race windows
+/// where intermediate state could be observed between separate connections.
+async fn send_commands(
     socket_path: &str,
-    cmd: &str,
+    cmds: &[&str],
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut stream = UnixStream::connect(socket_path).await.map_err(|e| {
         error!("Failed to connect to treadmill_io at {}: {}", socket_path, e);
         e
     })?;
-    stream.write_all(cmd.as_bytes()).await?;
+    for cmd in cmds {
+        stream.write_all(cmd.as_bytes()).await?;
+    }
     stream.shutdown().await?;
     Ok(())
 }

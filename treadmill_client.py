@@ -185,7 +185,7 @@ class TreadmillClient:
                         try:
                             self.on_message(msg)
                         except Exception:
-                            pass
+                            log.exception("Error in on_message callback")
             except OSError:
                 break
 
@@ -197,7 +197,7 @@ class TreadmillClient:
                 try:
                     self.on_disconnect()
                 except Exception:
-                    pass
+                    log.exception("Error in on_disconnect callback")
             self._start_reconnect()
 
     def _start_reconnect(self):
@@ -222,7 +222,7 @@ class TreadmillClient:
                     try:
                         self.on_reconnect()
                     except Exception:
-                        pass
+                        log.exception("Error in on_reconnect callback")
                 return
             except (OSError, ConnectionError):
                 delay = min(delay * 2, 10.0)

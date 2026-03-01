@@ -44,15 +44,13 @@ pub async fn run(
     );
 
     // --- Advertisement ---
-    // FTMS spec Section 3.1: Service Data must include Flags (available) + Machine Type (treadmill)
-    let ftms_service_data: Vec<u8> = vec![
-        0x01, // Flags: bit 0 = Fitness Machine Available
-        0x01, // Fitness Machine Type: bit 0 = Treadmill Supported
-    ];
+    // Advertise just the service UUID and local name. Omit FTMS service data
+    // (Flags + Machine Type) — multiple Kinomap-compatible implementations
+    // (ESPHome, bleFTMS, ESP32_TTGO) only advertise the UUID without service data,
+    // and some apps may not parse the service data AD type correctly.
     let adv = Advertisement {
         advertisement_type: bluer::adv::Type::Peripheral,
         service_uuids: vec![FTMS_SERVICE_UUID].into_iter().collect(),
-        service_data: [(FTMS_SERVICE_UUID, ftms_service_data)].into_iter().collect(),
         local_name: Some("Precor 9.31".to_string()),
         discoverable: Some(true),
         ..Default::default()
@@ -60,9 +58,10 @@ pub async fn run(
     let _adv_handle = adapter.advertise(adv).await?;
     info!("Advertising as 'Precor 9.31' with FTMS service");
 
-    // --- Treadmill Data notify (1 Hz) ---
+    // --- Treadmill Data read + notify (1 Hz) ---
     // Uses the Fun callback model: when a client subscribes, we spawn a task that
     // pushes data at 1 Hz until the session is stopped.
+    let td_read_state = state.clone();
     let td_state = state.clone();
     let treadmill_data_notify_fn: Box<
         dyn Fn(bluer::gatt::local::CharacteristicNotifier) -> std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>
@@ -184,9 +183,26 @@ pub async fn run(
                     }),
                     ..Default::default()
                 },
-                // Treadmill Data (0x2ACD) -- Notify at 1 Hz
+                // Treadmill Data (0x2ACD) -- Read + Notify at 1 Hz
+                // Read returns current snapshot; notify pushes updates at 1 Hz.
+                // Some apps (Kinomap) read the characteristic before subscribing.
                 Characteristic {
                     uuid: TREADMILL_DATA_UUID,
+                    read: Some(CharacteristicRead {
+                        read: true,
+                        fun: Box::new({
+                            let state = td_read_state.clone();
+                            move |_req| {
+                                let state = state.clone();
+                                async move {
+                                    debug!("Treadmill Data characteristic read");
+                                    Ok(state.lock().await.encode_ftms_data())
+                                }
+                                .boxed()
+                            }
+                        }),
+                        ..Default::default()
+                    }),
                     notify: Some(CharacteristicNotify {
                         notify: true,
                         method: CharacteristicNotifyMethod::Fun(treadmill_data_notify_fn),
@@ -249,9 +265,11 @@ pub async fn run(
                     }),
                     ..Default::default()
                 },
-                // Fitness Machine Control Point (0x2AD9) -- Write + Indicate
+                // Fitness Machine Control Point (0x2AD9) -- Write + Indicate + Notify
                 // Uses IO mode so we can process writes in our event loop and send
                 // indication responses via the notify/indicate handle.
+                // Note: FTMS spec requires indicate, but many apps (Kinomap, etc.)
+                // only subscribe to notifications. We advertise both so either works.
                 Characteristic {
                     uuid: CONTROL_POINT_UUID,
                     write: Some(CharacteristicWrite {
@@ -260,6 +278,7 @@ pub async fn run(
                         ..Default::default()
                     }),
                     notify: Some(CharacteristicNotify {
+                        notify: true,
                         indicate: true,
                         method: CharacteristicNotifyMethod::Io,
                         ..Default::default()

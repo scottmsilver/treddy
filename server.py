@@ -1110,8 +1110,10 @@ async def _exec_fn(name, args):
 
     elif name == "resume_program":
         if sess.prog.paused:
+            # toggle_pause() fires on_change which restores belt speed via _hw_set_speed
             await sess.prog.toggle_pause()
             sess.resume()
+            await broadcast_status()
             return "Program resumed"
         return "No paused program"
 

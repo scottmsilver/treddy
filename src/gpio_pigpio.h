@@ -45,9 +45,9 @@ struct PigpioPort {
 
     int wave_create() { return gpioWaveCreate(); }
 
-    void wave_tx_send(int wid, int mode) {
-        gpioWaveTxSend(wid, mode == PORT_WAVE_MODE_ONE_SHOT
-                            ? PI_WAVE_MODE_ONE_SHOT : PI_WAVE_MODE_ONE_SHOT);
+    void wave_tx_send(int wid, [[maybe_unused]] int mode) {
+        // Only one-shot mode is used; the previous ternary had identical branches.
+        gpioWaveTxSend(wid, PI_WAVE_MODE_ONE_SHOT);
     }
 
     void wave_delete(int wid) { gpioWaveDelete(wid); }

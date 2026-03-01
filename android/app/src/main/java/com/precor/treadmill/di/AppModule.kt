@@ -6,7 +6,11 @@ import com.precor.treadmill.data.remote.TreadmillApi
 import com.precor.treadmill.data.remote.TreadmillWebSocket
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
 import com.precor.treadmill.ui.viewmodel.VoiceViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
@@ -64,13 +68,27 @@ val appModule = module {
 /**
  * Interceptor that replaces the placeholder base URL with the actual server URL
  * from DataStore preferences on each request.
+ *
+ * Uses a cached @Volatile field updated by a coroutine collector instead of
+ * runBlocking on every request, which would block OkHttp dispatcher threads.
  */
 private class DynamicBaseUrlInterceptor(
-    private val serverPreferences: ServerPreferences,
+    serverPreferences: ServerPreferences,
 ) : Interceptor {
+    @Volatile
+    private var cachedUrl: String = runBlocking { serverPreferences.serverUrl.first() }
+
+    init {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            serverPreferences.serverUrl.collect { url ->
+                cachedUrl = url
+            }
+        }
+    }
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val original = chain.request()
-        val serverUrl = runBlocking { serverPreferences.serverUrl.first() }
+        val serverUrl = cachedUrl
 
         if (serverUrl.isBlank()) {
             return chain.proceed(original)

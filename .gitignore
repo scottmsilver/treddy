@@ -57,9 +57,15 @@ static/three.module.js
 # Node modules
 node_modules/
 
+# Gradle build cache (Android)
+android/.gradle/
+
 # Vite build output (hashed filenames)
 static/assets/*.js
 static/assets/*.css
+
+# Worktree environment (per-worktree ports)
+worktree.env
 
 # Claude config (local)
 .claude/

@@ -162,7 +162,7 @@ export function useProgram() {
   const intervals = program?.intervals ?? [];
 
   // Static elevation paths — only recompute when the interval list changes
-  const { elevOutline, elevAreaPath, pts, tangents, totalDur, maxIncline } = useMemo(() => {
+  const { elevOutline, elevAreaPath, pts, tangents, totalDur, maxIncline, yAxisMax, intervalBoundaryXs } = useMemo(() => {
     const dur = totalDuration || intervals.reduce((s, iv) => s + iv.duration, 0);
 
     // Build data points: one point at each interval midpoint

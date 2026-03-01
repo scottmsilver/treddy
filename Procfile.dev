@@ -1,0 +1,3 @@
+caddy: caddy run --config Caddyfile.dev --adapter caddyfile
+server: python3 server.py
+vite: cd ui && npx vite --port $VITE_SERVER_PORT

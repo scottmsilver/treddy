@@ -243,13 +243,15 @@ pub async fn send_start(
     send_commands(socket_path, &["{\"cmd\":\"emulate\",\"enabled\":true}\n"]).await
 }
 
-/// Send stop command (speed 0, incline 0) atomically over a single connection.
+/// Send stop command: zero speed/incline and exit emulate mode so physical
+/// console buttons work again. All commands sent on a single connection.
 pub async fn send_stop(
     socket_path: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     send_commands(socket_path, &[
         "{\"cmd\":\"speed\",\"value\":0.0}\n",
         "{\"cmd\":\"incline\",\"value\":0.0}\n",
+        "{\"cmd\":\"emulate\",\"enabled\":false}\n",
     ]).await
 }
 

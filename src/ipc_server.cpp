@@ -43,7 +43,7 @@ bool IpcServer::create() {
         return false;
     }
 
-    chmod(SOCK_PATH, 0777);
+    chmod(SOCK_PATH, 0770);
 
     if (listen(server_fd_, MAX_CLIENTS) < 0) {
         std::perror("listen");

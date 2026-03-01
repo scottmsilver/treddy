@@ -556,6 +556,23 @@ async def _apply_stop():
     await broadcast_status()
 
 
+async def _apply_pause_toggle():
+    """Shared pause/resume toggle logic. Returns 'paused' or 'resumed'."""
+    await sess.prog.toggle_pause()
+    if sess.prog.paused:
+        sess.pause()
+        state["_paused_speed"] = state["emu_speed"]
+        state["emu_speed"] = 0
+        await _hw_set_speed(0)
+        await broadcast_status()
+        return "paused"
+    else:
+        # Resume: on_change callback restores belt speed
+        sess.resume()
+        await broadcast_status()
+        return "resumed"
+
+
 # --- REST endpoints ---
 
 
@@ -814,17 +831,7 @@ async def api_reset():
 
 @app.post("/api/program/pause")
 async def api_pause_program():
-    await sess.prog.toggle_pause()
-    if sess.prog.paused:
-        # Pause: stop the belt, remember speed for resume
-        sess.pause()
-        state["_paused_speed"] = state["emu_speed"]
-        state["emu_speed"] = 0
-        await _hw_set_speed(0)
-        await broadcast_status()
-    else:
-        # Resume: session timer resumes, speed restored by program engine's on_change
-        sess.resume()
+    await _apply_pause_toggle()
     return sess.prog.to_dict()
 
 
@@ -1093,28 +1100,14 @@ async def _exec_fn(name, args):
 
     elif name == "pause_program":
         if sess.prog.running:
-            await sess.prog.toggle_pause()
-            if sess.prog.paused:
-                # Same as api_pause_program: stop belt, pause session timer
-                sess.pause()
-                state["_paused_speed"] = state["emu_speed"]
-                state["emu_speed"] = 0
-                await _hw_set_speed(0)
-                await broadcast_status()
-                return "Program paused"
-            else:
-                # Resume: session timer resumes, speed restored by on_change
-                sess.resume()
-                return "Program resumed"
+            result = await _apply_pause_toggle()
+            return f"Program {result}"
         return "No program running"
 
     elif name == "resume_program":
         if sess.prog.paused:
-            # toggle_pause() fires on_change which restores belt speed via _hw_set_speed
-            await sess.prog.toggle_pause()
-            sess.resume()
-            await broadcast_status()
-            return "Program resumed"
+            result = await _apply_pause_toggle()
+            return f"Program {result}"
         return "No paused program"
 
     elif name == "skip_interval":

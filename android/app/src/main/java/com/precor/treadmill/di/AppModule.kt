@@ -17,11 +17,7 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import retrofit2.Retrofit
-import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 
 val appModule = module {
 
@@ -35,23 +31,11 @@ val appModule = module {
     }
 
     single {
-        // WARNING: This disables SSL certificate validation entirely.
-        // Reason: The Raspberry Pi server uses Tailscale-issued certs which are
-        // trusted by the system CA store, but users may connect via IP address
-        // or local hostname where the cert CN won't match.
-        // TODO: Replace with proper certificate pinning for production use.
-        // Risk: Vulnerable to MITM attacks on the local network.
-        val trustManager = object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        }
-        val sslContext = SSLContext.getInstance("TLS").apply {
-            init(null, arrayOf<TrustManager>(trustManager), null)
-        }
-
+        // Use the system default trust manager (validates certificate chains
+        // including Tailscale's CA) but relax hostname verification since
+        // users may connect via IP address or local hostname where the cert
+        // CN won't match.
         OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
             .addInterceptor(DynamicBaseUrlInterceptor(get()))
             .connectTimeout(10, TimeUnit.SECONDS)

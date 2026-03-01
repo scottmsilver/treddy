@@ -41,10 +41,11 @@ public:
         return { head_, count_ };
     }
 
-    // Access a message by ring index (caller must hold no lock; message
-    // content may be stale if ring wraps — acceptable for best-effort IPC)
-    std::string_view at(int idx) const {
-        return msgs_.at(idx % Size).data();
+    // Access a message by ring index. Returns a copy under the lock to
+    // prevent reading torn data if the producer wraps the ring concurrently.
+    std::string at(int idx) const {
+        std::lock_guard<std::mutex> lk(mu_);
+        return std::string(msgs_.at(idx % Size).data());
     }
 
     static constexpr int size() { return Size; }

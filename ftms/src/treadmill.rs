@@ -166,18 +166,23 @@ async fn connect_and_run(
                                     let prev_speed_mph = s.speed_tenths_mph as f64 / 10.0;
                                     *accumulated_distance_m += prev_speed_mph * dt_hours * 1609.34;
 
-                                    // Track elapsed time
+                                    // Track elapsed time — reset when belt stops
                                     if effective_speed > 0 {
                                         if workout_start.is_none() {
                                             *workout_start = Some(now);
                                         }
+                                    } else if workout_start.is_some() {
+                                        *workout_start = None;
+                                        *accumulated_distance_m = 0.0;
                                     }
 
                                     s.speed_tenths_mph = effective_speed;
                                     s.incline_half_pct = effective_incline;
                                     s.distance_meters = *accumulated_distance_m as u32;
                                     if let Some(start) = *workout_start {
-                                        s.elapsed_secs = now.duration_since(start).as_secs() as u16;
+                                        // Clamp to u16::MAX (18h12m) — FTMS spec uses uint16 for elapsed seconds
+                                        let secs = now.duration_since(start).as_secs().min(u16::MAX as u64);
+                                        s.elapsed_secs = secs as u16;
                                     }
 
                                     debug!(

@@ -91,12 +91,23 @@ const MAX_KV_LOG = 500;
 // updates are ignored for that field so they don't snap back to stale values.
 const DIRTY_GRACE_MS = 500;
 
+function shallowEqual<T extends Record<string, unknown>>(a: T, b: T): boolean {
+  const keysA = Object.keys(a);
+  if (keysA.length !== Object.keys(b).length) return false;
+  for (const k of keysA) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'WS_CONNECTED':
+      if (state.wsConnected) return state;
       return { ...state, wsConnected: true };
 
     case 'WS_DISCONNECTED':
+      if (!state.wsConnected) return state;
       return { ...state, wsConnected: false, hrmDevices: [] };
 
     case 'STATUS_UPDATE': {
@@ -104,63 +115,58 @@ function reducer(state: AppState, action: Action): AppState {
       const now = Date.now();
       const speedDirty = now - state._dirtySpeed < DIRTY_GRACE_MS;
       const inclineDirty = now - state._dirtyIncline < DIRTY_GRACE_MS;
-      return {
-        ...state,
-        status: {
-          proxy: m.proxy,
-          emulate: m.emulate,
-          emuSpeed: speedDirty ? state.status.emuSpeed : (m.emu_speed ?? state.status.emuSpeed),
-          emuIncline: inclineDirty ? state.status.emuIncline : (m.emu_incline ?? state.status.emuIncline),
-          speed: m.speed ?? state.status.speed,
-          incline: m.incline ?? state.status.incline,
-          motor: m.motor ?? state.status.motor,
-          treadmillConnected: m.treadmill_connected ?? state.status.treadmillConnected,
-          heartRate: m.heart_rate ?? state.status.heartRate,
-          hrmConnected: m.hrm_connected ?? state.status.hrmConnected,
-        },
+      const next: TreadmillStatus = {
+        proxy: m.proxy,
+        emulate: m.emulate,
+        emuSpeed: speedDirty ? state.status.emuSpeed : (m.emu_speed ?? state.status.emuSpeed),
+        emuIncline: inclineDirty ? state.status.emuIncline : (m.emu_incline ?? state.status.emuIncline),
+        speed: m.speed ?? state.status.speed,
+        incline: m.incline ?? state.status.incline,
+        motor: m.motor ?? state.status.motor,
+        treadmillConnected: m.treadmill_connected ?? state.status.treadmillConnected,
+        heartRate: m.heart_rate ?? state.status.heartRate,
+        hrmConnected: m.hrm_connected ?? state.status.hrmConnected,
       };
+      if (shallowEqual(next, state.status)) return state;
+      return { ...state, status: next };
     }
 
     case 'SESSION_UPDATE': {
       const m = action.payload;
-      return {
-        ...state,
-        session: {
-          active: m.active,
-          elapsed: m.elapsed || 0,
-          distance: m.distance || 0,
-          vertFeet: m.vert_feet || 0,
-          wallStartedAt: m.wall_started_at || '',
-          endReason: m.end_reason,
-        },
+      const next: SessionState = {
+        active: m.active,
+        elapsed: m.elapsed || 0,
+        distance: m.distance || 0,
+        vertFeet: m.vert_feet || 0,
+        wallStartedAt: m.wall_started_at || '',
+        endReason: m.end_reason,
       };
+      if (shallowEqual(next, state.session)) return state;
+      return { ...state, session: next };
     }
 
     case 'PROGRAM_UPDATE': {
       const m = action.payload;
-      return {
-        ...state,
-        program: {
-          program: m.program,
-          running: m.running,
-          paused: m.paused,
-          completed: m.completed,
-          currentInterval: m.current_interval,
-          intervalElapsed: m.interval_elapsed,
-          totalElapsed: m.total_elapsed,
-          totalDuration: m.total_duration,
-        },
+      const next: ProgramState = {
+        program: m.program,
+        running: m.running,
+        paused: m.paused,
+        completed: m.completed,
+        currentInterval: m.current_interval,
+        intervalElapsed: m.interval_elapsed,
+        totalElapsed: m.total_elapsed,
+        totalDuration: m.total_duration,
       };
+      if (shallowEqual(next, state.program)) return state;
+      return { ...state, program: next };
     }
 
     case 'CONNECTION_UPDATE': {
       const m = action.payload;
+      if (state.status.treadmillConnected === m.connected) return state;
       return {
         ...state,
-        status: {
-          ...state.status,
-          treadmillConnected: m.connected,
-        },
+        status: { ...state.status, treadmillConnected: m.connected },
       };
     }
 
@@ -188,13 +194,10 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'HR_UPDATE': {
       const m = action.payload;
+      if (state.status.heartRate === m.bpm && state.status.hrmConnected === m.connected) return state;
       return {
         ...state,
-        status: {
-          ...state.status,
-          heartRate: m.bpm,
-          hrmConnected: m.connected,
-        },
+        status: { ...state.status, heartRate: m.bpm, hrmConnected: m.connected },
       };
     }
 
@@ -268,7 +271,7 @@ export function registerEncouragement(fn: BounceMessageFn) { _bounceMessageFn = 
 export function TreadmillProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Use module-level toast function (set by App.tsx via registerToast)
   const showToast = useCallback((msg: string) => {

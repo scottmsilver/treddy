@@ -406,8 +406,13 @@ pub async fn run(
                                 handle_control_command(&cmd, &cp_socket).await
                             }
                             None => {
-                                warn!("Unknown control point opcode: 0x{:02x}", bytes[0]);
-                                (bytes[0], protocol::RESULT_NOT_SUPPORTED)
+                                if let Some(&op) = bytes.first() {
+                                    warn!("Unknown control point opcode: 0x{:02x}", op);
+                                    (op, protocol::RESULT_NOT_SUPPORTED)
+                                } else {
+                                    warn!("Empty control point write");
+                                    (0x00, protocol::RESULT_NOT_SUPPORTED)
+                                }
                             }
                         };
 

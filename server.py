@@ -992,10 +992,19 @@ def _parse_gpx_to_intervals(gpx_bytes):
 
 @app.post("/api/gpx/upload")
 async def api_gpx_upload(file: UploadFile = File(...)):
+    MAX_GPX_SIZE = 10_000_000  # 10MB
     try:
-        gpx_bytes = await file.read()
-        if len(gpx_bytes) > 10_000_000:  # 10MB limit
+        # Check Content-Length header first (fast reject), then enforce during read
+        if file.size and file.size > MAX_GPX_SIZE:
             return {"ok": False, "error": "GPX file too large (max 10MB)"}
+        chunks = []
+        total = 0
+        while chunk := await file.read(65536):
+            total += len(chunk)
+            if total > MAX_GPX_SIZE:
+                return {"ok": False, "error": "GPX file too large (max 10MB)"}
+            chunks.append(chunk)
+        gpx_bytes = b"".join(chunks)
         program = _parse_gpx_to_intervals(gpx_bytes)
         sess.prog.load(program)
         _add_to_history(program, f"GPX: {file.filename}")

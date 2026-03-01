@@ -35,28 +35,28 @@ void ModeStateMachine::exit_emulate_locked() {
 }
 
 TransitionResult ModeStateMachine::request_proxy(bool enabled) {
-    std::lock_guard<std::mutex> lk(mu_);
     TransitionResult result{};
 
-    if (enabled) {
-        if (mode_ == Mode::Emulating) {
-            exit_emulate_locked();
-            result.emulate_stopped = true;
-        }
-        mode_ = Mode::Proxy;
-        update_snap_locked();
-        result.changed = true;
-    } else {
-        if (mode_ == Mode::Proxy) {
-            mode_ = Mode::Idle;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        if (enabled) {
+            if (mode_ == Mode::Emulating) {
+                exit_emulate_locked();
+                result.emulate_stopped = true;
+            }
+            mode_ = Mode::Proxy;
             update_snap_locked();
             result.changed = true;
+        } else {
+            if (mode_ == Mode::Proxy) {
+                mode_ = Mode::Idle;
+                update_snap_locked();
+                result.changed = true;
+            }
         }
     }
 
-    // Fire callback outside the lock would be better, but the emulate
-    // thread lifecycle is managed by the controller, so we fire here
-    // and the callback must not re-enter mode_state.
+    // Fire callback outside the lock (matches other methods' pattern)
     if (result.emulate_stopped && emulate_cb_) {
         emulate_cb_(false);
     }

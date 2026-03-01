@@ -453,6 +453,39 @@ class TTSRequest(BaseModel):
     voice: str = "Kore"
 
 
+# --- Async wrappers for blocking treadmill_client calls ---
+# TreadmillClient uses synchronous socket.sendall() — these wrappers
+# prevent blocking the FastAPI event loop.
+
+
+async def _hw_set_speed(mph):
+    try:
+        await asyncio.to_thread(client.set_speed, mph)
+    except ConnectionError:
+        log.warning("Cannot set speed: treadmill_io disconnected")
+
+
+async def _hw_set_incline(val):
+    try:
+        await asyncio.to_thread(client.set_incline, val)
+    except ConnectionError:
+        log.warning("Cannot set incline: treadmill_io disconnected")
+
+
+async def _hw_set_emulate(enabled):
+    try:
+        await asyncio.to_thread(client.set_emulate, enabled)
+    except ConnectionError:
+        log.warning("Cannot set emulate: treadmill_io disconnected")
+
+
+async def _hw_set_proxy(enabled):
+    try:
+        await asyncio.to_thread(client.set_proxy, enabled)
+    except ConnectionError:
+        log.warning("Cannot set proxy: treadmill_io disconnected")
+
+
 # --- Shared control helpers ---
 
 
@@ -477,10 +510,7 @@ async def _apply_speed(mph):
     # Split manual program interval to record course
     if sess.prog.is_manual and sess.prog.running and mph > 0:
         await sess.prog.split_for_manual(mph, state["emu_incline"] / 2.0)
-    try:
-        client.set_speed(mph)
-    except ConnectionError:
-        log.warning("Cannot set speed: treadmill_io disconnected")
+    await _hw_set_speed(mph)
     await broadcast_status()
 
 
@@ -508,10 +538,7 @@ async def _apply_incline(inc):
     if sess.prog.is_manual and sess.prog.running:
         await sess.prog.split_for_manual(state["emu_speed"] / 10, clamped)
     # Send float percent to C++
-    try:
-        client.set_incline(clamped)
-    except ConnectionError:
-        log.warning("Cannot set incline: treadmill_io disconnected")
+    await _hw_set_incline(clamped)
     await broadcast_status()
 
 
@@ -524,11 +551,8 @@ async def _apply_stop():
     if sess.active:
         sess.end("user_stop")
         await manager.broadcast(sess.to_dict())
-    try:
-        client.set_speed(0)
-        client.set_incline(0)
-    except ConnectionError:
-        log.warning("Cannot send stop: treadmill_io disconnected")
+    await _hw_set_speed(0)
+    await _hw_set_incline(0)
     await broadcast_status()
 
 
@@ -647,16 +671,13 @@ async def set_incline(req: InclineRequest):
 async def set_emulate(req: EmulateRequest):
     if not state["treadmill_connected"]:
         return JSONResponse({"error": "treadmill_io disconnected"}, status_code=503)
-    try:
-        if req.enabled:
-            state["proxy"] = False
-            state["emulate"] = True
-            client.set_emulate(True)
-        else:
-            state["emulate"] = False
-            client.set_emulate(False)
-    except ConnectionError:
-        return JSONResponse({"error": "treadmill_io disconnected"}, status_code=503)
+    if req.enabled:
+        state["proxy"] = False
+        state["emulate"] = True
+        await _hw_set_emulate(True)
+    else:
+        state["emulate"] = False
+        await _hw_set_emulate(False)
     await broadcast_status()
     return build_status()
 
@@ -665,16 +686,13 @@ async def set_emulate(req: EmulateRequest):
 async def set_proxy(req: ProxyRequest):
     if not state["treadmill_connected"]:
         return JSONResponse({"error": "treadmill_io disconnected"}, status_code=503)
-    try:
-        if req.enabled:
-            state["emulate"] = False
-            state["proxy"] = True
-            client.set_proxy(True)
-        else:
-            state["proxy"] = False
-            client.set_proxy(False)
-    except ConnectionError:
-        return JSONResponse({"error": "treadmill_io disconnected"}, status_code=503)
+    if req.enabled:
+        state["emulate"] = False
+        state["proxy"] = True
+        await _hw_set_proxy(True)
+    else:
+        state["proxy"] = False
+        await _hw_set_proxy(False)
     await broadcast_status()
     return build_status()
 
@@ -787,11 +805,8 @@ async def api_reset():
     await sess.reset()
     state["emu_speed"] = 0
     state["emu_incline"] = 0
-    try:
-        client.set_speed(0)
-        client.set_incline(0)
-    except ConnectionError:
-        log.warning("Cannot send stop: treadmill_io disconnected")
+    await _hw_set_speed(0)
+    await _hw_set_incline(0)
     await manager.broadcast(sess.to_dict())
     await broadcast_status()
     return {"ok": True}
@@ -805,10 +820,7 @@ async def api_pause_program():
         sess.pause()
         state["_paused_speed"] = state["emu_speed"]
         state["emu_speed"] = 0
-        try:
-            client.set_speed(0)
-        except ConnectionError:
-            pass
+        await _hw_set_speed(0)
         await broadcast_status()
     else:
         # Resume: session timer resumes, speed restored by program engine's on_change
@@ -1005,11 +1017,8 @@ def _prog_on_change():
         clamped_inc = max(0.0, min(float(incline), MAX_SAFE_INCLINE))
         clamped_inc = round(clamped_inc * 2) / 2  # snap to 0.5 steps
         state["emu_incline"] = int(clamped_inc * 2)
-        try:
-            client.set_speed(speed)
-            client.set_incline(clamped_inc)
-        except ConnectionError:
-            log.warning("Cannot apply program change: treadmill_io disconnected")
+        await _hw_set_speed(speed)
+        await _hw_set_incline(clamped_inc)
         await broadcast_status()
 
     return on_change
@@ -1024,11 +1033,8 @@ def _prog_on_update():
         if prog_state.get("completed") and not prog_state.get("running"):
             state["emu_speed"] = 0
             state["emu_incline"] = 0
-            try:
-                client.set_speed(0)
-                client.set_incline(0)
-            except ConnectionError:
-                pass
+            await _hw_set_speed(0)
+            await _hw_set_incline(0)
             if sess.active:
                 sess.end("program_complete")
                 await manager.broadcast(sess.to_dict())
@@ -1084,10 +1090,7 @@ async def _exec_fn(name, args):
                 sess.pause()
                 state["_paused_speed"] = state["emu_speed"]
                 state["emu_speed"] = 0
-                try:
-                    client.set_speed(0)
-                except ConnectionError:
-                    pass
+                await _hw_set_speed(0)
                 await broadcast_status()
                 return "Program paused"
             else:

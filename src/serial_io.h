@@ -118,16 +118,22 @@ public:
     SerialWriter(Port& port, int gpio_pin)
         : port_(port), pin_(gpio_pin) {}
 
+    // Max bytes per write — KV commands are short (e.g. "[hmph:78]\xff").
+    // 50 bytes × 10 pulses/byte + 1 = 501 pulses.
+    static constexpr int MAX_WRITE_BYTES = 50;
+    static constexpr int MAX_PULSES = MAX_WRITE_BYTES * 10 + 1;
+
     // Write bytes using inverted RS-485 DMA waveforms.
     // Thread-safe: serialized by internal mutex.
     void write_bytes(std::span<const uint8_t> data) {
         if (data.empty()) return;
+        if (static_cast<int>(data.size()) > MAX_WRITE_BYTES) return;  // reject oversized writes
 
         int len = static_cast<int>(data.size());
         uint32_t mask = 1u << pin_;
 
-        // VLA for pulse array — hot path, no heap allocation
-        gpioPulse_t pulses[len * 10 + 1];
+        // Fixed-size pulse array — avoids VLA stack overflow risk
+        std::array<gpioPulse_t, MAX_PULSES> pulses{};
         int np = 0;
 
         for (int b = 0; b < len; b++) {
@@ -165,7 +171,7 @@ public:
         }
 
         port_.wave_clear();
-        port_.wave_add_generic(np, pulses);
+        port_.wave_add_generic(np, pulses.data());
         int wid = port_.wave_create();
         if (wid >= 0) {
             port_.wave_tx_send(wid, PORT_WAVE_MODE_ONE_SHOT);

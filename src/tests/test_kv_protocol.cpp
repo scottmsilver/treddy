@@ -223,3 +223,21 @@ TEST_CASE("encode/decode incline round-trip (half-pct)") {
         CHECK(decoded == hp);
     }
 }
+
+// ── Overflow / out-of-range tests ────────────────────────────────────
+
+TEST_CASE("decode_speed_hex: huge value returns -1") {
+    // FFFFFFFF = 4294967295 hundredths, way beyond any valid speed
+    CHECK(decode_speed_hex("FFFFFFFF") == -1);
+    CHECK(decode_speed_hex("FFFFFFFFFFFFFFFF") == -1);
+    // Just above max valid (12.0 mph = 1200 hundredths = 0x4B0)
+    // 0x10000 = 65536 hundredths = 655 mph — clearly invalid
+    CHECK(decode_speed_hex("10000") == -1);
+}
+
+TEST_CASE("decode_incline_hex: huge value returns -1") {
+    CHECK(decode_incline_hex("FFFFFFFF") == -1);
+    CHECK(decode_incline_hex("FFFFFFFFFFFFFFFF") == -1);
+    // 0x1000 = 4096 half-pct = 2048% — clearly invalid
+    CHECK(decode_incline_hex("1000") == -1);
+}

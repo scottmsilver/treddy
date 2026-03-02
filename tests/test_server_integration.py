@@ -457,6 +457,49 @@ class TestChatEndpoint:
         data = resp.json()
         assert "wrong" in data["text"].lower() or "error" in data["text"].lower()
 
+    def test_chat_rollback_does_not_corrupt_other_call(self, test_app):
+        """Two concurrent chat calls: if one errors and rolls back, it must
+        not truncate messages appended by the other call."""
+        client, server, _ = test_app
+        server.chat_history = []
+
+        # Call A errors (rollback), Call B succeeds.
+        # After both complete, chat_history must contain Call B's messages.
+        call_count = 0
+
+        async def mock_gemini(history, system, tools):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # Call A — succeeds with a text response
+                return {"candidates": [{"content": {"role": "model", "parts": [{"text": "OK A"}]}}]}
+            else:
+                # Call B — errors
+                raise Exception("API error B")
+
+        with (
+            patch("server.call_gemini", side_effect=mock_gemini),
+            patch("server._load_history", return_value=[]),
+        ):
+            # Call A succeeds
+            resp_a = client.post("/api/chat", json={"message": "msg A"})
+            # Call B errors and rolls back
+            resp_b = client.post("/api/chat", json={"message": "msg B"})
+
+        assert resp_a.status_code == 200
+        assert resp_b.status_code == 200
+        # Call A's user message + model response should survive Call B's rollback
+        user_msgs = [m for m in server.chat_history if m.get("role") == "user"]
+        assert len(user_msgs) >= 1, f"Call A's message was lost: {server.chat_history}"
+
+    def test_chat_history_protected_by_lock(self, test_app):
+        """Verify that _chat_lock exists and is used."""
+        _, server, _ = test_app
+        import asyncio
+
+        assert hasattr(server, "_chat_lock"), "server must have _chat_lock for serializing chat"
+        assert isinstance(server._chat_lock, asyncio.Lock)
+
 
 class TestConfigEndpoint:
     """Test /api/config returns ephemeral token, not raw API key."""

@@ -260,6 +260,7 @@ latest = {
 }
 
 chat_history: list = []
+_chat_lock = asyncio.Lock()  # serializes chat history mutations
 
 HISTORY_FILE = "program_history.json"
 MAX_HISTORY = 10
@@ -1239,8 +1240,9 @@ async def _run_chat_core(smartass=False):
 
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest):
-    chat_history.append({"role": "user", "parts": [{"text": req.message}]})
-    return await _run_chat_core(smartass=req.smartass)
+    async with _chat_lock:
+        chat_history.append({"role": "user", "parts": [{"text": req.message}]})
+        return await _run_chat_core(smartass=req.smartass)
 
 
 @app.post("/api/chat/voice")
@@ -1253,18 +1255,19 @@ async def api_chat_voice(req: VoiceChatRequest):
     except Exception as e:
         log.warning(f"Transcription failed (proceeding with audio): {e}")
 
-    # Step 2: Add audio as user message — Gemini natively understands speech
-    audio_parts = [{"inlineData": {"mimeType": req.mime_type, "data": req.audio}}]
-    chat_history.append({"role": "user", "parts": audio_parts})
+    async with _chat_lock:
+        # Step 2: Add audio as user message — Gemini natively understands speech
+        audio_parts = [{"inlineData": {"mimeType": req.mime_type, "data": req.audio}}]
+        chat_history.append({"role": "user", "parts": audio_parts})
 
-    result = await _run_chat_core(smartass=req.smartass)
+        result = await _run_chat_core(smartass=req.smartass)
 
-    # Replace the audio blob in history with transcribed text to save memory
-    replacement_text = transcription if transcription else "[voice message]"
-    for msg in chat_history:
-        if msg.get("parts") is audio_parts:
-            msg["parts"] = [{"text": replacement_text}]
-            break
+        # Replace the audio blob in history with transcribed text to save memory
+        replacement_text = transcription if transcription else "[voice message]"
+        for msg in chat_history:
+            if msg.get("parts") is audio_parts:
+                msg["parts"] = [{"text": replacement_text}]
+                break
 
     # Include transcription in the response
     if transcription:

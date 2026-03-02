@@ -46,12 +46,15 @@ fi
 TS_DOMAIN=$(sudo tailscale cert --help >/dev/null 2>&1 && tailscale status --json | python3 -c "import sys,json; print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))" 2>/dev/null || true)
 if [ -n "$TS_DOMAIN" ]; then
     echo "Generating TLS cert for $TS_DOMAIN..."
-    sudo tailscale cert "$TS_DOMAIN"
-    sudo cp "$HOME/$TS_DOMAIN.crt" ts-cert.pem
-    sudo cp "$HOME/$TS_DOMAIN.key" ts-key.pem
-    sudo chown "$(whoami):$(whoami)" ts-cert.pem ts-key.pem
-    ln -sf ts-cert.pem cert.pem
-    ln -sf ts-key.pem key.pem
+    if sudo tailscale cert "$TS_DOMAIN"; then
+        sudo cp "$HOME/$TS_DOMAIN.crt" ts-cert.pem
+        sudo cp "$HOME/$TS_DOMAIN.key" ts-key.pem
+        sudo chown "$(whoami):$(whoami)" ts-cert.pem ts-key.pem
+        ln -sf ts-cert.pem cert.pem
+        ln -sf ts-key.pem key.pem
+    else
+        echo "WARNING: TLS cert generation failed — server will run without HTTPS"
+    fi
 fi
 
 # Venv + deps

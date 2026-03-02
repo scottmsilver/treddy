@@ -947,6 +947,37 @@ class TestValidateInterval:
         validate_interval(iv, index=2)
         assert iv["name"] == "Interval 3"
 
+    def test_non_numeric_speed_raises(self):
+        from program_engine import validate_interval
+
+        iv = {"speed": None, "incline": 0, "duration": 60}
+        with pytest.raises(ValueError, match="non-numeric"):
+            validate_interval(iv)
+
+    def test_non_numeric_incline_raises(self):
+        from program_engine import validate_interval
+
+        iv = {"speed": 3.0, "incline": {"nested": True}, "duration": 60}
+        with pytest.raises(ValueError, match="non-numeric"):
+            validate_interval(iv)
+
+    def test_non_numeric_duration_raises(self):
+        from program_engine import validate_interval
+
+        iv = {"speed": 3.0, "incline": 0, "duration": "five minutes"}
+        with pytest.raises(ValueError, match="non-numeric"):
+            validate_interval(iv)
+
+    def test_string_numeric_values_coerced(self):
+        """Gemini sometimes returns numbers as strings — should be coerced, not crash."""
+        from program_engine import validate_interval
+
+        iv = {"speed": "3.5", "incline": "2", "duration": "60"}
+        validate_interval(iv)
+        assert iv["speed"] == 3.5
+        assert iv["incline"] == 2.0
+        assert iv["duration"] == 60
+
 
 class TestWallClockTiming:
     """Tests specific to the wall-clock timing fix (59:18 bug)."""

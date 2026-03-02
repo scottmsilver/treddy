@@ -109,13 +109,16 @@ def read_api_key():
 
 def validate_interval(iv, index=None):
     """Clamp speed/incline/duration to safe ranges and ensure required fields."""
+    label = f"Interval {index}" if index is not None else "Interval"
     for field in ("duration", "speed", "incline"):
         if field not in iv:
-            label = f"Interval {index}" if index is not None else "Interval"
             raise ValueError(f"{label} missing '{field}'")
-    iv["speed"] = round(max(MIN_SPEED, min(MAX_SPEED, float(iv["speed"]))), 1)
-    iv["incline"] = max(0, min(MAX_INCLINE, round(float(iv["incline"]) * 2) / 2))
-    iv["duration"] = max(MIN_DURATION, int(iv["duration"]))
+    try:
+        iv["speed"] = round(max(MIN_SPEED, min(MAX_SPEED, float(iv["speed"]))), 1)
+        iv["incline"] = max(0, min(MAX_INCLINE, round(float(iv["incline"]) * 2) / 2))
+        iv["duration"] = max(MIN_DURATION, int(iv["duration"]))
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"{label} has non-numeric value: {e}") from e
     if "name" not in iv:
         iv["name"] = f"Interval {index + 1}" if index is not None else "Added"
     return iv

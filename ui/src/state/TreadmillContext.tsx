@@ -287,11 +287,9 @@ export function TreadmillProvider({ children }: { children: React.ReactNode }) {
 
       ws.onopen = () => {
         dispatch({ type: 'WS_CONNECTED' });
-        // Fetch initial program state
+        // Fetch initial program state (always dispatch to clear stale data on reconnect)
         api.getProgram().then(d => {
-          if (d.program) {
-            dispatch({ type: 'PROGRAM_UPDATE', payload: d as ServerMessage & { type: 'program' } });
-          }
+          dispatch({ type: 'PROGRAM_UPDATE', payload: d as ServerMessage & { type: 'program' } });
         }).catch(() => {});
       };
 

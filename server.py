@@ -415,6 +415,7 @@ async def broadcast_loop():
         except asyncio.TimeoutError:
             pass
         except Exception:
+            log.exception("broadcast_loop error")
             await asyncio.sleep(0.1)
 
 

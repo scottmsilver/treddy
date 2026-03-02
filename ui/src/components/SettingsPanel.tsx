@@ -26,6 +26,9 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps): Re
   const [smartass, setSmartass] = useState(() => {
     try { return localStorage.getItem('smartass_mode') === 'true'; } catch { return false; }
   });
+  const [mountainView, setMountainView] = useState(() => {
+    try { return localStorage.getItem('mountain_view') === 'true'; } catch { return false; }
+  });
   const [hrmScanning, setHrmScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const debugTaps = useRef<number[]>([]);
@@ -145,6 +148,35 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps): Re
               background: '#fff',
               position: 'absolute', top: 2,
               left: smartass ? 20 : 2,
+              transition: 'left 200ms var(--ease)',
+            }} />
+          </div>
+        </div>
+
+        {/* Mountain View experiment */}
+        <div
+          onClick={() => {
+            const next = !mountainView;
+            setMountainView(next);
+            try { localStorage.setItem('mountain_view', String(next)); } catch {}
+            window.dispatchEvent(new Event('mountain_view_changed'));
+            haptic(25);
+            showToast(next ? 'Mountain view enabled' : 'Mountain view disabled');
+          }}
+          style={rowStyle}
+        >
+          <span style={{ fontSize: 15, color: 'var(--text)' }}>Mountain View</span>
+          <div style={{
+            width: 44, height: 26, borderRadius: 13,
+            background: mountainView ? 'var(--teal)' : 'var(--fill)',
+            position: 'relative', transition: 'background 200ms var(--ease)',
+            flexShrink: 0,
+          }}>
+            <div style={{
+              width: 22, height: 22, borderRadius: 11,
+              background: '#fff',
+              position: 'absolute', top: 2,
+              left: mountainView ? 20 : 2,
               transition: 'left 200ms var(--ease)',
             }} />
           </div>

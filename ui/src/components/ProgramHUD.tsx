@@ -4,12 +4,25 @@ import { useProgram } from '../state/useProgram';
 import { useTreadmillActions, showBounceMessage } from '../state/TreadmillContext';
 import { haptic } from '../utils/haptics';
 import ElevationProfile from './ElevationProfile';
+import MountainView from './MountainView';
 
 export default function ProgramHUD(): React.ReactElement | null {
   const pgm = useProgram();
   const actions = useTreadmillActions();
   const [overlayVisible, setOverlayVisible] = useState(false);
   const autoHideTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Mountain view experiment toggle (persisted in localStorage)
+  const [mountainView, setMountainView] = useState(() => {
+    try { return localStorage.getItem('mountain_view') === 'true'; } catch { return false; }
+  });
+  useEffect(() => {
+    const handler = () => {
+      try { setMountainView(localStorage.getItem('mountain_view') === 'true'); } catch {}
+    };
+    window.addEventListener('mountain_view_changed', handler);
+    return () => window.removeEventListener('mountain_view_changed', handler);
+  }, []);
 
   // Cleanup auto-hide timer on unmount
   useEffect(() => {
@@ -92,9 +105,12 @@ export default function ProgramHUD(): React.ReactElement | null {
           containerType: 'size',
         } as React.CSSProperties}
       >
-        {/* Elevation SVG fills the card */}
+        {/* Chart fills the card — elevation profile or mountain view */}
         <div style={{ padding: '6px 4px 2px', flex: 1, minHeight: 0 }}>
-          <ElevationProfile onSingleTap={handleSingleTap} />
+          {mountainView
+            ? <MountainView onSingleTap={handleSingleTap} />
+            : <ElevationProfile onSingleTap={handleSingleTap} />
+          }
         </div>
 
         {/* Position counter */}

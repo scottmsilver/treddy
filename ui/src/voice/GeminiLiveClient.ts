@@ -27,7 +27,7 @@ interface SetupMessage {
   setup: {
     model: string;
     system_instruction: { parts: { text: string }[] };
-    tools: { function_declarations: typeof TOOL_DECLARATIONS };
+    tools: { function_declarations: typeof TOOL_DECLARATIONS }[];
     generation_config: {
       speech_config: {
         voice_config: { prebuilt_voice_config: { voice_name: string } };
@@ -136,6 +136,12 @@ export class GeminiLiveClient {
 
   disconnect(): void {
     if (this.ws) {
+      // Detach handlers before close so the old socket's onclose/onerror
+      // can't call cleanup() and null out a new WebSocket created by connect()
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
       this.ws.close();
       this.cleanup();
     }

@@ -122,7 +122,10 @@ async def lifespan(application):
         def _handle_disconnect():
             state["treadmill_connected"] = False
             if sess.prog.running and not sess.prog.paused:
-                asyncio.ensure_future(sess.prog.toggle_pause())
+                task = asyncio.ensure_future(sess.prog.toggle_pause())
+                task.add_done_callback(
+                    lambda t: log.error(f"Auto-pause on disconnect failed: {t.exception()}") if t.exception() else None
+                )
             if sess.active:
                 sess.end("disconnect")
                 _enqueue(sess.to_dict())

@@ -5,23 +5,51 @@ import { fmtDur, paceDisplay } from '../utils/formatters';
 export function useSession() {
   const { session, status, program } = useTreadmillState();
 
-  // --- Local clock interpolation ---
-  // Server sends elapsed at 1Hz. We interpolate locally at ~10Hz
-  // so the timer counts smoothly without visible 1-second jumps.
+  // --- Pure client-side timer with gradual drift correction ---
+  // Instead of anchoring to server elapsed and interpolating forward (which causes
+  // visible bouncing when server updates arrive late), we maintain a local start time
+  // and count up independently. On each server update, we blend toward the server value
+  // using exponential smoothing — never snapping, always smooth.
+  const BLEND_FACTOR = 0.15;    // 15% correction per server update (~1Hz)
+  const SNAP_THRESHOLD = 2000;  // ms — snap if drift > 2s (unpause, initial state)
+
   const serverElapsed = session.elapsed;
-  const serverTimestamp = useRef(Date.now());
+  const timerStartRef = useRef(0);        // Date.now() base for local counting
+  const timerInitRef = useRef(false);
   const prevServerElapsed = useRef(serverElapsed);
   const [localElapsed, setLocalElapsed] = useState(serverElapsed);
-  const tickRef = useRef<ReturnType<typeof setInterval>>();
+  const tickRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
-  // When server sends a new elapsed value, update the anchor
+  // When server sends a new elapsed value, apply gradual drift correction
   useEffect(() => {
     if (serverElapsed !== prevServerElapsed.current) {
       prevServerElapsed.current = serverElapsed;
-      serverTimestamp.current = Date.now();
-      setLocalElapsed(serverElapsed);
+      const now = Date.now();
+      const targetStart = now - serverElapsed * 1000;
+
+      if (!timerInitRef.current) {
+        // First update — snap to server elapsed
+        timerStartRef.current = targetStart;
+        timerInitRef.current = true;
+      } else {
+        // Gradual drift correction via exponential blend
+        const drift = targetStart - timerStartRef.current;
+        if (Math.abs(drift) > SNAP_THRESHOLD) {
+          timerStartRef.current = targetStart;  // large drift — snap
+        } else {
+          timerStartRef.current += drift * BLEND_FACTOR;
+        }
+      }
     }
   }, [serverElapsed]);
+
+  // Reset when session becomes inactive
+  useEffect(() => {
+    if (!session.active) {
+      timerInitRef.current = false;
+      setLocalElapsed(serverElapsed);
+    }
+  }, [session.active, serverElapsed]);
 
   // Run local ticker when session is active and not paused
   useEffect(() => {
@@ -36,11 +64,9 @@ export function useSession() {
     }
 
     tickRef.current = setInterval(() => {
-      const delta = (Date.now() - serverTimestamp.current) / 1000;
-      const interpolated = prevServerElapsed.current + delta;
-      // Clamp: never go backwards, cap at server + 1.5s tolerance
-      const clamped = Math.max(prevServerElapsed.current, Math.min(interpolated, prevServerElapsed.current + 1.5));
-      setLocalElapsed(clamped);
+      if (timerInitRef.current) {
+        setLocalElapsed(Math.max(0, (Date.now() - timerStartRef.current) / 1000));
+      }
     }, 100);
 
     return () => {

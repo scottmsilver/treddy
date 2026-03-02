@@ -108,8 +108,7 @@ async def lifespan(application):
                 # Detect watchdog / auto-proxy killing emulate while session active
                 if was_emulating and not state["emulate"] and sess.active:
                     reason = "auto_proxy" if state["proxy"] else "watchdog"
-                    sess.end(reason)
-                    _enqueue(sess.to_dict())
+                    _handle_auto_proxy(reason)
                 _enqueue(build_status())
 
         loop.call_soon_threadsafe(_apply)
@@ -290,6 +289,9 @@ def _add_to_history(program, prompt=""):
         "program": program,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "total_duration": sum(iv["duration"] for iv in program.get("intervals", [])),
+        "completed": False,
+        "last_interval": 0,
+        "last_elapsed": 0,
     }
     # Deduplicate by name - replace if same name exists
     history = [h for h in history if h["program"].get("name") != program.get("name")]
@@ -297,6 +299,20 @@ def _add_to_history(program, prompt=""):
     history = history[:MAX_HISTORY]
     _save_history(history)
     return entry
+
+
+def _update_history_position(program_name, interval, elapsed, completed=False):
+    """Update the history entry for a program with its last position."""
+    history = _load_history()
+    for entry in history:
+        if entry["program"].get("name") == program_name:
+            entry["last_interval"] = interval
+            entry["last_elapsed"] = elapsed
+            entry["completed"] = completed
+            break
+    else:
+        return  # Not in history
+    _save_history(history)
 
 
 def _enqueue(msg):
@@ -316,6 +332,32 @@ def _enqueue(msg):
 def push_msg(msg):
     if loop and msg_queue:
         loop.call_soon_threadsafe(_enqueue, msg)
+
+
+def _handle_auto_proxy(reason="auto_proxy"):
+    """Handle emulate→proxy transition: pause program + session, send bounce message.
+
+    Called from on_message when C++ auto-switches from emulate to proxy
+    (hardware stop button) or when watchdog kills emulate mode.
+    Pauses instead of ending so the user can resume where they left off.
+    """
+    if not sess.active:
+        return
+    # Pause program if running (not already paused).
+    # Set paused directly + record pause_start (no async needed — we're in
+    # a synchronous callback and don't want to re-apply speed/incline since
+    # emulate is already off).
+    if sess.prog.running and not sess.prog.paused:
+        sess.prog.paused = True
+        sess.prog._pause_start = sess.prog._clock()
+    # Pause session timer (not end)
+    sess.pause()
+    # Send bounce message via program encouragement
+    msg = "Console took over — paused" if reason == "auto_proxy" else "Belt stopped — heartbeat lost"
+    sess.prog._pending_encouragement = msg
+    _enqueue(sess.prog.to_dict())
+    sess.prog.drain_encouragement()
+    log.info(f"Auto-paused session: {reason}")
 
 
 async def _session_tick_loop():
@@ -549,6 +591,13 @@ async def _apply_incline(inc):
 
 async def _apply_stop():
     """Core stop logic shared by REST endpoint and Gemini function calls."""
+    # Save position to history before stopping (for resume)
+    if sess.prog.running and sess.prog.program:
+        _update_history_position(
+            sess.prog.program.get("name", ""),
+            sess.prog.current_interval,
+            sess.prog.total_elapsed,
+        )
     if sess.prog.running:
         await sess.prog.stop()
     state["emu_speed"] = 0
@@ -901,6 +950,27 @@ async def api_load_from_history(entry_id: str):
     return {"ok": True, "program": entry["program"]}
 
 
+@app.post("/api/programs/history/{entry_id}/resume")
+async def api_resume_from_history(entry_id: str):
+    """Load a program from history and start from the saved position."""
+    history = _load_history()
+    entry = next((h for h in history if h["id"] == entry_id), None)
+    if not entry:
+        return {"ok": False, "error": "Not found"}
+    if entry.get("completed", False):
+        return {"ok": False, "error": "Program already completed — use load to start over"}
+    sess.prog.load(entry["program"])
+    resume_iv = entry.get("last_interval", 0)
+    resume_elapsed = entry.get("last_elapsed", 0)
+    await sess.start_program(
+        _prog_on_change(),
+        _prog_on_update(),
+        resume_interval=resume_iv,
+        resume_elapsed=resume_elapsed,
+    )
+    return {"ok": True, **sess.prog.to_dict()}
+
+
 # --- GPX upload ---
 
 
@@ -1052,6 +1122,15 @@ def _prog_on_update():
         await manager.broadcast(prog_state)
         # When program completes, stop the treadmill and end the session
         if prog_state.get("completed") and not prog_state.get("running"):
+            # Mark completed in history
+            prog = prog_state.get("program")
+            if prog:
+                _update_history_position(
+                    prog.get("name", ""),
+                    prog_state.get("current_interval", 0),
+                    prog_state.get("total_elapsed", 0),
+                    completed=True,
+                )
             state["emu_speed"] = 0
             state["emu_incline"] = 0
             await _hw_set_speed(0)

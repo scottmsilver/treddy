@@ -141,6 +141,9 @@ export interface HistoryEntry {
   program: Program;
   created_at: string;
   total_duration: number;
+  completed?: boolean;
+  last_interval?: number;
+  last_elapsed?: number;
 }
 
 // --- Chat ---

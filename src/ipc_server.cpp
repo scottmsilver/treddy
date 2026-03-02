@@ -43,7 +43,10 @@ bool IpcServer::create() {
         return false;
     }
 
-    chmod(SOCK_PATH, 0770);
+    // Unix socket — 0777 is safe here since permissions only gate connect()
+    // access, not file content. The daemon runs as root but clients (server.py,
+    // ftms-daemon) run as unprivileged users and need to connect.
+    chmod(SOCK_PATH, 0777);
 
     if (listen(server_fd_, MAX_CLIENTS) < 0) {
         std::perror("listen");

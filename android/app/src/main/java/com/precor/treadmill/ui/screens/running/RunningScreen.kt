@@ -2,7 +2,7 @@ package com.precor.treadmill.ui.screens.running
 
 import android.content.res.Configuration
 import androidx.compose.animation.*
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -228,27 +229,14 @@ fun RunningScreen(
 
             // Voice button (top-right, drawn after timer so it's on top)
             if (isActive || pgm.completed) {
-                IconButton(
+                VoiceMicButton(
+                    voiceState = voiceState,
                     onClick = {
                         haptic(context, if (voiceState == "idle") 20 else 10)
                         onVoiceToggle(null)
                     },
                     modifier = Modifier.align(Alignment.TopEnd),
-                ) {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = when (voiceState) {
-                            "listening" -> "Listening"
-                            "speaking" -> "Speaking"
-                            else -> "Voice"
-                        },
-                        tint = when (voiceState) {
-                            "listening" -> Color(0xFFC45C52)
-                            "speaking" -> Color(0xFF8B7FA0)
-                            else -> Color(0x59E8E4DF).copy(alpha = 0.7f)
-                        },
-                    )
-                }
+                )
             }
         }
 
@@ -315,7 +303,8 @@ fun RunningScreen(
                                 ) {
                                     Icon(Icons.Default.Home, "Home", tint = Color(0x59E8E4DF).copy(alpha = 0.7f))
                                 }
-                                IconButton(
+                                VoiceMicButton(
+                                    voiceState = voiceState,
                                     onClick = {
                                         haptic(context, if (voiceState == "idle") 20 else 10)
                                         onVoiceToggle(null)
@@ -333,17 +322,7 @@ fun RunningScreen(
                                             color = Color.White.copy(alpha = 0.25f),
                                             shape = RoundedCornerShape(12.dp),
                                         ),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Mic,
-                                        "Voice",
-                                        tint = when (voiceState) {
-                                            "listening" -> Color(0xFFC45C52)
-                                            "speaking" -> Color(0xFF8B7FA0)
-                                            else -> Color(0x59E8E4DF).copy(alpha = 0.7f)
-                                        },
-                                    )
-                                }
+                                )
                             }
                         }
                     }
@@ -399,23 +378,14 @@ private fun RunningScreenLandscape(
                     ) {
                         Icon(Icons.Default.Home, "Home", tint = Color(0x59E8E4DF).copy(alpha = 0.7f))
                     }
-                    IconButton(
+                    VoiceMicButton(
+                        voiceState = voiceState,
                         onClick = {
                             haptic(context, if (voiceState == "idle") 20 else 10)
                             onVoiceToggle(null)
                         },
                         modifier = Modifier.align(Alignment.TopEnd),
-                    ) {
-                        Icon(
-                            Icons.Default.Mic,
-                            "Voice",
-                            tint = when (voiceState) {
-                                "listening" -> Color(0xFFC45C52)
-                                "speaking" -> Color(0xFF8B7FA0)
-                                else -> Color(0x59E8E4DF).copy(alpha = 0.7f)
-                            },
-                        )
-                    }
+                    )
                 }
 
                 Column(
@@ -558,6 +528,59 @@ private fun RunningScreenLandscape(
                 }
             }
         }
+    }
+}
+
+/** Mic button with pulsing glow when listening/speaking. */
+@Composable
+private fun VoiceMicButton(
+    voiceState: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val active = voiceState == "listening" || voiceState == "speaking"
+    val isListening = voiceState == "listening"
+    val glowColor = when (voiceState) {
+        "listening" -> Color(0xFFC45C52)
+        "speaking" -> Color(0xFF8B7FA0)
+        else -> Color.Transparent
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "micGlow")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = if (isListening) 0.2f else 0.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (isListening) 1000 else 1600, easing = EaseInOut),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulseAlpha",
+    )
+
+    IconButton(
+        onClick = onClick,
+        modifier = modifier.drawBehind {
+            if (active) {
+                drawCircle(
+                    color = glowColor.copy(alpha = pulseAlpha),
+                    radius = size.minDimension * 0.7f,
+                )
+            }
+        },
+    ) {
+        Icon(
+            Icons.Default.Mic,
+            contentDescription = when (voiceState) {
+                "listening" -> "Listening"
+                "speaking" -> "Speaking"
+                else -> "Voice"
+            },
+            tint = when (voiceState) {
+                "listening" -> Color(0xFFC45C52)
+                "speaking" -> Color(0xFF8B7FA0)
+                else -> Color(0x59E8E4DF).copy(alpha = 0.7f)
+            },
+        )
     }
 }
 

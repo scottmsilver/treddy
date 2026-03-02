@@ -53,6 +53,8 @@ class VoiceViewModel(
     private var lastSpeed: Int = 0
     private var lastIncline: Double = 0.0
     private var currentStateContext = ""
+    /** True only when the user explicitly toggled voice on (not from state updates). */
+    private var userActivated = false
 
     private val functionBridge = FunctionBridge(api)
 
@@ -173,6 +175,7 @@ class VoiceViewModel(
                 }
                 ClientState.DISCONNECTED, ClientState.ERROR -> {
                     Log.d(TAG, "Background connection lost: $state")
+                    userActivated = false
                     if (_voiceState.value != VoiceState.IDLE) {
                         stopMicCapture()
                         player.flush()
@@ -193,11 +196,18 @@ class VoiceViewModel(
         }
 
         override fun onSpeakingEnd() {
-            _voiceState.value = VoiceState.LISTENING
-            // Start mic if not already running (deferred from text prompt)
-            if (audioCapture?.let { !isMicActive() } == true) {
-                Log.d(TAG, "Starting deferred mic capture after speaking")
-                startMicCapture()
+            if (userActivated) {
+                _voiceState.value = VoiceState.LISTENING
+                // Start mic if not already running (deferred from text prompt)
+                if (audioCapture?.let { !isMicActive() } == true) {
+                    Log.d(TAG, "Starting deferred mic capture after speaking")
+                    startMicCapture()
+                }
+            } else {
+                // Gemini spoke in response to a state update, not user voice.
+                // Return to IDLE — don't enable mic.
+                Log.d(TAG, "onSpeakingEnd: user not activated, returning to IDLE")
+                _voiceState.value = VoiceState.IDLE
             }
         }
 
@@ -281,6 +291,7 @@ class VoiceViewModel(
     fun toggle(prompt: String? = null) {
         when (_voiceState.value) {
             VoiceState.IDLE -> {
+                userActivated = true
                 if (geminiClient?.isConnected == true) {
                     // Hot path: connection ready, just start mic
                     if (prompt != null) {
@@ -300,11 +311,13 @@ class VoiceViewModel(
                 }
             }
             VoiceState.CONNECTING -> {
+                userActivated = false
                 stopMicCapture()
                 pendingPrompt = null
                 _voiceState.value = VoiceState.IDLE
             }
             VoiceState.LISTENING -> {
+                userActivated = false
                 stopMicCapture()
                 _voiceState.value = VoiceState.IDLE
             }

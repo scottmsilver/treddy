@@ -203,7 +203,7 @@ class ProgramState:
         self._pause_start = 0.0
         self._interval_start_elapsed = 0
 
-    async def start(self, on_change, on_update):
+    async def start(self, on_change, on_update, *, resume_interval=0, resume_elapsed=0):
         await self.stop()
         if not self.program:
             return
@@ -212,16 +212,22 @@ class ProgramState:
         self.running = True
         self.paused = False
         self.completed = False
-        self.current_interval = 0
-        self.interval_elapsed = 0
-        self.total_elapsed = 0
+        self.current_interval = resume_interval
+        self.total_elapsed = resume_elapsed
+        self.interval_elapsed = resume_elapsed - self._cumulative_at(resume_interval)
         self._encouragement_milestones = set()
         self._last_encouragement_interval = -3
         self._pending_encouragement = None
-        self._loop_start = self._clock()
+        self._loop_start = self._clock() - resume_elapsed
         self._pause_accumulated = 0.0
         self._pause_start = 0.0
-        self._interval_start_elapsed = 0
+        self._interval_start_elapsed = self._cumulative_at(resume_interval)
+        # Pre-mark milestones already passed
+        if self.total_duration > 0:
+            pct = (resume_elapsed / self.total_duration) * 100
+            for milestone in (25, 50, 75):
+                if pct >= milestone:
+                    self._encouragement_milestones.add(milestone)
         iv = self.current_iv
         if iv and self._on_change:
             await self._on_change(iv["speed"], iv["incline"])

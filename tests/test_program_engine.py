@@ -979,6 +979,120 @@ class TestValidateInterval:
         assert iv["duration"] == 60
 
 
+class TestResumeFromPosition:
+    """Tests for starting a program from a saved position (resume)."""
+
+    @pytest.mark.asyncio
+    async def test_start_from_resume_position(self):
+        """Start with resume_interval=1, resume_elapsed=60 should begin at interval 1."""
+        prog = ProgramState()
+        clock = FakeClock()
+        prog._clock = clock
+        prog.load(make_program())  # Warmup(60s), Run(120s), Cooldown(60s)
+        on_change = AsyncMock()
+        on_update = AsyncMock()
+        tick_count = 0
+
+        async def mock_sleep(d):
+            nonlocal tick_count
+            tick_count += 1
+            clock.advance(1)
+            if tick_count >= 3:
+                prog.running = False
+
+        with patch("asyncio.sleep", side_effect=mock_sleep):
+            await prog.start(on_change, on_update, resume_interval=1, resume_elapsed=60)
+            if prog._task:
+                try:
+                    await asyncio.wait_for(prog._task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
+
+        # Should have started at interval 1 with Run's speed/incline
+        assert on_change.call_args_list[0].args == (6.0, 3)
+        assert prog.current_interval == 1
+        # total_elapsed should be 60 + 3 ticks = 63
+        assert prog.total_elapsed == 63
+
+    @pytest.mark.asyncio
+    async def test_resume_skips_passed_milestones(self):
+        """Resuming at 60% should not re-fire 25% and 50% milestones."""
+        prog = ProgramState()
+        clock = FakeClock()
+        prog._clock = clock
+        # 100s total = easy milestone math
+        prog.load(
+            make_program(
+                [
+                    {"name": "A", "duration": 50, "speed": 3.0, "incline": 0},
+                    {"name": "B", "duration": 50, "speed": 5.0, "incline": 2},
+                ]
+            )
+        )
+        on_change = AsyncMock()
+        encouragements = []
+
+        async def on_update(state):
+            e = state.get("encouragement")
+            if e:
+                encouragements.append((state["total_elapsed"], e))
+
+        tick_count = 0
+
+        async def mock_sleep(d):
+            nonlocal tick_count
+            tick_count += 1
+            clock.advance(1)
+            if tick_count >= 20:
+                prog.running = False
+
+        with patch("asyncio.sleep", side_effect=mock_sleep):
+            await prog.start(on_change, on_update, resume_interval=1, resume_elapsed=60)
+            if prog._task:
+                try:
+                    await asyncio.wait_for(prog._task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
+
+        # 25% and 50% milestones should NOT fire (already passed)
+        assert 25 in prog._encouragement_milestones
+        assert 50 in prog._encouragement_milestones
+        # 75% should fire at elapsed=75 (we resume at 60, tick 15 more)
+        times = [t for t, _ in encouragements]
+        assert any(t >= 75 for t in times), f"75% milestone should fire, got: {times}"
+        # No early milestones
+        assert not any(t < 65 for t in times), f"No early milestones expected, got: {times}"
+
+    @pytest.mark.asyncio
+    async def test_resume_at_zero_is_normal_start(self):
+        """resume_interval=0, resume_elapsed=0 should behave like normal start."""
+        prog = ProgramState()
+        clock = FakeClock()
+        prog._clock = clock
+        prog.load(make_program())
+        on_change = AsyncMock()
+        on_update = AsyncMock()
+        tick_count = 0
+
+        async def mock_sleep(d):
+            nonlocal tick_count
+            tick_count += 1
+            clock.advance(1)
+            if tick_count >= 2:
+                prog.running = False
+
+        with patch("asyncio.sleep", side_effect=mock_sleep):
+            await prog.start(on_change, on_update, resume_interval=0, resume_elapsed=0)
+            if prog._task:
+                try:
+                    await asyncio.wait_for(prog._task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
+
+        assert on_change.call_args_list[0].args == (2.0, 0)  # Warmup
+        assert prog.current_interval == 0
+
+
 class TestWallClockTiming:
     """Tests specific to the wall-clock timing fix (59:18 bug)."""
 

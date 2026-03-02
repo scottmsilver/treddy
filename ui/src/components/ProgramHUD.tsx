@@ -10,7 +10,7 @@ export default function ProgramHUD(): React.ReactElement | null {
   const pgm = useProgram();
   const actions = useTreadmillActions();
   const [overlayVisible, setOverlayVisible] = useState(false);
-  const autoHideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const autoHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Mountain view experiment toggle (persisted in localStorage)
   const [mountainView, setMountainView] = useState(() => {

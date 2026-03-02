@@ -1,4 +1,4 @@
-import React from 'react';
+// React import not needed with React 19 JSX transform
 
 interface MotorCacheProps {
   motor: Record<string, string>;

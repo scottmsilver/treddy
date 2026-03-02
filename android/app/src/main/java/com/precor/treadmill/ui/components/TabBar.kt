@@ -1,5 +1,6 @@
 package com.precor.treadmill.ui.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,9 +13,11 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -58,20 +61,9 @@ fun TabBar(
             selected = isRunRoute,
             onClick = { onNavigate("running") },
         )
-        // Voice button with state-dependent color
-        TabItem(
-            icon = Icons.Default.Mic,
-            label = when (voiceState) {
-                "listening" -> "Listening"
-                "speaking" -> "Speaking"
-                else -> "Voice"
-            },
-            selected = voiceState != "idle",
-            tint = when (voiceState) {
-                "listening" -> Color(0xFFC45C52) // red
-                "speaking" -> Color(0xFF8B7FA0) // purple
-                else -> null
-            },
+        // Voice button with state-dependent color and glow
+        VoiceTabItem(
+            voiceState = voiceState,
             onClick = onVoiceToggle,
         )
         TabItem(
@@ -113,6 +105,78 @@ private fun TabItem(
         Spacer(Modifier.height(2.dp))
         Text(
             text = label,
+            color = color,
+            fontSize = 10.sp,
+        )
+    }
+}
+
+@Composable
+private fun VoiceTabItem(
+    voiceState: String,
+    onClick: () -> Unit,
+) {
+    val active = voiceState == "listening" || voiceState == "speaking"
+    val isListening = voiceState == "listening"
+    val glowColor = when (voiceState) {
+        "listening" -> Color(0xFFC45C52)
+        "speaking" -> Color(0xFF8B7FA0)
+        else -> Color.Transparent
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "tabMicGlow")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = if (isListening) 0.15f else 0.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (isListening) 1000 else 1600, easing = EaseInOut),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "tabPulseAlpha",
+    )
+
+    val color = when (voiceState) {
+        "listening" -> Color(0xFFC45C52)
+        "speaking" -> Color(0xFF8B7FA0)
+        else -> Color(0x59E8E4DF)
+    }
+
+    Column(
+        modifier = Modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(vertical = 4.dp, horizontal = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Mic,
+            contentDescription = when (voiceState) {
+                "listening" -> "Listening"
+                "speaking" -> "Speaking"
+                else -> "Voice"
+            },
+            tint = color,
+            modifier = Modifier
+                .size(24.dp)
+                .drawBehind {
+                    if (active) {
+                        drawCircle(
+                            color = glowColor.copy(alpha = pulseAlpha),
+                            radius = size.minDimension * 0.9f,
+                        )
+                    }
+                },
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = when (voiceState) {
+                "listening" -> "Listening"
+                "speaking" -> "Speaking"
+                else -> "Voice"
+            },
             color = color,
             fontSize = 10.sp,
         )

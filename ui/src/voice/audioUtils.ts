@@ -73,7 +73,7 @@ export class AudioPlayerQueue {
     const float32 = pcm16ToFloat32(pcmBytes);
 
     const buffer = ctx.createBuffer(1, float32.length, this.sampleRate);
-    buffer.copyToChannel(float32, 0);
+    buffer.copyToChannel(float32 as Float32Array<ArrayBuffer>, 0);
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;

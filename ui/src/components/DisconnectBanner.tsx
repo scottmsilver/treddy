@@ -14,7 +14,7 @@ export default function DisconnectBanner() {
   const { status } = useTreadmillState();
   const [showReconnect, setShowReconnect] = useState(false);
   const prevConnected = useRef(status.treadmillConnected);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (!prevConnected.current && status.treadmillConnected) {

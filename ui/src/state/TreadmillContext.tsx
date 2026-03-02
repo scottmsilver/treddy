@@ -316,9 +316,7 @@ export function TreadmillProvider({ children }: { children: React.ReactNode }) {
           case 'session':
             dispatch({ type: 'SESSION_UPDATE', payload: msg });
             if (!msg.active && msg.end_reason) {
-              if (msg.end_reason === 'watchdog') showToast('Belt stopped — heartbeat lost');
-              else if (msg.end_reason === 'auto_proxy') showToast('Belt stopped — console took over');
-              else if (msg.end_reason === 'disconnect') showToast('Belt stopped — treadmill disconnected');
+              if (msg.end_reason === 'disconnect') showToast('Belt stopped — treadmill disconnected');
             }
             break;
           case 'program':

@@ -66,6 +66,9 @@ interface TreadmillApi {
     @POST("/api/programs/history/{id}/load")
     suspend fun loadFromHistory(@Path("id") id: String): LoadHistoryResponse
 
+    @POST("/api/programs/history/{id}/resume")
+    suspend fun resumeFromHistory(@Path("id") id: String): ProgramMessage
+
     // --- GPX ---
 
     @Multipart

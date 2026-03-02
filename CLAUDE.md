@@ -36,6 +36,28 @@ python3 dual_monitor.py        # Primary TUI (curses, side-by-side panes)
 python3 listen.py              # Simple KV listener (--changes, --unique flags)
 ```
 
+## Local Development
+
+The local dev stack uses Caddy as a reverse proxy in front of Vite (HMR) and server.py. **Always browse via the Caddy URL** — never access Vite directly.
+
+```bash
+# First time (or per worktree): allocate unique ports
+scripts/setup-worktree.sh        # creates worktree.env with random free ports
+
+# Launch full dev stack (Caddy + server.py + Vite)
+./scripts/dev.sh                 # connects to real Pi
+TREADMILL_MOCK=1 ./scripts/dev.sh  # mock mode, no Pi needed
+
+# The Caddy entry-point URL is printed on startup — use that URL in the browser.
+# Ports are dynamic (from worktree.env). Do NOT hardcode port numbers.
+```
+
+**Key files:** `Caddyfile.dev` (routing rules), `scripts/dev.sh` (launcher), `scripts/worktree-env.sh` (port sourcing), `scripts/setup-worktree.sh` (port allocation).
+
+**Routing:** Caddy proxies `/api/*` and `/ws` to server.py, everything else to Vite. This mirrors the production setup where server.py serves both API and static files.
+
+**Verifying UI changes:** After editing web UI code, launch the dev stack and open the Caddy URL in a browser. Vite provides HMR so changes appear instantly. For production builds, run `cd ui && npx vite build` then `deploy/deploy.sh ui`.
+
 ## Dependencies
 
 - `pigpio` (system package, libpigpio) — linked by `treadmill_io` for GPIO access

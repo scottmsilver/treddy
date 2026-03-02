@@ -103,11 +103,11 @@ const ElevationProfile = memo(function ElevationProfile({ onSingleTap }: Elevati
   // Double-tap detection
   const lastTapTime = useRef(0);
   const lastTapSide = useRef<'left' | 'right' | null>(null);
-  const singleTapTimer = useRef<ReturnType<typeof setTimeout>>();
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Arrow indicator state
   const [arrow, setArrow] = useState<'left' | 'right' | null>(null);
-  const arrowTimer = useRef<ReturnType<typeof setTimeout>>();
+  const arrowTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const showArrow = useCallback((dir: 'left' | 'right') => {
     clearTimeout(arrowTimer.current);

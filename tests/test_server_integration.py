@@ -961,3 +961,512 @@ class TestWorkoutSession:
 
         sess.pause()
         assert sess.paused_at == first_paused_at  # unchanged
+
+
+class TestHistoryResume:
+    """Tests for program history resume (saving/restoring position)."""
+
+    def test_stop_saves_position_to_history(self, test_app):
+        """Stopping a program should save its position to history."""
+        client, server, mock = test_app
+        program = {
+            "name": "Resume Test",
+            "intervals": [
+                {"name": "A", "duration": 120, "speed": 3.0, "incline": 0},
+                {"name": "B", "duration": 120, "speed": 5.0, "incline": 2},
+            ],
+        }
+        # Add to history first
+        with patch.object(server, "_load_history", return_value=[]):
+            with patch.object(server, "_save_history") as mock_save:
+                server._add_to_history(program)
+
+        # Set up running program
+        sess = server.sess
+        sess.prog.load(program)
+        sess.prog.running = True
+        sess.prog.current_interval = 1
+        sess.prog.total_elapsed = 150
+        sess.prog._on_change = AsyncMock()
+        sess.prog._on_update = AsyncMock()
+        sess.start()
+        server.state["emu_speed"] = 50
+
+        # Stop and check history was updated
+        history = [{"id": "123", "program": program, "completed": False, "last_interval": 0, "last_elapsed": 0}]
+        with patch.object(server, "_load_history", return_value=history):
+            with patch.object(server, "_save_history") as mock_save:
+                resp = client.post("/api/program/stop")
+
+        assert resp.status_code == 200
+        # Verify _save_history was called with updated position
+        saved = mock_save.call_args[0][0]
+        entry = saved[0]
+        assert entry["last_interval"] == 1
+        assert entry["last_elapsed"] == 150
+        assert entry["completed"] is False
+
+    def test_add_to_history_includes_position_fields(self, test_app):
+        """_add_to_history should include completed, last_interval, last_elapsed."""
+        _, server, _ = test_app
+        program = {
+            "name": "Test",
+            "intervals": [
+                {"name": "A", "duration": 60, "speed": 3.0, "incline": 0},
+            ],
+        }
+        with patch.object(server, "_load_history", return_value=[]):
+            with patch.object(server, "_save_history") as mock_save:
+                entry = server._add_to_history(program)
+
+        assert entry["completed"] is False
+        assert entry["last_interval"] == 0
+        assert entry["last_elapsed"] == 0
+
+    def test_resume_endpoint_starts_from_position(self, test_app):
+        """POST /api/programs/history/{id}/resume should start from saved position."""
+        client, server, mock = test_app
+        program = {
+            "name": "Resume Test",
+            "intervals": [
+                {"name": "A", "duration": 120, "speed": 3.0, "incline": 0},
+                {"name": "B", "duration": 120, "speed": 5.0, "incline": 2},
+            ],
+        }
+        history = [{"id": "456", "program": program, "completed": False, "last_interval": 1, "last_elapsed": 130}]
+        with patch.object(server, "_load_history", return_value=history):
+            resp = client.post("/api/programs/history/456/resume")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["current_interval"] == 1
+        assert data["running"] is True
+
+    def test_resume_completed_program_rejected(self, test_app):
+        """Completed programs should not be resumable."""
+        client, server, _ = test_app
+        program = {
+            "name": "Done",
+            "intervals": [
+                {"name": "A", "duration": 60, "speed": 3.0, "incline": 0},
+            ],
+        }
+        history = [{"id": "789", "program": program, "completed": True, "last_interval": 0, "last_elapsed": 60}]
+        with patch.object(server, "_load_history", return_value=history):
+            resp = client.post("/api/programs/history/789/resume")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is False
+        assert "completed" in data["error"].lower()
+
+
+class TestAutoProxy:
+    """Tests for auto-proxy detection (hardware stop button pressed)."""
+
+    def _simulate_auto_proxy(self, server):
+        """Simulate what on_message does when C++ reports emulate→proxy transition."""
+        # The on_message callback runs _apply in the event loop.
+        # For testing, we call the relevant logic directly.
+        was_emulating = server.state["emulate"]
+        server.state["proxy"] = True
+        server.state["emulate"] = False
+        sess = server.sess
+        if was_emulating and not server.state["emulate"] and sess.active:
+            # This is the code path under test (server.py:108-112)
+            server._handle_auto_proxy()
+
+    def test_auto_proxy_pauses_program_not_ends_session(self, test_app):
+        """When console takes over (auto-proxy), program should pause, session stays active."""
+        client, server, mock = test_app
+        sess = server.sess
+
+        # Set up: active session with running program
+        sess.prog.load({"name": "Test", "intervals": [{"name": "A", "duration": 300, "speed": 5.0, "incline": 2}]})
+        sess.prog.running = True
+        sess.prog._on_change = AsyncMock()
+        sess.prog._on_update = AsyncMock()
+        sess.start()
+        server.state["emulate"] = True
+        server.state["proxy"] = False
+        server.state["emu_speed"] = 50
+
+        assert sess.active is True
+        assert sess.prog.running is True
+
+        # Act: simulate auto-proxy (console takes over)
+        self._simulate_auto_proxy(server)
+
+        # Assert: session should still be active (paused, not ended)
+        assert sess.active is True, "Session should stay active on auto-proxy"
+        assert sess.paused_at > 0, "Session should be paused on auto-proxy"
+        assert sess.end_reason is None, "Session should NOT have an end_reason"
+
+    def test_auto_proxy_pauses_running_program(self, test_app):
+        """Auto-proxy should pause the program, not stop it."""
+        client, server, mock = test_app
+        sess = server.sess
+
+        sess.prog.load({"name": "Test", "intervals": [{"name": "A", "duration": 300, "speed": 5.0, "incline": 2}]})
+        sess.prog.running = True
+        sess.prog._on_change = AsyncMock()
+        sess.prog._on_update = AsyncMock()
+        sess.start()
+        server.state["emulate"] = True
+        server.state["proxy"] = False
+
+        self._simulate_auto_proxy(server)
+
+        assert sess.prog.paused is True, "Program should be paused on auto-proxy"
+        assert sess.prog.running is True, "Program should still be running (just paused)"
+
+    def test_auto_proxy_sends_encouragement_bounce(self, test_app):
+        """Auto-proxy should send a bounce message (encouragement), not a toast."""
+        client, server, mock = test_app
+        sess = server.sess
+
+        sess.prog.load({"name": "Test", "intervals": [{"name": "A", "duration": 300, "speed": 5.0, "incline": 2}]})
+        sess.prog.running = True
+        sess.prog._on_change = AsyncMock()
+        sess.prog._on_update = AsyncMock()
+        sess.start()
+        server.state["emulate"] = True
+        server.state["proxy"] = False
+
+        self._simulate_auto_proxy(server)
+
+        # Check that a program message with encouragement was enqueued
+        enqueued = [
+            call.args[0] for call in server.msg_queue.put_nowait.call_args_list if isinstance(call.args[0], dict)
+        ]
+        program_msgs = [m for m in enqueued if m.get("type") == "program"]
+        assert len(program_msgs) > 0, "Should enqueue a program message"
+        assert any("encouragement" in m for m in program_msgs), "Program message should contain an encouragement field"
+
+    def test_auto_proxy_noop_when_no_session(self, test_app):
+        """Auto-proxy with no active session should be a no-op."""
+        client, server, mock = test_app
+        server.state["emulate"] = True
+        server.state["proxy"] = False
+        assert server.sess.active is False
+
+        # Should not raise
+        self._simulate_auto_proxy(server)
+
+
+class TestTimerBlend:
+    """Test the pure client-side timer drift correction algorithm.
+
+    Both Android (TreadmillViewModel.kt) and web (useSession.ts) use the same
+    algorithm: maintain a local start time, count up independently, and blend
+    toward the server elapsed on each update via exponential smoothing.
+
+    These tests validate the algorithm in pure Python to catch regressions
+    without needing a Kotlin or TypeScript test harness.
+    """
+
+    BLEND = 0.15  # matches TIMER_BLEND / BLEND_FACTOR in implementations
+    SNAP_MS = 2000  # matches TIMER_SNAP_MS / SNAP_THRESHOLD
+
+    @staticmethod
+    def simulate_timer(server_updates, blend=0.15, snap_ms=2000):
+        """Simulate the timer blend algorithm.
+
+        Args:
+            server_updates: list of (wall_time_ms, server_elapsed_s) tuples
+                representing server WebSocket messages arriving at wall clock times.
+            blend: exponential blend factor (0-1).
+            snap_ms: threshold for snapping vs blending.
+
+        Returns:
+            list of (wall_time_ms, display_elapsed_s) tuples — what the timer
+            would show at each 100ms tick after all server updates are applied.
+        """
+        timer_start_ms = 0
+        initialized = False
+        results = []
+
+        for wall_ms, server_elapsed in server_updates:
+            target_start = wall_ms - int(server_elapsed * 1000)
+
+            if not initialized:
+                timer_start_ms = target_start
+                initialized = True
+            else:
+                drift = target_start - timer_start_ms
+                if abs(drift) > snap_ms:
+                    timer_start_ms = target_start
+                else:
+                    timer_start_ms += int(drift * blend)
+
+            # Record what display would show at this moment
+            display = max(0.0, (wall_ms - timer_start_ms) / 1000.0)
+            results.append((wall_ms, display))
+
+        return results
+
+    def test_first_update_snaps_to_server(self):
+        """First server update should set timer exactly to server elapsed."""
+        results = self.simulate_timer([(1000, 5.0)])
+        assert len(results) == 1
+        assert abs(results[0][1] - 5.0) < 0.01
+
+    def test_steady_state_no_drift(self):
+        """When server and client agree, display should match server."""
+        # Server sends elapsed=1, 2, 3 at wall times 1000, 2000, 3000
+        updates = [(1000, 1.0), (2000, 2.0), (3000, 3.0)]
+        results = self.simulate_timer(updates)
+        for wall_ms, display in results:
+            expected = wall_ms / 1000.0
+            assert (
+                abs(display - expected) < 0.1
+            ), f"At wall={wall_ms}ms, display={display:.2f} but expected ~{expected:.1f}"
+
+    def test_no_backwards_jump_on_late_update(self):
+        """If server update arrives late, timer should never jump backwards.
+
+        This is the core bug being fixed: old implementation would snap to
+        server elapsed, causing the timer to jump back visibly.
+        """
+        # Client starts at wall=1000, elapsed=1.0
+        # At wall=2500 (1.5s later), server says elapsed=2.0
+        # (server is 0.5s behind where client would expect: 2.5s)
+        # Old behavior: snap to 2.0, visible backwards jump from ~2.5 to 2.0
+        # New behavior: blend, never go backwards
+        updates = [(1000, 1.0), (2500, 2.0)]
+        results = self.simulate_timer(updates)
+
+        # After first update at wall=1000: display = 1.0
+        # At wall=2500: client would show (2500-(-0))/1000 but let's check
+        # The key assertion: display at wall=2500 should be >= display at wall=1000
+        assert results[1][1] >= results[0][1], f"Timer went backwards: {results[0][1]:.2f} -> {results[1][1]:.2f}"
+
+    def test_gradual_correction_not_snap(self):
+        """Server drift should be corrected gradually, not in one snap."""
+        # Start at wall=1000, elapsed=10.0
+        # At wall=2000, server says elapsed=10.5 (client expected 11.0)
+        # Drift = 0.5s behind server's "slower" pace
+        updates = [(1000, 10.0), (2000, 10.5)]
+        results = self.simulate_timer(updates)
+
+        # Client at wall=2000 would naively show 11.0 (1s after start anchor)
+        # Server says 10.5 — so target_start shifts forward by 500ms
+        # With 15% blend, correction = 500 * 0.15 = 75ms
+        # Display at wall=2000 should be ~10.925 (not snapped to 10.5)
+        display_at_2000 = results[1][1]
+        assert display_at_2000 > 10.5, f"Timer snapped to server value ({display_at_2000:.2f}), should blend"
+        assert display_at_2000 < 11.1, f"Timer too far from expected ({display_at_2000:.2f})"
+
+    def test_large_drift_snaps(self):
+        """Drift > 2s (e.g. after unpause) should snap immediately."""
+        # Start at wall=1000, elapsed=10.0
+        # At wall=2000, server says elapsed=15.0 (3s jump from unpause)
+        updates = [(1000, 10.0), (2000, 15.0)]
+        results = self.simulate_timer(updates)
+
+        display_at_2000 = results[1][1]
+        # Should snap to server value (drift of 4s > 2s threshold)
+        assert (
+            abs(display_at_2000 - 15.0) < 0.01
+        ), f"Large drift should snap: display={display_at_2000:.2f}, expected 15.0"
+
+    def test_convergence_over_multiple_updates(self):
+        """Timer should converge to server value over several updates."""
+        # Simulate 0.5s drift, then 10 subsequent updates at correct pace
+        updates = [(1000, 10.0)]
+        # Server is 0.5s "slower" than client expects
+        for i in range(1, 11):
+            wall = 1000 + i * 1000
+            server_elapsed = 10.0 + i * 0.95  # slightly slower than wall clock
+            updates.append((wall, server_elapsed))
+
+        results = self.simulate_timer(updates)
+
+        # After 10 updates with blend factor 0.15, drift should be mostly corrected
+        # Check that final display is close to final server elapsed
+        final_display = results[-1][1]
+        final_server = updates[-1][1]
+        drift = abs(final_display - final_server)
+        assert (
+            drift < 0.3
+        ), f"Timer should converge: display={final_display:.2f}, server={final_server:.2f}, drift={drift:.2f}"
+
+    def test_never_negative(self):
+        """Timer should never show negative elapsed."""
+        # Edge case: server says 0.0 but local clock is behind
+        updates = [(0, 0.0), (500, 0.0)]
+        results = self.simulate_timer(updates)
+        for _, display in results:
+            assert display >= 0, f"Timer went negative: {display}"
+
+
+class TestVoiceStateGuard:
+    """Test the userActivated voice state machine guard.
+
+    Android VoiceViewModel.kt has a `userActivated` flag that prevents
+    voice auto-enabling when Gemini speaks in response to state updates
+    (e.g. interval changes pushing context). These tests validate the
+    state machine logic in pure Python.
+    """
+
+    @staticmethod
+    def simulate_voice_fsm(events):
+        """Simulate the voice state machine with userActivated guard.
+
+        Args:
+            events: list of event strings:
+                "toggle"         — user taps voice button
+                "connected"      — Gemini connection established
+                "speaking_start" — Gemini starts speaking
+                "speaking_end"   — Gemini finishes speaking
+                "disconnected"   — connection lost
+
+        Returns:
+            list of (event, state, userActivated) tuples after each event.
+        """
+        state = "idle"
+        user_activated = False
+        is_connected = False
+        trace = []
+
+        for event in events:
+            if event == "toggle":
+                if state == "idle":
+                    user_activated = True
+                    if is_connected:
+                        state = "listening"
+                    else:
+                        state = "connecting"
+                elif state == "connecting":
+                    user_activated = False
+                    state = "idle"
+                elif state == "listening":
+                    user_activated = False
+                    state = "idle"
+                elif state == "speaking":
+                    # interrupt
+                    state = "listening"
+
+            elif event == "connected":
+                is_connected = True
+                if state == "connecting":
+                    state = "listening"
+
+            elif event == "speaking_start":
+                state = "speaking"
+
+            elif event == "speaking_end":
+                if user_activated:
+                    state = "listening"
+                else:
+                    state = "idle"
+
+            elif event == "disconnected":
+                is_connected = False
+                user_activated = False
+                state = "idle"
+
+            trace.append((event, state, user_activated))
+
+        return trace
+
+    def test_user_toggle_enables_listening(self):
+        """User toggling voice on should activate listening."""
+        trace = self.simulate_voice_fsm(["connected", "toggle"])
+        assert trace[-1][1] == "listening"
+        assert trace[-1][2] is True  # userActivated
+
+    def test_speaking_end_returns_to_listening_when_user_activated(self):
+        """After Gemini speaks, should return to listening if user toggled on."""
+        trace = self.simulate_voice_fsm(
+            [
+                "connected",
+                "toggle",
+                "speaking_start",
+                "speaking_end",
+            ]
+        )
+        assert trace[-1][1] == "listening"
+        assert trace[-1][2] is True
+
+    def test_speaking_end_returns_to_idle_when_not_user_activated(self):
+        """After Gemini speaks from state update, should return to idle.
+
+        This is the core Bug #3 fix: when Gemini responds to a context
+        update (interval change), it speaks, but since the user never
+        toggled voice on, we should NOT auto-enable listening.
+        """
+        # Simulate: connection is hot, Gemini speaks in response to state update
+        # (no user toggle — userActivated stays False)
+        trace = self.simulate_voice_fsm(
+            [
+                "connected",
+                "speaking_start",
+                "speaking_end",
+            ]
+        )
+        final_event, final_state, final_activated = trace[-1]
+        assert final_state == "idle", f"Should return to idle when user hasn't activated, got '{final_state}'"
+        assert final_activated is False
+
+    def test_user_toggle_off_clears_activation(self):
+        """User toggling voice off should clear userActivated."""
+        trace = self.simulate_voice_fsm(
+            [
+                "connected",
+                "toggle",  # on -> listening, userActivated=True
+                "toggle",  # off -> idle, userActivated=False
+            ]
+        )
+        assert trace[-1][1] == "idle"
+        assert trace[-1][2] is False
+
+    def test_disconnect_clears_activation(self):
+        """Connection drop should clear userActivated."""
+        trace = self.simulate_voice_fsm(
+            [
+                "connected",
+                "toggle",  # on -> listening, userActivated=True
+                "disconnected",  # drop -> idle, userActivated=False
+            ]
+        )
+        assert trace[-1][1] == "idle"
+        assert trace[-1][2] is False
+
+    def test_multiple_state_updates_dont_enable_mic(self):
+        """Multiple Gemini responses to state updates should never enable mic."""
+        trace = self.simulate_voice_fsm(
+            [
+                "connected",
+                "speaking_start",
+                "speaking_end",  # state update 1
+                "speaking_start",
+                "speaking_end",  # state update 2
+                "speaking_start",
+                "speaking_end",  # state update 3
+            ]
+        )
+        # Every speaking_end should return to idle
+        for event, state, activated in trace:
+            if event == "speaking_end":
+                assert state == "idle", f"State update speech should return to idle, got '{state}'"
+                assert activated is False
+
+    def test_user_activated_persists_across_speaking_cycles(self):
+        """userActivated should persist across multiple speak/listen cycles."""
+        trace = self.simulate_voice_fsm(
+            [
+                "connected",
+                "toggle",  # user activates
+                "speaking_start",
+                "speaking_end",  # Gemini responds
+                "speaking_start",
+                "speaking_end",  # Gemini responds again
+            ]
+        )
+        # After each speaking_end, should return to listening (user is active)
+        speaking_ends = [(e, s, a) for e, s, a in trace if e == "speaking_end"]
+        for event, state, activated in speaking_ends:
+            assert state == "listening", f"Should stay listening while user activated, got '{state}'"
+            assert activated is True

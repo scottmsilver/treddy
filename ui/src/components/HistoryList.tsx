@@ -32,6 +32,20 @@ export default function HistoryList({ variant, onAfterLoad, onVoice }: HistoryLi
     }
   }, [showToast, onAfterLoad]);
 
+  const handleResume = useCallback(async (id: string) => {
+    try {
+      const res = await api.resumeFromHistory(id);
+      if (res?.ok) {
+        haptic(25);
+        onAfterLoad?.();
+      } else {
+        showToast(res?.error || 'Failed to resume');
+      }
+    } catch (_e) {
+      showToast('Failed to resume program');
+    }
+  }, [showToast, onAfterLoad]);
+
   const handleCustomWorkout = useCallback(async () => {
     if (!onVoice) return;
     haptic(20);
@@ -77,7 +91,7 @@ export default function HistoryList({ variant, onAfterLoad, onVoice }: HistoryLi
           </div>
         )}
         {history.map(h => (
-          <HistoryCard key={h.id} entry={h} variant="lobby" onLoad={handleLoad} />
+          <HistoryCard key={h.id} entry={h} variant="lobby" onLoad={handleLoad} onResume={handleResume} />
         ))}
       </div>
     );
@@ -102,7 +116,7 @@ export default function HistoryList({ variant, onAfterLoad, onVoice }: HistoryLi
         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
       }}>
         {history.map(h => (
-          <HistoryCard key={h.id} entry={h} variant="compact" onLoad={handleLoad} />
+          <HistoryCard key={h.id} entry={h} variant="compact" onLoad={handleLoad} onResume={handleResume} />
         ))}
       </div>
     </div>

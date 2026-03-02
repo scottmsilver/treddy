@@ -23,7 +23,7 @@ export function useMotivation(enabled: boolean): string {
   const [msg, setMsg] = useState(() =>
     fallbacks[Math.floor(Math.random() * fallbacks.length)]
   );
-  const timer = useRef<ReturnType<typeof setInterval>>();
+  const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     if (!enabled) return;

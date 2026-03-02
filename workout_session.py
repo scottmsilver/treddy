@@ -53,10 +53,10 @@ class WorkoutSession:
         self.end_reason = None
         log.info("Session started")
 
-    async def start_program(self, on_change, on_update):
+    async def start_program(self, on_change, on_update, *, resume_interval=0, resume_elapsed=0):
         """Start loaded program within a session. Ensures session active."""
         self.start()
-        await self.prog.start(on_change, on_update)
+        await self.prog.start(on_change, on_update, resume_interval=resume_interval, resume_elapsed=resume_elapsed)
 
     async def ensure_manual(self, speed=3.0, incline=0, duration_minutes=60, *, on_change, on_update):
         """Auto-create manual program if none running, start it."""

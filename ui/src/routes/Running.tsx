@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'wouter';
 import { useSession } from '../state/useSession';
@@ -39,7 +39,7 @@ export default function Running(): React.ReactElement {
 
   // --- Bounce encouragement state ---
   const [encouragement, setEncouragement] = useState<string | null>(null);
-  const encouragementTimer = useRef<ReturnType<typeof setTimeout>>();
+  const encouragementTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Register bounce message callback so anyone can push messages to the timer area
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function Running(): React.ReactElement {
   // finish tapping speed/incline without the layout shifting under them.
   // Each speed/incline change restarts the settle timer.
   const [visualActive, setVisualActive] = React.useState(false);
-  const settleTimer = React.useRef<ReturnType<typeof setTimeout>>();
+  const settleTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const physicalActive = sess.active || pgm.running;
 
   React.useEffect(() => {

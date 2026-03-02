@@ -102,6 +102,10 @@ export async function loadFromHistory(id: string): Promise<{ ok: boolean; progra
   return post(`/api/programs/history/${id}/load`, {});
 }
 
+export async function resumeFromHistory(id: string): Promise<{ ok: boolean; error?: string }> {
+  return post(`/api/programs/history/${id}/resume`, {});
+}
+
 // --- GPX ---
 
 export async function uploadGpx(file: File): Promise<{ ok: boolean; program?: unknown; error?: string }> {

@@ -129,6 +129,8 @@ private const val ELEV_PAD = 10f
 private const val MAX_KV_LOG = 500
 private const val DIRTY_GRACE_MS = 500L
 private const val TAG = "TreadmillVM"
+private const val TIMER_BLEND = 0.15       // 15% correction per server update (~1Hz)
+private const val TIMER_SNAP_MS = 2000L    // snap if drift > 2s (unpause, initial state)
 
 class TreadmillViewModel(
     private val api: TreadmillApi,
@@ -174,9 +176,13 @@ class TreadmillViewModel(
         }
     }
 
-    // --- Local clock interpolation ---
-    private var lastServerElapsed = 0.0
-    private var lastServerTimestamp = SystemClock.elapsedRealtime()
+    // --- Pure client-side timer with gradual drift correction ---
+    // Instead of anchoring to server elapsed and interpolating forward (which causes
+    // visible bouncing when server updates arrive late), we maintain a local start time
+    // and count up independently. On each server update, we blend toward the server value
+    // using exponential smoothing — never snapping, always smooth.
+    private var timerStartMs = 0L       // SystemClock.elapsedRealtime() base
+    private var timerInitialized = false
 
     // --- Dirty guard timestamps ---
     private var dirtySpeed = 0L
@@ -217,12 +223,9 @@ class TreadmillViewModel(
     ) { sess, stat, pgm, now ->
         val speedMph = if (stat.emulate) stat.emuSpeed / 10.0 else (stat.speed ?: 0.0)
 
-        // Interpolate elapsed locally between server updates
-        val displayElapsed = if (sess.active && !pgm.paused) {
-            val delta = (now - lastServerTimestamp) / 1000.0
-            val interpolated = lastServerElapsed + delta
-            // Clamp: never go backwards, cap at server + 1.5s tolerance
-            max(lastServerElapsed, min(interpolated, lastServerElapsed + 1.5))
+        // Pure client-side timer: count from local start, never snap
+        val displayElapsed = if (sess.active && !pgm.paused && timerInitialized) {
+            max(0.0, (now - timerStartMs) / 1000.0)
         } else {
             sess.elapsed
         }
@@ -320,9 +323,25 @@ class TreadmillViewModel(
     }
 
     private fun handleSessionUpdate(msg: SessionMessage) {
-        // Update local clock anchor for interpolation
-        lastServerElapsed = msg.elapsed
-        lastServerTimestamp = SystemClock.elapsedRealtime()
+        val now = SystemClock.elapsedRealtime()
+        if (msg.active) {
+            val targetStartMs = now - (msg.elapsed * 1000).toLong()
+            if (!timerInitialized) {
+                // First update — snap to server elapsed
+                timerStartMs = targetStartMs
+                timerInitialized = true
+            } else {
+                // Gradual drift correction via exponential blend
+                val drift = targetStartMs - timerStartMs
+                if (abs(drift) > TIMER_SNAP_MS) {
+                    timerStartMs = targetStartMs  // large drift (unpause, etc.) — snap
+                } else {
+                    timerStartMs += (drift * TIMER_BLEND).toLong()
+                }
+            }
+        } else {
+            timerInitialized = false
+        }
 
         _session.update {
             SessionState(
@@ -336,8 +355,6 @@ class TreadmillViewModel(
         }
         if (!msg.active && msg.endReason != null) {
             val toastMsg = when (msg.endReason) {
-                "watchdog" -> "Belt stopped — heartbeat lost"
-                "auto_proxy" -> "Belt stopped — console took over"
                 "disconnect" -> "Belt stopped — treadmill disconnected"
                 else -> null
             }

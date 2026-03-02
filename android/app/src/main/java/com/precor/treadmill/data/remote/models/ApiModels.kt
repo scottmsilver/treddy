@@ -128,6 +128,9 @@ data class HistoryEntry(
     val program: Program,
     @SerialName("created_at") val createdAt: String,
     @SerialName("total_duration") val totalDuration: Double,
+    val completed: Boolean = false,
+    @SerialName("last_interval") val lastInterval: Int = 0,
+    @SerialName("last_elapsed") val lastElapsed: Int = 0,
 )
 
 @Serializable

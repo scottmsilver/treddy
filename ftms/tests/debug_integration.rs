@@ -171,8 +171,8 @@ async fn test_02_read_feature_characteristic() {
     let hex = lines[0].trim_start_matches("feat ");
     assert_eq!(hex.len(), 16, "Feature should be 8 bytes = 16 hex chars");
 
-    // Machine features: 0x0000200C, Target features: 0x00000003
-    assert_eq!(hex, "0c20000003000000");
+    // Machine features: 0x0000100C, Target features: 0x00000003
+    assert_eq!(hex, "0c10000003000000");
     println!("Feature: {}", hex);
 }
 
@@ -391,8 +391,8 @@ async fn test_09_treadmill_data_encoding() {
     // Verify flags
     let flags = u16::from_le_bytes([bytes[0], bytes[1]]);
     assert_eq!(
-        flags, 0x008C,
-        "Flags should be 0x008C (speed + distance + incline + elapsed)"
+        flags, 0x040C,
+        "Flags should be 0x040C (speed + distance + incline + elapsed)"
     );
 
     // Verify structure is parseable
@@ -631,7 +631,7 @@ async fn test_25_malformed_hex_inputs() {
     // Daemon should still work
     let lines = client.send_cmd("feat").await;
     assert_eq!(lines.len(), 1, "feat should still work");
-    assert!(lines[0].contains("0c20000003000000"), "feat data should be correct");
+    assert!(lines[0].contains("0c10000003000000"), "feat data should be correct");
     println!("Daemon survived malformed hex inputs");
 }
 

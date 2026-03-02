@@ -45,6 +45,15 @@ fun HistoryList(
         }
     }
 
+    val handleResume: (String) -> Unit = { id ->
+        scope.launch {
+            runCatching {
+                api.resumeFromHistory(id)
+                onAfterLoad()
+            }
+        }
+    }
+
     if (variant == "lobby") {
         Column(
             modifier = modifier.padding(horizontal = 16.dp),
@@ -55,6 +64,7 @@ fun HistoryList(
                     entry = entry,
                     variant = "lobby",
                     onLoad = handleLoad,
+                    onResume = handleResume,
                 )
             }
         }
@@ -86,6 +96,7 @@ fun HistoryList(
                         entry = entry,
                         variant = "compact",
                         onLoad = handleLoad,
+                        onResume = handleResume,
                     )
                 }
             }
@@ -98,11 +109,15 @@ private fun HistoryCard(
     entry: HistoryEntry,
     variant: String,
     onLoad: (String) -> Unit,
+    onResume: (String) -> Unit = {},
 ) {
     val colors = LocalPrecorColors.current
     val name = entry.program.name.ifBlank { "Workout" }
     val intervals = entry.program.intervals.size
     val duration = fmtDur(entry.totalDuration.toInt())
+    val canResume = !entry.completed && entry.lastElapsed > 0
+    val resumeLabel = if (canResume) "Resume from ${fmtDur(entry.lastElapsed)}" else null
+    val displayName = if (entry.completed) "$name \u2713" else name
 
     if (variant == "lobby") {
         Row(
@@ -119,7 +134,7 @@ private fun HistoryCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = name,
+                    text = displayName,
                     color = colors.text,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -133,6 +148,21 @@ private fun HistoryCard(
                     fontSize = 12.sp,
                 )
             }
+            if (canResume) {
+                Text(
+                    text = resumeLabel ?: "",
+                    color = colors.green,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clickable { onResume(entry.id) }
+                        .background(
+                            color = colors.green.copy(alpha = 0.12f),
+                            shape = MaterialTheme.shapes.small,
+                        )
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
         }
     } else {
         Column(
@@ -142,11 +172,11 @@ private fun HistoryCard(
                     color = colors.card,
                     shape = MaterialTheme.shapes.medium,
                 )
-                .clickable { onLoad(entry.id) }
+                .clickable { if (canResume) onResume(entry.id) else onLoad(entry.id) }
                 .padding(12.dp),
         ) {
             Text(
-                text = name,
+                text = displayName,
                 color = colors.text,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -155,8 +185,8 @@ private fun HistoryCard(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "$duration \u00B7 $intervals intervals",
-                color = colors.text3,
+                text = if (canResume) resumeLabel ?: "" else "$duration \u00B7 $intervals intervals",
+                color = if (canResume) colors.green else colors.text3,
                 fontSize = 11.sp,
             )
         }

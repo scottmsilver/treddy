@@ -252,11 +252,7 @@ fun AppNavigation(
                 .statusBarsPadding(),
         )
 
-        // Voice overlay
-        VoiceOverlay(
-            voiceState = voiceState,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+        // Voice overlay removed — mic icon glow on RunningScreen serves as indicator
     }
 
     // Settings bottom sheet

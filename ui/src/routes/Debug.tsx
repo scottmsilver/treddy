@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTreadmillState } from '../state/TreadmillContext';
 import MotorCache from '../components/debug/MotorCache';
 import KVStream from '../components/debug/KVStream';

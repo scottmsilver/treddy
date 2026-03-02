@@ -305,7 +305,12 @@ export function TreadmillProvider({ children }: { children: React.ReactNode }) {
       };
 
       ws.onmessage = (evt) => {
-        const msg: ServerMessage = JSON.parse(evt.data);
+        let msg: ServerMessage;
+        try {
+          msg = JSON.parse(evt.data);
+        } catch {
+          return;
+        }
         switch (msg.type) {
           case 'status':
             dispatch({ type: 'STATUS_UPDATE', payload: msg });

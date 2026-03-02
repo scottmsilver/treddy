@@ -45,7 +45,10 @@ public:
     // prevent reading torn data if the producer wraps the ring concurrently.
     std::string at(int idx) const {
         std::lock_guard<std::mutex> lk(mu_);
-        return std::string(msgs_.at(idx % Size).data());
+        // Safe modulo: C++ % can be negative for negative dividends
+        int mod = idx % Size;
+        if (mod < 0) mod += Size;
+        return std::string(msgs_.at(mod).data());
     }
 
     static constexpr int size() { return Size; }

@@ -65,6 +65,19 @@ TEST_CASE("message truncation") {
     CHECK(msg.size() <= 7);
 }
 
+TEST_CASE("negative index wraps safely") {
+    RingBuffer<4, 64> ring;
+    ring.push("a\n");
+    ring.push("b\n");
+    ring.push("c\n");
+    ring.push("d\n");
+
+    // Negative indices should wrap around safely (not crash)
+    CHECK(ring.at(-1) == ring.at(3));  // -1 % 4 → 3
+    CHECK(ring.at(-4) == ring.at(0));  // -4 % 4 → 0
+    CHECK(ring.at(-5) == ring.at(3));  // -5 % 4 → 3
+}
+
 TEST_CASE("concurrent push and snapshot") {
     RingBuffer<> ring;
     constexpr int N = 1000;

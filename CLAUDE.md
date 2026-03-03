@@ -326,3 +326,4 @@ All C++ code in `src/` must follow these rules. The environment is resource-cons
 - **Progressive disclosure.** Essential info (speed, time, current interval) is prominent. Settings, history, and debug are tucked away but accessible.
 - **Mobile/tablet first.** Touch targets 44px+, no hover-dependent interactions, responsive layout, haptic feedback.
 - **Dual-platform requirement.** All UI changes must be made in BOTH the web UI (`ui/`) and Android app (`android/`) unless explicitly told otherwise.
+- **No external CDN dependencies.** The app runs on a treadmill that may not have internet. All assets (fonts, scripts, styles) must be self-hosted. Never load from Google Fonts, cdnjs, unpkg, or any external CDN. Fonts live in `ui/public/fonts/` (copied to `static/fonts/` on build).

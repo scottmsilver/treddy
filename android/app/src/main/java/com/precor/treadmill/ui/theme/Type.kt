@@ -20,23 +20,28 @@ val QuicksandFamily = FontFamily(
     Font(R.font.quicksand_bold, FontWeight.Bold),
 )
 
-// Recursive — variable font with CASL (casual) and MONO axes
-// Matches the web UI's font-variation-settings: "CASL" 0.5
+// Inter — clean modern sans-serif for timer/numeric displays
+// Variable font with weight axis; matches web UI's .font-timer class
 val TimerFontFamily = FontFamily(
     Font(
-        R.font.recursive_semibold,
+        R.font.inter_variable,
         weight = FontWeight.SemiBold,
         variationSettings = FontVariation.Settings(
-            FontVariation.Setting("CASL", 0.5f),
-            FontVariation.Setting("MONO", 1f),
+            FontVariation.Setting("wght", 600f),
         ),
     ),
     Font(
-        R.font.recursive_regular,
+        R.font.inter_variable,
+        weight = FontWeight.Medium,
+        variationSettings = FontVariation.Settings(
+            FontVariation.Setting("wght", 500f),
+        ),
+    ),
+    Font(
+        R.font.inter_variable,
         weight = FontWeight.Normal,
         variationSettings = FontVariation.Settings(
-            FontVariation.Setting("CASL", 0.5f),
-            FontVariation.Setting("MONO", 1f),
+            FontVariation.Setting("wght", 400f),
         ),
     ),
 )

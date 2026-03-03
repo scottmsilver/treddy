@@ -32,10 +32,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.precor.treadmill.ui.components.HistoryList
 import com.precor.treadmill.ui.theme.TimerFontFamily
 import com.precor.treadmill.ui.util.fmtDur
+import com.precor.treadmill.ui.util.timerText
 import com.precor.treadmill.ui.util.haptic
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
 import kotlinx.coroutines.delay
@@ -156,8 +158,9 @@ fun RunningScreen(
                                 text = msg,
                                 color = Color(0xFF6BC89B),
                                 fontSize = 28.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Medium,
                                 fontFamily = TimerFontFamily,
+                                letterSpacing = (-0.03).em,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -165,13 +168,13 @@ fun RunningScreen(
                             )
                         } else {
                             Text(
-                                text = sess.elapsedDisplay,
+                                text = timerText(sess.elapsedDisplay),
                                 color = Color(0xFFE8E4DF),
                                 fontSize = 96.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 fontFamily = TimerFontFamily,
                                 lineHeight = 96.sp,
-                                letterSpacing = (-0.02).sp,
+                                letterSpacing = (-0.03).em,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier
                                     .clickable(
@@ -190,10 +193,11 @@ fun RunningScreen(
                 // Manual remaining time
                 if (isManual && pgm.running) {
                     Text(
-                        text = "${fmtDur(pgm.totalRemaining.toInt())} remaining of ${fmtDur(pgm.totalDuration.toInt())}",
+                        text = timerText("${fmtDur(pgm.totalRemaining.toInt())} remaining of ${fmtDur(pgm.totalDuration.toInt())}"),
                         color = Color(0x59E8E4DF),
                         fontSize = 12.sp,
                         fontFamily = TimerFontFamily,
+                        letterSpacing = (-0.03).em,
                     )
                 }
 
@@ -415,8 +419,9 @@ private fun RunningScreenLandscape(
                                     text = msg,
                                     color = Color(0xFF6BC89B),
                                     fontSize = 24.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontWeight = FontWeight.Medium,
                                     fontFamily = TimerFontFamily,
+                                    letterSpacing = (-0.03).em,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -424,12 +429,13 @@ private fun RunningScreenLandscape(
                                 )
                             } else {
                                 Text(
-                                    text = sess.elapsedDisplay,
+                                    text = timerText(sess.elapsedDisplay),
                                     color = Color(0xFFE8E4DF),
                                     fontSize = 72.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     fontFamily = TimerFontFamily,
                                     lineHeight = 72.sp,
+                                    letterSpacing = (-0.03).em,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.clickable(
                                         enabled = isManual && pgm.running,

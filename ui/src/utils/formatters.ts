@@ -1,3 +1,17 @@
+import { createElement, Fragment, type ReactNode } from 'react';
+
+/** Wrap colons in <span class="colon"> for vertical centering in .font-timer */
+export function timerJsx(text: string): ReactNode {
+  const parts = text.split(':');
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    createElement(Fragment, { key: i },
+      i > 0 && createElement('span', { className: 'colon' }, ':'),
+      part,
+    )
+  );
+}
+
 export function fmtDur(secs: number | null | undefined): string {
   if (secs == null || secs < 0) secs = 0;
   secs = Math.floor(secs);

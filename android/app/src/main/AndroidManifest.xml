@@ -8,6 +8,7 @@
     <application
         android:name=".TreadmillApp"
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:label="Precor Treadmill"
         android:supportsRtl="true"

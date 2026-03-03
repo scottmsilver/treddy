@@ -1,6 +1,14 @@
 @import './tokens.css';
 @import './responsive.css';
 
+/* Self-hosted fonts — no external CDN, works offline */
+@font-face { font-family: 'Inter'; src: url('/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Quicksand'; src: url('/fonts/quicksand_light.woff2') format('woff2'); font-weight: 300; font-display: swap; }
+@font-face { font-family: 'Quicksand'; src: url('/fonts/quicksand_regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Quicksand'; src: url('/fonts/quicksand_medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Quicksand'; src: url('/fonts/quicksand_semibold.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Quicksand'; src: url('/fonts/quicksand_bold.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
@@ -84,8 +92,9 @@ body::after {
 .pulse-value { animation: valuePulse 500ms var(--ease) forwards; }
 .pulse-btn { animation: btnGlow 500ms var(--ease) forwards; }
 
-/* Monospace timer font — Recursive with half-casual axis */
-.font-timer { font-family: 'Recursive', monospace; font-variation-settings: "CASL" 0.5; }
+/* Timer font — Inter with tabular nums and tightened kerning */
+.font-timer { font-family: 'Inter', sans-serif; font-feature-settings: "tnum" 1; letter-spacing: -0.03em; }
+.font-timer .colon { display: inline-block; transform: translateY(-0.08em); }
 
 /* Floating Home/Voice icons when idle */
 .idle-icon { position: absolute; top: 6px; z-index: 2; }

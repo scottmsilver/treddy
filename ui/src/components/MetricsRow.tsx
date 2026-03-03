@@ -1,6 +1,7 @@
 import type React from 'react';
 import { motion } from 'motion/react';
 import { useSession } from '../state/useSession';
+import { timerJsx } from '../utils/formatters';
 import HeartRate from './HeartRate';
 
 export default function MetricsRow(): React.ReactElement {
@@ -18,7 +19,7 @@ export default function MetricsRow(): React.ReactElement {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span className="metric-value" style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--teal)' }}>{sess.pace}</span>
+        <span className="metric-value font-timer" style={{ fontSize: 15, fontWeight: 600, color: 'var(--teal)' }}>{timerJsx(sess.pace)}</span>
         <span className="metric-label" style={{ fontSize: 10, color: 'var(--text3)' }}>min/mi</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>

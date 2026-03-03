@@ -6,7 +6,7 @@ import { useProgram } from '../state/useProgram';
 import { useTreadmillState, registerBounceMessage } from '../state/TreadmillContext';
 import { useVoiceContext } from '../state/VoiceContext';
 import * as api from '../state/api';
-import { fmtDur } from '../utils/formatters';
+import { fmtDur, timerJsx } from '../utils/formatters';
 import { haptic } from '../utils/haptics';
 import MetricsRow from '../components/MetricsRow';
 import ProgramHUD from '../components/ProgramHUD';
@@ -204,7 +204,7 @@ export default function Running(): React.ReactElement {
                       WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    {sess.elapsedDisplay}
+                    {timerJsx(sess.elapsedDisplay)}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -216,7 +216,7 @@ export default function Running(): React.ReactElement {
           <div className="font-timer" style={{
             fontSize: 12, color: 'var(--text3)', marginTop: 2,
           }}>
-            {fmtDur(pgm.totalRemaining)} remaining of {fmtDur(pgm.totalDuration)}
+            {timerJsx(fmtDur(pgm.totalRemaining))} remaining of {timerJsx(fmtDur(pgm.totalDuration))}
           </div>
         )}
 

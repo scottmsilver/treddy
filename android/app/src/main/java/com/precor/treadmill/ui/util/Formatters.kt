@@ -1,10 +1,28 @@
 package com.precor.treadmill.ui.util
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.withStyle
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.round
+
+/** Raise colons for vertical centering in timer displays. */
+fun timerText(text: String): AnnotatedString = buildAnnotatedString {
+    for (ch in text) {
+        if (ch == ':') {
+            withStyle(SpanStyle(baselineShift = BaselineShift(0.15f))) {
+                append(':')
+            }
+        } else {
+            append(ch)
+        }
+    }
+}
 
 /** Format seconds as m:ss or h:mm:ss. */
 fun fmtDur(secs: Number?): String {

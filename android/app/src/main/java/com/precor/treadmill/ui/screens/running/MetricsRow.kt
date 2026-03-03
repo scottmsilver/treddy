@@ -31,6 +31,7 @@ private fun hrColor(bpm: Int): Color = when {
 @Composable
 fun MetricsRow(
     viewModel: TreadmillViewModel,
+    scale: Float = 1f,
     modifier: Modifier = Modifier,
 ) {
     val sess by viewModel.derivedSession.collectAsState()
@@ -51,33 +52,36 @@ fun MetricsRow(
         ) {
             // Heart rate (only when HRM connected)
             if (status.hrmConnected) {
-                HeartRateMetric(bpm = status.heartRate)
-                Spacer(Modifier.width(20.dp))
+                HeartRateMetric(bpm = status.heartRate, scale = scale)
+                Spacer(Modifier.width((20 * scale).dp))
             }
             MetricItem(
                 value = sess.pace,
                 label = "min/mi",
                 color = Color(0xFF6B8F8B), // teal
                 fontFamily = TimerFontFamily,
+                scale = scale,
             )
-            Spacer(Modifier.width(20.dp))
+            Spacer(Modifier.width((20 * scale).dp))
             MetricItem(
                 value = sess.distDisplay,
                 label = "miles",
                 color = Color(0xFFE8E4DF), // text
+                scale = scale,
             )
-            Spacer(Modifier.width(20.dp))
+            Spacer(Modifier.width((20 * scale).dp))
             MetricItem(
                 value = sess.vertDisplay,
                 label = "vert ft",
                 color = Color(0xFFA69882), // orange
+                scale = scale,
             )
         }
     }
 }
 
 @Composable
-private fun HeartRateMetric(bpm: Int) {
+private fun HeartRateMetric(bpm: Int, scale: Float = 1f) {
     val color = hrColor(bpm)
     val pulseDurationMs = if (bpm > 0) max(400, (60_000 / bpm)) else 1000
 
@@ -107,19 +111,19 @@ private fun HeartRateMetric(bpm: Int) {
         Text(
             text = "\u2665",
             color = color,
-            fontSize = 14.sp,
+            fontSize = (14 * scale).sp,
             modifier = Modifier.scale(pulseScale),
         )
         Text(
             text = if (bpm > 0) bpm.toString() else "---",
             color = color,
-            fontSize = 15.sp,
+            fontSize = (15 * scale).sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = "bpm",
             color = Color(0x59E8E4DF), // text3
-            fontSize = 10.sp,
+            fontSize = (10 * scale).sp,
         )
     }
 }
@@ -131,6 +135,7 @@ private fun MetricItem(
     color: Color,
     modifier: Modifier = Modifier,
     fontFamily: FontFamily? = null,
+    scale: Float = 1f,
 ) {
     Row(
         modifier = modifier,
@@ -141,9 +146,9 @@ private fun MetricItem(
             text = value,
             color = color,
             textAlign = TextAlign.Right,
-            modifier = Modifier.widthIn(min = 40.dp).alignByBaseline(),
+            modifier = Modifier.widthIn(min = (40 * scale).dp).alignByBaseline(),
             style = TextStyle(
-                fontSize = 15.sp,
+                fontSize = (15 * scale).sp,
                 fontWeight = FontWeight.SemiBold,
                 fontFeatureSettings = "tnum",
                 fontFamily = fontFamily,
@@ -152,7 +157,7 @@ private fun MetricItem(
         Text(
             text = label,
             color = Color(0x59E8E4DF), // text3
-            fontSize = 10.sp,
+            fontSize = (10 * scale).sp,
             modifier = Modifier.alignByBaseline(),
         )
     }

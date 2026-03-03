@@ -37,6 +37,7 @@ import kotlinx.coroutines.delay
 fun SpeedInclineControls(
     viewModel: TreadmillViewModel,
     vertical: Boolean = false,
+    fillHeight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val status by viewModel.status.collectAsState()
@@ -57,6 +58,7 @@ fun SpeedInclineControls(
                 .alpha(if (status.treadmillConnected) 1f else 0.3f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val panelModifier = if (fillHeight) Modifier.weight(1f).fillMaxWidth() else Modifier.fillMaxWidth()
             ControlPanel(
                 value = (status.emuSpeed / 10.0).let { "%.1f".format(it) },
                 label = "mph",
@@ -64,7 +66,8 @@ fun SpeedInclineControls(
                 smallDelta = 1.0, largeDelta = 10.0,
                 enabled = status.treadmillConnected,
                 onAdjust = { speedAdjust(it.toInt()) },
-                modifier = Modifier.fillMaxWidth(),
+                fillHeight = fillHeight,
+                modifier = panelModifier,
             )
             ControlPanel(
                 value = formatIncline(status.emuIncline),
@@ -73,7 +76,8 @@ fun SpeedInclineControls(
                 smallDelta = 0.5, largeDelta = 1.0,
                 enabled = status.treadmillConnected,
                 onAdjust = inclineAdjust,
-                modifier = Modifier.fillMaxWidth(),
+                fillHeight = fillHeight,
+                modifier = panelModifier,
             )
         }
     } else {
@@ -121,11 +125,16 @@ private fun ControlPanel(
     enabled: Boolean,
     onAdjust: (Double) -> Unit,
     modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
 ) {
-    // Build readable metric name from label (e.g., "mph" -> "speed", "% incline" -> "incline")
     val metricName = if (label.contains("incline", ignoreCase = true)) "incline" else "speed"
     val smallAmount = if (metricName == "speed") "%.1f mph".format(smallDelta / 10.0) else "%.1f%%".format(smallDelta)
     val largeAmount = if (metricName == "speed") "%.1f mph".format(largeDelta / 10.0) else "%.1f%%".format(largeDelta)
+
+    val config = LocalConfiguration.current
+    val isTablet = minOf(config.screenWidthDp, config.screenHeightDp) >= 600
+    val btnW = if (isTablet) 52.dp else 44.dp
+    val btnH = if (isTablet) 72.dp else 62.dp
 
     Row(
         modifier = modifier
@@ -143,7 +152,10 @@ private fun ControlPanel(
         horizontalArrangement = Arrangement.spacedBy(1.dp),
     ) {
         // Small buttons column
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(
+            modifier = if (fillHeight) Modifier.fillMaxHeight() else Modifier,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
             RepeatButton(
                 delta = smallDelta,
                 enabled = enabled,
@@ -151,6 +163,7 @@ private fun ControlPanel(
                 isUp = true,
                 color = accentColor,
                 description = "Increase $metricName by $smallAmount",
+                modifier = if (fillHeight) Modifier.weight(1f).width(btnW) else Modifier.size(btnW, btnH),
             )
             RepeatButton(
                 delta = -smallDelta,
@@ -159,18 +172,20 @@ private fun ControlPanel(
                 isUp = false,
                 color = accentColor,
                 description = "Decrease $metricName by $smallAmount",
+                modifier = if (fillHeight) Modifier.weight(1f).width(btnW) else Modifier.size(btnW, btnH),
             )
         }
 
-        // Value display — use min dimension to detect true tablet vs phone-in-landscape
-        val config = LocalConfiguration.current
-        val isTablet = minOf(config.screenWidthDp, config.screenHeightDp) >= 600
-        val valueFontSize = if (isTablet) 32.sp else 26.sp
+        // Value display
+        val valueFontSize = if (fillHeight) 40.sp else if (isTablet) 32.sp else 26.sp
+        val labelFontSize = if (fillHeight) 14.sp else if (isTablet) 12.sp else 10.sp
         Column(
             modifier = Modifier
                 .weight(1f)
+                .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
                 .padding(vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = value,
@@ -183,12 +198,15 @@ private fun ControlPanel(
             Text(
                 text = label,
                 color = Color(0x59E8E4DF),
-                fontSize = if (isTablet) 12.sp else 10.sp,
+                fontSize = labelFontSize,
             )
         }
 
         // Large buttons column
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(
+            modifier = if (fillHeight) Modifier.fillMaxHeight() else Modifier,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
             RepeatButton(
                 delta = largeDelta,
                 enabled = enabled,
@@ -197,6 +215,7 @@ private fun ControlPanel(
                 color = accentColor,
                 isDouble = true,
                 description = "Increase $metricName by $largeAmount",
+                modifier = if (fillHeight) Modifier.weight(1f).width(btnW) else Modifier.size(btnW, btnH),
             )
             RepeatButton(
                 delta = -largeDelta,
@@ -206,6 +225,7 @@ private fun ControlPanel(
                 color = accentColor,
                 isDouble = true,
                 description = "Decrease $metricName by $largeAmount",
+                modifier = if (fillHeight) Modifier.weight(1f).width(btnW) else Modifier.size(btnW, btnH),
             )
         }
     }
@@ -241,17 +261,11 @@ private fun RepeatButton(
         }
     }
 
-    val config = LocalConfiguration.current
-    val isTablet = minOf(config.screenWidthDp, config.screenHeightDp) >= 600
-    val btnW = if (isTablet) 52.dp else 44.dp
-    val btnH = if (isTablet) 72.dp else 62.dp
-
     Box(
         modifier = modifier
-            .size(width = btnW, height = btnH)
             .semantics { contentDescription = description }
             .background(
-                color = Color(0x3D787880), // fill
+                color = Color(0x3D787880),
                 shape = RoundedCornerShape(10.dp),
             )
             .pointerInteropFilter { event ->
@@ -270,10 +284,9 @@ private fun RepeatButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        // Chevron icon — Canvas-drawn to match web SVG style
-        val iconSize = if (isTablet) 28.dp else 24.dp
+        // Chevron icon — scales proportionally with button size
         Canvas(
-            modifier = Modifier.size(iconSize),
+            modifier = Modifier.fillMaxHeight(0.4f).aspectRatio(1f),
         ) {
             val w = size.width
             val h = size.height
@@ -286,11 +299,10 @@ private fun RepeatButton(
             val inset = sw / 2 + w * 0.05f
 
             if (isDouble) {
-                // Two chevrons stacked, tight vertical gap
-                val chevAmp = h * 0.18f  // how tall each V is
-                val gap = h * 0.06f      // space between the two Vs
+                val chevAmp = h * 0.18f
+                val gap = h * 0.06f
                 val totalH = chevAmp * 2 + gap
-                val topY = (h - totalH) / 2  // center vertically
+                val topY = (h - totalH) / 2
 
                 if (isUp) {
                     val path1 = Path().apply {
@@ -320,7 +332,6 @@ private fun RepeatButton(
                     drawPath(path2, color, style = stroke)
                 }
             } else {
-                // Single chevron — same amplitude as each line in the double
                 val chevAmp = h * 0.22f
                 val topY = (h - chevAmp) / 2
                 val path = Path().apply {

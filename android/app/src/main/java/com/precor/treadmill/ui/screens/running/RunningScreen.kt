@@ -141,9 +141,9 @@ fun RunningScreen(
                     enter = fadeIn() + scaleIn(initialScale = 0.8f),
                     exit = fadeOut() + scaleOut(targetScale = 0.8f),
                 ) {
-                    // Bounce between timer and encouragement
+                    // Bounce only on timer↔encouragement transition, not on text changes within
                     AnimatedContent(
-                        targetState = encouragement,
+                        targetState = encouragement != null,
                         transitionSpec = {
                             (scaleIn(
                                 animationSpec = spring(dampingRatio = 0.6f),
@@ -154,10 +154,10 @@ fun RunningScreen(
                         },
                         contentAlignment = Alignment.Center,
                         label = "hero-bounce",
-                    ) { msg ->
-                        if (msg != null) {
+                    ) { showEncouragement ->
+                        if (showEncouragement) {
                             Text(
-                                text = glowText(msg),
+                                text = glowText(encouragement ?: ""),
                                 color = Color(0xFF6BC89B),
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Medium,
@@ -407,7 +407,7 @@ private fun RunningScreenLandscape(
                         exit = fadeOut() + scaleOut(targetScale = 0.8f),
                     ) {
                         AnimatedContent(
-                            targetState = encouragement,
+                            targetState = encouragement != null,
                             transitionSpec = {
                                 (scaleIn(
                                     animationSpec = spring(dampingRatio = 0.6f),
@@ -418,10 +418,10 @@ private fun RunningScreenLandscape(
                             },
                             contentAlignment = Alignment.Center,
                             label = "hero-bounce-landscape",
-                        ) { msg ->
-                            if (msg != null) {
+                        ) { showEncouragement ->
+                            if (showEncouragement) {
                                 Text(
-                                    text = glowText(msg),
+                                    text = glowText(encouragement ?: ""),
                                     color = Color(0xFF6BC89B),
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Medium,

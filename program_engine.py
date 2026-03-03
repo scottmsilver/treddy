@@ -397,7 +397,11 @@ class ProgramState:
         return True
 
     async def _finish(self):
-        self._cancel_task()
+        # Don't cancel the task here — _finish() is called from within _tick_loop,
+        # and cancelling our own task would raise CancelledError at the next await,
+        # preventing _on_change and _broadcast from executing (which ends the session).
+        # The task exits naturally via `break` after _finish() returns.
+        self._task = None
         self.running = False
         self.paused = False
         self.completed = True

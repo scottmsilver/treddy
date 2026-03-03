@@ -451,14 +451,23 @@ class ProgramState:
             return
         remaining = iv["duration"] - self.interval_elapsed
         is_last = self.current_interval == len(self.program["intervals"]) - 1
-        suffix = "till finish" if is_last else "till next section"
+
+        # Build suffix: "til the end" or "til 6 mph and 3%" (only changed parts)
+        if is_last:
+            suffix = "til the end"
+        else:
+            next_iv = self.program["intervals"][self.current_interval + 1]
+            parts = []
+            if next_iv.get("speed") != iv.get("speed"):
+                parts.append(f"{next_iv['speed']:g}mph")
+            if next_iv.get("incline") != iv.get("incline"):
+                parts.append(f"{next_iv['incline']:g}%")
+            suffix = ("til " + " and ".join(parts)) if parts else "til next section"
 
         if remaining <= 30:
-            # Continuous countdown: "<<13>>s till next section"
             if remaining >= 1:
                 self._pending_encouragement = f"<<{remaining}>>s {suffix}"
         elif remaining <= 600:
-            # Whole-minute callouts: "<<3>> minutes till next section"
             if remaining % 60 == 0:
                 minutes = remaining // 60
                 unit = "minute" if minutes == 1 else "minutes"

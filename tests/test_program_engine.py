@@ -878,38 +878,36 @@ class TestEncouragement:
 class TestIntervalCountdown:
     """Test interval countdown encouragement messages."""
 
-    def _make_countdown_prog(self, duration=120):
-        """Create a non-manual program with two intervals for countdown testing.
-        The first interval is the one under test (not last, so suffix = 'till next section')."""
+    def _make_countdown_prog(self, duration=120, intervals=None):
+        """Create a program positioned at interval 0 with milestones/every-3 suppressed."""
+        if intervals is None:
+            intervals = [
+                {"name": "Run", "duration": duration, "speed": 5.0, "incline": 2},
+                {"name": "Cooldown", "duration": 60, "speed": 2.0, "incline": 0},
+            ]
         prog = ProgramState()
-        prog.load(
-            make_program(
-                [
-                    {"name": "Run", "duration": duration, "speed": 5.0, "incline": 2},
-                    {"name": "Cooldown", "duration": 60, "speed": 2.0, "incline": 0},
-                ]
-            )
-        )
+        prog.load(make_program(intervals))
         prog.running = True
         prog._encouragement_milestones = {25, 50, 75}  # suppress milestones
         prog._last_encouragement_interval = prog.current_interval  # suppress every-3
         return prog
 
-    def test_countdown_at_30_seconds(self):
-        """At 30s remaining, shows '<<30>>s till next section'."""
+    def test_countdown_shows_next_speed_and_incline(self):
+        """At 30s remaining, shows what's changing in the next interval."""
+        # Run(5.0mph, 2%) → Cooldown(2.0mph, 0%) — both change
         prog = self._make_countdown_prog(duration=120)
         prog.total_elapsed = 90
         prog.interval_elapsed = 90  # 120 - 90 = 30 remaining
         prog._check_encouragement()
-        assert prog._pending_encouragement == "<<30>>s till next section"
+        assert prog._pending_encouragement == "<<30>>s til 2mph and 0%"
 
     def test_countdown_at_1_second(self):
-        """At 1s remaining, shows '<<1>>s till next section'."""
+        """At 1s remaining, shows countdown with next interval info."""
         prog = self._make_countdown_prog(duration=60)
         prog.total_elapsed = 59
         prog.interval_elapsed = 59  # 60 - 59 = 1 remaining
         prog._check_encouragement()
-        assert prog._pending_encouragement == "<<1>>s till next section"
+        assert prog._pending_encouragement == "<<1>>s til 2mph and 0%"
 
     def test_no_countdown_at_zero(self):
         """At 0s remaining, no countdown (interval transitions)."""
@@ -919,13 +917,13 @@ class TestIntervalCountdown:
         prog._check_encouragement()
         assert prog._pending_encouragement is None
 
-    def test_minute_callout(self):
-        """At exactly N minutes remaining, shows '<<4>> minutes till next section'."""
+    def test_minute_callout_shows_next_info(self):
+        """At exactly N minutes remaining, shows next interval info."""
         prog = self._make_countdown_prog(duration=300)
         prog.total_elapsed = 60
         prog.interval_elapsed = 60  # 300 - 60 = 240 = 4 min
         prog._check_encouragement()
-        assert prog._pending_encouragement == "<<4>> minutes till next section"
+        assert prog._pending_encouragement == "<<4>> minutes til 2mph and 0%"
 
     def test_no_callout_between_minutes(self):
         """Between whole minutes (>30s), no message."""
@@ -975,7 +973,6 @@ class TestIntervalCountdown:
         prog.total_elapsed = 30
         prog.interval_elapsed = 30  # 120 - 30 = 90 remaining, also 25% milestone
         prog._check_encouragement()
-        # Should get the milestone, not "90" or "1 min"
         assert prog._pending_encouragement is not None
         assert prog._pending_encouragement == "Quarter of the way done — strong start!"
 
@@ -985,7 +982,7 @@ class TestIntervalCountdown:
         prog.total_elapsed = 5
         prog.interval_elapsed = 5  # 20 - 5 = 15 remaining
         prog._check_encouragement()
-        assert prog._pending_encouragement == "<<15>>s till next section"
+        assert prog._pending_encouragement == "<<15>>s til 2mph and 0%"
 
     def test_countdown_sequence(self):
         """Verify the countdown ticks through values correctly."""
@@ -998,11 +995,11 @@ class TestIntervalCountdown:
             prog._check_encouragement()
             results.append(prog._pending_encouragement)
         assert results == [
-            "<<5>>s till next section",
-            "<<4>>s till next section",
-            "<<3>>s till next section",
-            "<<2>>s till next section",
-            "<<1>>s till next section",
+            "<<5>>s til 2mph and 0%",
+            "<<4>>s til 2mph and 0%",
+            "<<3>>s til 2mph and 0%",
+            "<<2>>s til 2mph and 0%",
+            "<<1>>s til 2mph and 0%",
         ]
 
     def test_minute_callout_singular(self):
@@ -1011,17 +1008,56 @@ class TestIntervalCountdown:
         prog.total_elapsed = 60
         prog.interval_elapsed = 60  # 120 - 60 = 60 = 1 min
         prog._check_encouragement()
-        assert prog._pending_encouragement == "<<1>> minute till next section"
+        assert prog._pending_encouragement == "<<1>> minute til 2mph and 0%"
 
-    def test_last_interval_says_till_finish(self):
-        """On the last interval, countdown says 'till finish' instead of 'till next section'."""
+    def test_last_interval_says_til_the_end(self):
+        """On the last interval, countdown says 'til the end'."""
         prog = self._make_countdown_prog(duration=120)
         # Advance to last interval (index 1 = Cooldown)
         prog.current_interval = 1
         prog.interval_elapsed = 50
         prog.total_elapsed = 170  # 120 + 50
         prog._check_encouragement()
-        assert prog._pending_encouragement == "<<10>>s till finish"
+        assert prog._pending_encouragement == "<<10>>s til the end"
+
+    def test_only_speed_changes(self):
+        """When only speed changes, only show speed in suffix."""
+        prog = self._make_countdown_prog(
+            intervals=[
+                {"name": "A", "duration": 60, "speed": 5.0, "incline": 2},
+                {"name": "B", "duration": 60, "speed": 8.0, "incline": 2},
+            ]
+        )
+        prog.total_elapsed = 30
+        prog.interval_elapsed = 30  # 30s remaining
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<30>>s til 8mph"
+
+    def test_only_incline_changes(self):
+        """When only incline changes, only show incline in suffix."""
+        prog = self._make_countdown_prog(
+            intervals=[
+                {"name": "A", "duration": 60, "speed": 5.0, "incline": 2},
+                {"name": "B", "duration": 60, "speed": 5.0, "incline": 8},
+            ]
+        )
+        prog.total_elapsed = 30
+        prog.interval_elapsed = 30  # 30s remaining
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<30>>s til 8%"
+
+    def test_nothing_changes_falls_back(self):
+        """When speed and incline are the same, fall back to generic suffix."""
+        prog = self._make_countdown_prog(
+            intervals=[
+                {"name": "A", "duration": 60, "speed": 5.0, "incline": 2},
+                {"name": "B", "duration": 60, "speed": 5.0, "incline": 2},
+            ]
+        )
+        prog.total_elapsed = 30
+        prog.interval_elapsed = 30
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<30>>s til next section"
 
 
 class TestValidateInterval:

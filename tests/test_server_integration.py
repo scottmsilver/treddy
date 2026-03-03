@@ -963,6 +963,40 @@ class TestWorkoutSession:
         assert sess.paused_at == first_paused_at  # unchanged
 
 
+class TestSessionEndpoint:
+    """Tests for /api/session endpoint — ensures reconnecting clients get fresh state."""
+
+    def test_session_endpoint_returns_inactive_by_default(self, test_app):
+        """GET /api/session on a fresh server should return active=false."""
+        client, server, _ = test_app
+        resp = client.get("/api/session")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["type"] == "session"
+        assert data["active"] is False
+        assert data["elapsed"] == 0.0
+        assert data["end_reason"] is None
+
+    def test_session_endpoint_returns_active_during_workout(self, test_app):
+        """GET /api/session during a workout should return active=true."""
+        client, server, mock = test_app
+        server.sess.start()
+        resp = client.get("/api/session")
+        data = resp.json()
+        assert data["active"] is True
+        assert data["wall_started_at"] != ""
+
+    def test_session_endpoint_after_end(self, test_app):
+        """GET /api/session after ending returns active=false with end_reason."""
+        client, server, mock = test_app
+        server.sess.start()
+        server.sess.end("user_stop")
+        resp = client.get("/api/session")
+        data = resp.json()
+        assert data["active"] is False
+        assert data["end_reason"] == "user_stop"
+
+
 class TestHistoryResume:
     """Tests for program history resume (saving/restoring position)."""
 

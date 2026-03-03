@@ -4,6 +4,16 @@ import { useSession } from '../state/useSession';
 import { timerJsx } from '../utils/formatters';
 import HeartRate from './HeartRate';
 
+const valStyle: React.CSSProperties = {
+  fontSize: 15, fontWeight: 600,
+  fontVariantNumeric: 'tabular-nums',
+  display: 'inline-block', textAlign: 'right', minWidth: '5ch',
+};
+
+const unitStyle: React.CSSProperties = { fontSize: 10, color: 'var(--text3)' };
+
+const cellStyle: React.CSSProperties = { display: 'flex', alignItems: 'baseline', gap: 4 };
+
 export default function MetricsRow(): React.ReactElement {
   const sess = useSession();
 
@@ -18,17 +28,17 @@ export default function MetricsRow(): React.ReactElement {
         padding: '0 16px 4px', flexShrink: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span className="metric-value font-timer" style={{ fontSize: 15, fontWeight: 600, color: 'var(--teal)' }}>{timerJsx(sess.pace)}</span>
-        <span className="metric-label" style={{ fontSize: 10, color: 'var(--text3)' }}>min/mi</span>
+      <div style={cellStyle}>
+        <span className="metric-value font-timer" style={{ ...valStyle, color: 'var(--teal)' }}>{timerJsx(sess.pace)}</span>
+        <span className="metric-label" style={unitStyle}>min/mi</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span className="metric-value" style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{sess.distDisplay}</span>
-        <span className="metric-label" style={{ fontSize: 10, color: 'var(--text3)' }}>miles</span>
+      <div style={cellStyle}>
+        <span className="metric-value" style={valStyle}>{sess.distDisplay}</span>
+        <span className="metric-label" style={unitStyle}>miles</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span className="metric-value" style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--orange)' }}>{sess.vertDisplay}</span>
-        <span className="metric-label" style={{ fontSize: 10, color: 'var(--text3)' }}>vert ft</span>
+      <div style={cellStyle}>
+        <span className="metric-value" style={{ ...valStyle, color: 'var(--orange)' }}>{sess.vertDisplay}</span>
+        <span className="metric-label" style={unitStyle}>vert ft</span>
       </div>
       <HeartRate />
     </motion.div>

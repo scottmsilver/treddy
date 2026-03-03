@@ -188,26 +188,22 @@ class VoiceViewModel(
         }
 
         override fun onAudioChunk(pcmBase64: String) {
+            if (!userActivated) return  // Don't play audio unless user toggled voice
             player.enqueue(pcmBase64)
         }
 
         override fun onSpeakingStart() {
+            if (!userActivated) return  // Don't change state unless user toggled voice
             _voiceState.value = VoiceState.SPEAKING
         }
 
         override fun onSpeakingEnd() {
-            if (userActivated) {
-                _voiceState.value = VoiceState.LISTENING
-                // Start mic if not already running (deferred from text prompt)
-                if (audioCapture?.let { !isMicActive() } == true) {
-                    Log.d(TAG, "Starting deferred mic capture after speaking")
-                    startMicCapture()
-                }
-            } else {
-                // Gemini spoke in response to a state update, not user voice.
-                // Return to IDLE — don't enable mic.
-                Log.d(TAG, "onSpeakingEnd: user not activated, returning to IDLE")
-                _voiceState.value = VoiceState.IDLE
+            if (!userActivated) return  // Silently ignore — user didn't activate voice
+            _voiceState.value = VoiceState.LISTENING
+            // Start mic if not already running (deferred from text prompt)
+            if (audioCapture?.let { !isMicActive() } == true) {
+                Log.d(TAG, "Starting deferred mic capture after speaking")
+                startMicCapture()
             }
         }
 

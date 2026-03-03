@@ -416,14 +416,14 @@ class ProgramState:
             self._task = None
 
     def _check_encouragement(self):
-        """Set encouragement message at milestones or every 3 intervals."""
+        """Set encouragement message at milestones, every 3 intervals, or countdown."""
         if not self.program or not self.running:
             return
         td = self.total_duration
         if td <= 0:
             return
 
-        # Milestone check (25/50/75%)
+        # Milestone check (25/50/75%) — highest priority
         pct = (self.total_elapsed / td) * 100
         for milestone, msg in MILESTONE_MESSAGES.items():
             if pct >= milestone and milestone not in self._encouragement_milestones:
@@ -441,6 +441,28 @@ class ProgramState:
             import random
 
             self._pending_encouragement = random.choice(ENCOURAGEMENT_MESSAGES)
+            return
+
+        # Interval countdown (structured programs only)
+        if self.is_manual:
+            return
+        iv = self.current_iv
+        if not iv:
+            return
+        remaining = iv["duration"] - self.interval_elapsed
+        is_last = self.current_interval == len(self.program["intervals"]) - 1
+        suffix = "till finish" if is_last else "till next section"
+
+        if remaining <= 30:
+            # Continuous countdown: "<<13>>s till next section"
+            if remaining >= 1:
+                self._pending_encouragement = f"<<{remaining}>>s {suffix}"
+        elif remaining <= 600:
+            # Whole-minute callouts: "<<3>> minutes till next section"
+            if remaining % 60 == 0:
+                minutes = remaining // 60
+                unit = "minute" if minutes == 1 else "minutes"
+                self._pending_encouragement = f"<<{minutes}>> {unit} {suffix}"
 
     async def _tick_loop(self):
         try:

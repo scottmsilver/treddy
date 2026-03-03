@@ -1,9 +1,12 @@
 package com.precor.treadmill.ui.util
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import kotlin.math.floor
@@ -44,6 +47,30 @@ fun paceDisplay(speedMph: Double): String {
     val m = floor(minPerMile).toInt()
     val s = round((minPerMile - m) * 60).toInt()
     return "$m:${s.toString().padStart(2, '0')}"
+}
+
+private val glowPurple = Color(0xFF8B7FA0)
+
+/** Parse <<word>> glow markup into an AnnotatedString with purple glow effect. */
+fun glowText(text: String): AnnotatedString = buildAnnotatedString {
+    val regex = Regex("<<(.+?)>>")
+    var cursor = 0
+    for (match in regex.findAll(text)) {
+        append(text.substring(cursor, match.range.first))
+        withStyle(SpanStyle(
+            color = glowPurple,
+            fontWeight = FontWeight.SemiBold,
+            shadow = Shadow(
+                color = glowPurple.copy(alpha = 0.6f),
+                offset = Offset.Zero,
+                blurRadius = 12f,
+            ),
+        )) {
+            append(match.groupValues[1])
+        }
+        cursor = match.range.last + 1
+    }
+    if (cursor < text.length) append(text.substring(cursor))
 }
 
 /** Compute interval color based on name and intensity. */

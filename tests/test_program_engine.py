@@ -875,6 +875,155 @@ class TestEncouragement:
         assert prog._pending_encouragement is not None
 
 
+class TestIntervalCountdown:
+    """Test interval countdown encouragement messages."""
+
+    def _make_countdown_prog(self, duration=120):
+        """Create a non-manual program with two intervals for countdown testing.
+        The first interval is the one under test (not last, so suffix = 'till next section')."""
+        prog = ProgramState()
+        prog.load(
+            make_program(
+                [
+                    {"name": "Run", "duration": duration, "speed": 5.0, "incline": 2},
+                    {"name": "Cooldown", "duration": 60, "speed": 2.0, "incline": 0},
+                ]
+            )
+        )
+        prog.running = True
+        prog._encouragement_milestones = {25, 50, 75}  # suppress milestones
+        prog._last_encouragement_interval = prog.current_interval  # suppress every-3
+        return prog
+
+    def test_countdown_at_30_seconds(self):
+        """At 30s remaining, shows '<<30>>s till next section'."""
+        prog = self._make_countdown_prog(duration=120)
+        prog.total_elapsed = 90
+        prog.interval_elapsed = 90  # 120 - 90 = 30 remaining
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<30>>s till next section"
+
+    def test_countdown_at_1_second(self):
+        """At 1s remaining, shows '<<1>>s till next section'."""
+        prog = self._make_countdown_prog(duration=60)
+        prog.total_elapsed = 59
+        prog.interval_elapsed = 59  # 60 - 59 = 1 remaining
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<1>>s till next section"
+
+    def test_no_countdown_at_zero(self):
+        """At 0s remaining, no countdown (interval transitions)."""
+        prog = self._make_countdown_prog(duration=60)
+        prog.total_elapsed = 60
+        prog.interval_elapsed = 60  # 60 - 60 = 0 remaining
+        prog._check_encouragement()
+        assert prog._pending_encouragement is None
+
+    def test_minute_callout(self):
+        """At exactly N minutes remaining, shows '<<4>> minutes till next section'."""
+        prog = self._make_countdown_prog(duration=300)
+        prog.total_elapsed = 60
+        prog.interval_elapsed = 60  # 300 - 60 = 240 = 4 min
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<4>> minutes till next section"
+
+    def test_no_callout_between_minutes(self):
+        """Between whole minutes (>30s), no message."""
+        prog = self._make_countdown_prog(duration=300)
+        prog.total_elapsed = 61
+        prog.interval_elapsed = 61  # 300 - 61 = 239 remaining
+        prog._check_encouragement()
+        assert prog._pending_encouragement is None
+
+    def test_no_countdown_for_manual_program(self):
+        """Manual programs should not get countdown messages."""
+        prog = ProgramState()
+        prog.load(
+            {
+                "name": "Manual",
+                "manual": True,
+                "intervals": [{"name": "Seg 1", "duration": 3600, "speed": 3.0, "incline": 0}],
+            }
+        )
+        prog.running = True
+        prog._encouragement_milestones = {25, 50, 75}
+        prog.total_elapsed = 3570
+        prog.interval_elapsed = 3570  # 30s remaining
+        prog._check_encouragement()
+        assert prog._pending_encouragement is None
+
+    def test_no_callout_over_10_minutes(self):
+        """Intervals with >10 min remaining don't get minute callouts."""
+        prog = self._make_countdown_prog(duration=1200)
+        prog.total_elapsed = 480
+        prog.interval_elapsed = 480  # 1200 - 480 = 720 = 12 min (> 600s)
+        prog._check_encouragement()
+        assert prog._pending_encouragement is None
+
+    def test_milestone_takes_priority_over_countdown(self):
+        """Milestone messages should win over countdown."""
+        prog = ProgramState()
+        prog.load(
+            make_program(
+                [
+                    {"name": "Run", "duration": 120, "speed": 5.0, "incline": 2},
+                ]
+            )
+        )
+        prog.running = True
+        # Don't suppress milestones — let 25% fire
+        prog.total_elapsed = 30
+        prog.interval_elapsed = 30  # 120 - 30 = 90 remaining, also 25% milestone
+        prog._check_encouragement()
+        # Should get the milestone, not "90" or "1 min"
+        assert prog._pending_encouragement is not None
+        assert prog._pending_encouragement == "Quarter of the way done — strong start!"
+
+    def test_short_interval_goes_straight_to_countdown(self):
+        """Intervals <30s go directly into countdown mode."""
+        prog = self._make_countdown_prog(duration=20)
+        prog.total_elapsed = 5
+        prog.interval_elapsed = 5  # 20 - 5 = 15 remaining
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<15>>s till next section"
+
+    def test_countdown_sequence(self):
+        """Verify the countdown ticks through values correctly."""
+        prog = self._make_countdown_prog(duration=60)
+        results = []
+        for elapsed in range(55, 60):
+            prog.total_elapsed = elapsed
+            prog.interval_elapsed = elapsed
+            prog._pending_encouragement = None
+            prog._check_encouragement()
+            results.append(prog._pending_encouragement)
+        assert results == [
+            "<<5>>s till next section",
+            "<<4>>s till next section",
+            "<<3>>s till next section",
+            "<<2>>s till next section",
+            "<<1>>s till next section",
+        ]
+
+    def test_minute_callout_singular(self):
+        """At exactly 1 minute remaining, uses singular 'minute'."""
+        prog = self._make_countdown_prog(duration=120)
+        prog.total_elapsed = 60
+        prog.interval_elapsed = 60  # 120 - 60 = 60 = 1 min
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<1>> minute till next section"
+
+    def test_last_interval_says_till_finish(self):
+        """On the last interval, countdown says 'till finish' instead of 'till next section'."""
+        prog = self._make_countdown_prog(duration=120)
+        # Advance to last interval (index 1 = Cooldown)
+        prog.current_interval = 1
+        prog.interval_elapsed = 50
+        prog.total_elapsed = 170  # 120 + 50
+        prog._check_encouragement()
+        assert prog._pending_encouragement == "<<10>>s till finish"
+
+
 class TestValidateInterval:
     """Test interval validation and clamping."""
 

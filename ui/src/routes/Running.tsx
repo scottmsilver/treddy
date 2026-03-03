@@ -7,6 +7,7 @@ import { useTreadmillState, registerBounceMessage } from '../state/TreadmillCont
 import { useVoiceContext } from '../state/VoiceContext';
 import * as api from '../state/api';
 import { fmtDur, timerJsx } from '../utils/formatters';
+import { renderGlowText } from '../components/Toast';
 import { haptic } from '../utils/haptics';
 import MetricsRow from '../components/MetricsRow';
 import ProgramHUD from '../components/ProgramHUD';
@@ -163,7 +164,7 @@ export default function Running(): React.ReactElement {
           transition={spring}
           style={{ overflow: 'hidden', position: 'relative', zIndex: 1 }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: isActive ? 96 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: isActive ? 96 : 0 }}>
             {isActive && (
               <AnimatePresence mode="wait">
                 {encouragement ? (
@@ -183,7 +184,7 @@ export default function Running(): React.ReactElement {
                       padding: '16px 8px',
                     }}
                   >
-                    {encouragement}
+                    {renderGlowText(encouragement)}
                   </motion.div>
                 ) : (
                   <motion.div
@@ -215,6 +216,7 @@ export default function Running(): React.ReactElement {
         {isManual && pgm.running && (
           <div className="font-timer" style={{
             fontSize: 12, color: 'var(--text3)', marginTop: 2,
+            fontVariantNumeric: 'tabular-nums',
           }}>
             {timerJsx(fmtDur(pgm.totalRemaining))} remaining of {timerJsx(fmtDur(pgm.totalDuration))}
           </div>

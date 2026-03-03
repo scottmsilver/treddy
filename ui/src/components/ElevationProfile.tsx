@@ -70,6 +70,12 @@ const labelStyle: React.CSSProperties = {
 // Tick mark size
 const TICK = 4;
 
+// Shared style for section indicator dots (HTML overlays)
+const dotBase: React.CSSProperties = {
+  position: 'absolute', borderRadius: '50%',
+  transform: 'translate(-50%, -50%)', pointerEvents: 'none',
+};
+
 // Double-tap detection threshold (ms)
 const DOUBLE_TAP_MS = 300;
 
@@ -218,35 +224,11 @@ const ElevationProfile = memo(function ElevationProfile({ onSingleTap }: Elevati
                     strokeLinejoin="round" strokeLinecap="round" clipPath="url(#elev-done)" />
             </>
           )}
-          {/* Step indicator dots */}
-          {pgm.intervalBoundaryXs.length > 2 && (() => {
-            const trackY = H - 2;
-            return (
-              <>
-                {/* Track line */}
-                <line x1={0} y1={trackY} x2={W} y2={trackY}
-                  stroke="rgba(232,228,223,0.1)" strokeWidth="1" />
-                {/* Dots at interval boundaries (skip last = end) */}
-                {pgm.intervalBoundaryXs.slice(0, -1).map((bx, i) => {
-                  const isCompleted = i < pgm.currentInterval;
-                  const isCurrent = i === pgm.currentInterval;
-                  if (isCurrent) {
-                    return (
-                      <React.Fragment key={i}>
-                        <circle cx={bx} cy={trackY} r={6} fill="rgba(107,200,155,0.15)" />
-                        <circle cx={bx} cy={trackY} r={3.5} fill="rgba(107,200,155,1)" />
-                      </React.Fragment>
-                    );
-                  }
-                  if (isCompleted) {
-                    return <circle key={i} cx={bx} cy={trackY} r={2.5} fill="rgba(107,200,155,0.8)" />;
-                  }
-                  return <circle key={i} cx={bx} cy={trackY} r={2.5}
-                    fill="none" stroke="rgba(232,228,223,0.3)" strokeWidth="1" />;
-                })}
-              </>
-            );
-          })()}
+          {/* Track line for section dots (dots are HTML overlays below) */}
+          {pgm.intervalBoundaryXs.length > 2 && (
+            <line x1={0} y1={H - 2} x2={W} y2={H - 2}
+              stroke="rgba(232,228,223,0.1)" strokeWidth="1" />
+          )}
         </g>
       </svg>
 
@@ -295,6 +277,31 @@ const ElevationProfile = memo(function ElevationProfile({ onSingleTap }: Elevati
           {arrow === 'right' ? '\u00bb' : '\u00ab'}
         </div>
       )}
+
+      {/* Section dots — HTML overlays so they don't stretch with SVG */}
+      {pgm.intervalBoundaryXs.length > 2 && pgm.intervalBoundaryXs.slice(0, -1).map((bx, i) => {
+        const pctX = ((ML + bx) / VB_W) * 100;
+        const pctY = ((MT + H - 2) / VB_H) * 100;
+        const pos = { left: `${pctX}%`, top: `${pctY}%` };
+        const isCompleted = i < pgm.currentInterval;
+        const isCurrent = i === pgm.currentInterval;
+        if (isCurrent) {
+          return (
+            <React.Fragment key={`dot-${i}`}>
+              <div style={{ ...dotBase, ...pos, width: 12, height: 12, background: 'rgba(107,200,155,0.15)' }} />
+              <div style={{ ...dotBase, ...pos, width: 7, height: 7, background: 'rgba(107,200,155,1)' }} />
+            </React.Fragment>
+          );
+        }
+        if (isCompleted) {
+          return (
+            <div key={`dot-${i}`} style={{ ...dotBase, ...pos, width: 5, height: 5, background: 'rgba(107,200,155,0.8)' }} />
+          );
+        }
+        return (
+          <div key={`dot-${i}`} style={{ ...dotBase, ...pos, width: 5, height: 5, background: 'none', border: '1px solid rgba(232,228,223,0.3)', boxSizing: 'border-box' }} />
+        );
+      })}
 
       {/* Position dot */}
       <div style={{

@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.precor.treadmill.ui.components.HistoryList
 import com.precor.treadmill.ui.theme.TimerFontFamily
 import com.precor.treadmill.ui.util.fmtDur
+import com.precor.treadmill.ui.util.glowText
 import com.precor.treadmill.ui.util.timerText
 import com.precor.treadmill.ui.util.haptic
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
@@ -155,7 +157,7 @@ fun RunningScreen(
                     ) { msg ->
                         if (msg != null) {
                             Text(
-                                text = msg,
+                                text = glowText(msg),
                                 color = Color(0xFF6BC89B),
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Medium,
@@ -169,13 +171,16 @@ fun RunningScreen(
                         } else {
                             Text(
                                 text = timerText(sess.elapsedDisplay),
-                                color = Color(0xFFE8E4DF),
-                                fontSize = 96.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = TimerFontFamily,
-                                lineHeight = 96.sp,
-                                letterSpacing = (-0.03).em,
                                 textAlign = TextAlign.Center,
+                                style = TextStyle(
+                                    color = Color(0xFFE8E4DF),
+                                    fontSize = 96.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = TimerFontFamily,
+                                    lineHeight = 96.sp,
+                                    letterSpacing = (-0.03).em,
+                                    fontFeatureSettings = "tnum",
+                                ),
                                 modifier = Modifier
                                     .clickable(
                                         enabled = isManual && pgm.running,
@@ -416,7 +421,7 @@ private fun RunningScreenLandscape(
                         ) { msg ->
                             if (msg != null) {
                                 Text(
-                                    text = msg,
+                                    text = glowText(msg),
                                     color = Color(0xFF6BC89B),
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Medium,
@@ -430,13 +435,16 @@ private fun RunningScreenLandscape(
                             } else {
                                 Text(
                                     text = timerText(sess.elapsedDisplay),
-                                    color = Color(0xFFE8E4DF),
-                                    fontSize = 72.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = TimerFontFamily,
-                                    lineHeight = 72.sp,
-                                    letterSpacing = (-0.03).em,
                                     textAlign = TextAlign.Center,
+                                    style = TextStyle(
+                                        color = Color(0xFFE8E4DF),
+                                        fontSize = 72.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = TimerFontFamily,
+                                        lineHeight = 72.sp,
+                                        letterSpacing = (-0.03).em,
+                                        fontFeatureSettings = "tnum",
+                                    ),
                                     modifier = Modifier.clickable(
                                         enabled = isManual && pgm.running,
                                         interactionSource = remember { MutableInteractionSource() },

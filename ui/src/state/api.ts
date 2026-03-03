@@ -1,4 +1,4 @@
-import type { ChatResponse, HistoryEntry, StatusMessage, ProgramMessage, AppConfig } from './types';
+import type { ChatResponse, HistoryEntry, StatusMessage, ProgramMessage, SessionMessage, AppConfig } from './types';
 
 function apiBase(): string {
   return '';  // same origin; Vite proxy handles in dev
@@ -44,6 +44,10 @@ export async function setProxy(enabled: boolean): Promise<StatusMessage> {
 
 export async function getStatus(): Promise<StatusMessage> {
   return get('/api/status');
+}
+
+export async function getSession(): Promise<SessionMessage> {
+  return get('/api/session');
 }
 
 // --- Programs ---

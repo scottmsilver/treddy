@@ -86,9 +86,6 @@ button, [role="button"], a, input, select, textarea {
     justify-content: center !important;
   }
 
-  /* Align floating icons with top of speed/incline up arrows */
-  .idle-icon { top: 17px; }
-
   /* Scale up control buttons for tablet — fill top-to-bottom */
   .controls .ctrl-btn { width: 58px !important; height: auto !important; flex: 1 !important; border-radius: 14px !important; }
   .controls .ctrl-btn svg { width: 24px; height: 24px; }
@@ -113,7 +110,7 @@ button, [role="button"], a, input, select, textarea {
   .history-section { max-width: 720px; margin-left: auto; margin-right: auto; }
 
   /* Tab bar labels */
-  .tab-label { font-size: 11px !important; }
+  .nav-label { font-size: 11px !important; }
 
   /* History: 2-column grid on tablet */
   .history-section .history-scroll {

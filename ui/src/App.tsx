@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useLocation } from 'wouter';
 import ErrorBoundary from './components/ErrorBoundary';
-import TabBar from './components/TabBar';
+import NavRail, { useIsLandscape } from './components/NavRail';
 import Toast from './components/Toast';
 import DisconnectBanner from './components/DisconnectBanner';
 import SettingsPanel from './components/SettingsPanel';
@@ -37,15 +36,14 @@ function useWakeLock() {
 }
 
 export default function App({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
   const [toastMsg, setToastMsg] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { voiceState, toggle: toggleVoice } = useVoiceContext();
+  const isLandscape = useIsLandscape();
 
   useWakeLock();
-  const isRun = location.startsWith('/run');
 
   const showToast = useCallback((message: string) => {
     setToastMsg(message);
@@ -65,10 +63,14 @@ export default function App({ children }: { children: React.ReactNode }) {
     <ErrorBoundary>
       <ToastContext.Provider value={showToast}>
         <DisconnectBanner />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: isRun ? 0 : 60 }}>
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          paddingBottom: isLandscape ? 0 : 56,
+          paddingLeft: isLandscape ? 'calc(56px + env(safe-area-inset-left, 0px))' : 0,
+        }}>
           {children}
         </div>
-        <TabBar
+        <NavRail
           voiceState={voiceState}
           onVoiceToggle={toggleVoice}
           onSettingsToggle={() => setSettingsOpen(s => !s)}

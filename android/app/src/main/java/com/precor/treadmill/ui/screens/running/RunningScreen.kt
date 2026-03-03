@@ -4,7 +4,6 @@ import android.content.res.Configuration
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -13,17 +12,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -47,8 +40,6 @@ import kotlinx.coroutines.delay
 @Composable
 fun RunningScreen(
     viewModel: TreadmillViewModel,
-    voiceState: String,
-    onNavigateHome: () -> Unit,
     onVoiceToggle: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -86,14 +77,11 @@ fun RunningScreen(
     var durationEditOpen by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val isWideScreen = configuration.screenWidthDp >= 600
 
     if (isLandscape) {
         // Landscape: side-by-side layout
         RunningScreenLandscape(
             viewModel = viewModel,
-            voiceState = voiceState,
-            onNavigateHome = onNavigateHome,
             onVoiceToggle = onVoiceToggle,
             isActive = isActive,
             isManual = isManual,
@@ -131,7 +119,7 @@ fun RunningScreen(
                 )
             }
 
-            // Hero timer (drawn first so buttons overlay it)
+            // Hero timer
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -225,28 +213,6 @@ fun RunningScreen(
                     }
                 }
             }
-
-            // Home button (top-left, drawn after timer so it's on top)
-            if (isActive || pgm.completed) {
-                IconButton(
-                    onClick = { onNavigateHome(); haptic(context, 15) },
-                    modifier = Modifier.align(Alignment.TopStart),
-                ) {
-                    Icon(Icons.Default.Home, "Home", tint = Color(0x59E8E4DF).copy(alpha = 0.7f))
-                }
-            }
-
-            // Voice button (top-right, drawn after timer so it's on top)
-            if (isActive || pgm.completed) {
-                VoiceMicButton(
-                    voiceState = voiceState,
-                    onClick = {
-                        haptic(context, if (voiceState == "idle") 20 else 10)
-                        onVoiceToggle(null)
-                    },
-                    modifier = Modifier.align(Alignment.TopEnd),
-                )
-            }
         }
 
         // Metrics row
@@ -286,54 +252,11 @@ fun RunningScreen(
                         }
                     }
                     else -> {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            IdleCard(
-                                viewModel = viewModel,
-                                onVoice = { prompt -> haptic(context, 20); onVoiceToggle(prompt) },
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                            // Floating home/voice icons — rendered after IdleCard so they draw on top
-                            if (!isActive) {
-                                IconButton(
-                                    onClick = { onNavigateHome(); haptic(context, 15) },
-                                    modifier = Modifier
-                                        .align(Alignment.TopStart)
-                                        .padding(start = 28.dp, top = 16.dp)
-                                        .size(44.dp)
-                                        .background(
-                                            color = Color(0xFF1E1D1B),
-                                            shape = RoundedCornerShape(12.dp),
-                                        )
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color.White.copy(alpha = 0.25f),
-                                            shape = RoundedCornerShape(12.dp),
-                                        ),
-                                ) {
-                                    Icon(Icons.Default.Home, "Home", tint = Color(0x59E8E4DF).copy(alpha = 0.7f))
-                                }
-                                VoiceMicButton(
-                                    voiceState = voiceState,
-                                    onClick = {
-                                        haptic(context, if (voiceState == "idle") 20 else 10)
-                                        onVoiceToggle(null)
-                                    },
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(end = 28.dp, top = 16.dp)
-                                        .size(44.dp)
-                                        .background(
-                                            color = Color(0xFF1E1D1B),
-                                            shape = RoundedCornerShape(12.dp),
-                                        )
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color.White.copy(alpha = 0.25f),
-                                            shape = RoundedCornerShape(12.dp),
-                                        ),
-                                )
-                            }
-                        }
+                        IdleCard(
+                            viewModel = viewModel,
+                            onVoice = { prompt -> haptic(context, 20); onVoiceToggle(prompt) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                 }
             }
@@ -347,8 +270,6 @@ fun RunningScreen(
 @Composable
 private fun RunningScreenLandscape(
     viewModel: TreadmillViewModel,
-    voiceState: String,
-    onNavigateHome: () -> Unit,
     onVoiceToggle: (String?) -> Unit,
     isActive: Boolean,
     isManual: Boolean,
@@ -374,29 +295,12 @@ private fun RunningScreenLandscape(
                 .weight(1f)
                 .fillMaxHeight(),
         ) {
-            // Header row with home + voice buttons
+            // Header with timer
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, start = 12.dp, end = 12.dp),
             ) {
-                if (isActive || pgm.completed) {
-                    IconButton(
-                        onClick = { onNavigateHome(); haptic(context, 15) },
-                        modifier = Modifier.align(Alignment.TopStart),
-                    ) {
-                        Icon(Icons.Default.Home, "Home", tint = Color(0x59E8E4DF).copy(alpha = 0.7f))
-                    }
-                    VoiceMicButton(
-                        voiceState = voiceState,
-                        onClick = {
-                            haptic(context, if (voiceState == "idle") 20 else 10)
-                            onVoiceToggle(null)
-                        },
-                        modifier = Modifier.align(Alignment.TopEnd),
-                    )
-                }
-
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -542,59 +446,6 @@ private fun RunningScreenLandscape(
                 }
             }
         }
-    }
-}
-
-/** Mic button with pulsing glow when listening/speaking. */
-@Composable
-private fun VoiceMicButton(
-    voiceState: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val active = voiceState == "listening" || voiceState == "speaking"
-    val isListening = voiceState == "listening"
-    val glowColor = when (voiceState) {
-        "listening" -> Color(0xFFC45C52)
-        "speaking" -> Color(0xFF8B7FA0)
-        else -> Color.Transparent
-    }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "micGlow")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = if (isListening) 0.2f else 0.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (isListening) 1000 else 1600, easing = EaseInOut),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pulseAlpha",
-    )
-
-    IconButton(
-        onClick = onClick,
-        modifier = modifier.drawBehind {
-            if (active) {
-                drawCircle(
-                    color = glowColor.copy(alpha = pulseAlpha),
-                    radius = size.minDimension * 0.7f,
-                )
-            }
-        },
-    ) {
-        Icon(
-            Icons.Default.Mic,
-            contentDescription = when (voiceState) {
-                "listening" -> "Listening"
-                "speaking" -> "Speaking"
-                else -> "Voice"
-            },
-            tint = when (voiceState) {
-                "listening" -> Color(0xFFC45C52)
-                "speaking" -> Color(0xFF8B7FA0)
-                else -> Color(0x59E8E4DF).copy(alpha = 0.7f)
-            },
-        )
     }
 }
 

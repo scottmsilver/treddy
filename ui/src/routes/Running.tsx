@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useLocation } from 'wouter';
 import { useSession } from '../state/useSession';
 import { useProgram } from '../state/useProgram';
 import { useTreadmillState, registerBounceMessage } from '../state/TreadmillContext';
@@ -15,25 +14,15 @@ import ProgramComplete from '../components/ProgramComplete';
 import IdleCard from '../components/IdleCard';
 import HistoryList from '../components/HistoryList';
 import BottomBar from '../components/BottomBar';
-import { HomeIcon, MicIcon } from '../components/shared';
-
-const iconBtn: React.CSSProperties = {
-  width: 44, height: 44,
-  border: 'none', cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  WebkitTapHighlightColor: 'transparent',
-  borderRadius: 'var(--r-md)',
-};
 
 const spring = { type: 'spring' as const, stiffness: 400, damping: 28 };
 const springBouncy = { type: 'spring' as const, stiffness: 300, damping: 20 };
 
 export default function Running(): React.ReactElement {
-  const [, setLocation] = useLocation();
   const sess = useSession();
   const pgm = useProgram();
   const { status } = useTreadmillState();
-  const { voiceState, toggle: toggleVoice } = useVoiceContext();
+  const { toggle: toggleVoice } = useVoiceContext();
   const [durationEditOpen, setDurationEditOpen] = useState(false);
 
   const isManual = pgm.program?.manual === true;
@@ -92,44 +81,6 @@ export default function Running(): React.ReactElement {
     haptic(25);
   };
 
-  const homeButton = (
-    <motion.button
-      layoutId="home-icon"
-      onClick={() => { setLocation('/'); haptic(15); }}
-      style={{
-        ...iconBtn,
-        background: isActive ? 'none' : 'var(--card)',
-        border: isActive ? 'none' : '1px solid rgba(255,255,255,0.25)',
-        color: 'var(--text3)', opacity: 0.7,
-      }}
-      transition={{ layout: springBouncy }}
-      aria-label="Home"
-    >
-      <HomeIcon size={20} />
-    </motion.button>
-  );
-
-  const voiceButton = (
-    <motion.button
-      layoutId="voice-icon"
-      onClick={() => { haptic(voiceState === 'idle' ? 20 : 10); toggleVoice(); }}
-      style={{
-        ...iconBtn,
-        background: isActive ? 'none' : 'var(--card)',
-        border: isActive ? 'none' : '1px solid rgba(255,255,255,0.25)',
-        color: voiceState === 'listening' ? 'var(--red)'
-          : voiceState === 'speaking' ? 'var(--purple)'
-          : 'var(--text3)',
-        opacity: voiceState === 'idle' ? 0.7 : 1,
-        transition: 'color 0.2s, opacity 0.2s',
-      }}
-      transition={{ layout: springBouncy }}
-      aria-label={voiceState === 'idle' ? 'Voice' : voiceState === 'listening' ? 'Listening' : 'Speaking'}
-    >
-      <MicIcon size={20} />
-    </motion.button>
-  );
-
   return (
     <div className="run-screen" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       {/* Hero time with ambient glow */}
@@ -137,17 +88,6 @@ export default function Running(): React.ReactElement {
         textAlign: 'center', padding: '12px 16px 4px', flexShrink: 0,
         position: 'relative',
       }}>
-        {/* Home & Mic in header when active or completed */}
-        {(isActive || pgm.completed) && (
-          <>
-            <div style={{ position: 'absolute', top: 6, left: 16, zIndex: 2 }}>
-              {homeButton}
-            </div>
-            <div style={{ position: 'absolute', top: 6, right: 16, zIndex: 2 }}>
-              {voiceButton}
-            </div>
-          </>
-        )}
         <div style={{
           position: 'absolute', top: '50%', left: '50%',
           width: 200, height: 140,
@@ -288,15 +228,8 @@ export default function Running(): React.ReactElement {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               transition={springBouncy}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
             >
-              {/* Floating icons in the viz area when idle */}
-              <div className="idle-icon idle-icon-left">
-                {homeButton}
-              </div>
-              <div className="idle-icon idle-icon-right">
-                {voiceButton}
-              </div>
               <IdleCard onVoice={(prompt) => { haptic(20); toggleVoice(prompt); }} />
             </motion.div>
           )}

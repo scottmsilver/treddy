@@ -95,8 +95,3 @@ body::after {
 /* Timer font — Inter with tabular nums and tightened kerning */
 .font-timer { font-family: 'Inter', sans-serif; font-feature-settings: "tnum" 1; letter-spacing: -0.03em; }
 .font-timer .colon { display: inline-block; transform: translateY(-0.08em); }
-
-/* Floating Home/Voice icons when idle */
-.idle-icon { position: absolute; top: 6px; z-index: 2; }
-.idle-icon-left { left: 22px; }
-.idle-icon-right { right: 22px; }

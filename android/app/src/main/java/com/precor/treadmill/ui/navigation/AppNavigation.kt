@@ -2,6 +2,7 @@ package com.precor.treadmill.ui.navigation
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -11,6 +12,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
@@ -171,75 +173,92 @@ fun AppNavigation(
         }
     }
 
+    // Orientation detection
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    // Navigation callbacks shared between NavRail and content
+    val navigateTo: (String) -> Unit = { route ->
+        if (route != currentRoute) {
+            navController.navigate(route) {
+                popUpTo(Routes.LOBBY)
+                launchSingleTop = true
+            }
+        }
+    }
+
+    val navRail = @Composable {
+        NavRail(
+            currentRoute = currentRoute,
+            voiceState = voiceState,
+            onNavigate = navigateTo,
+            onVoiceToggle = { handleVoiceToggle(null) },
+            onSettingsToggle = {
+                showSettings = true
+                scope.launch { settingsSheetState.show() }
+            },
+        )
+    }
+
+    val navHostContent = @Composable {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+        ) {
+            composable(Routes.SETUP) {
+                SetupScreen(
+                    onConnected = {
+                        navController.navigate(Routes.LOBBY) {
+                            popUpTo(Routes.SETUP) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(Routes.LOBBY) {
+                LobbyScreen(
+                    onNavigateToRun = {
+                        navController.navigate(Routes.RUNNING)
+                    },
+                    viewModel = viewModel,
+                )
+            }
+            composable(Routes.RUNNING) {
+                RunningScreen(
+                    viewModel = viewModel,
+                    onVoiceToggle = handleVoiceToggle,
+                )
+            }
+            composable(Routes.DEBUG) {
+                DebugScreen(viewModel = viewModel)
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.bg),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Disconnect banner (only shown after setup)
-            if (currentRoute != Routes.SETUP) {
-                DisconnectBanner(connected = wsConnected)
-            }
-
-            // Nav host content
-            Box(modifier = Modifier.weight(1f)) {
-                NavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                ) {
-                    composable(Routes.SETUP) {
-                        SetupScreen(
-                            onConnected = {
-                                navController.navigate(Routes.LOBBY) {
-                                    popUpTo(Routes.SETUP) { inclusive = true }
-                                }
-                            }
-                        )
-                    }
-                    composable(Routes.LOBBY) {
-                        LobbyScreen(
-                            onNavigateToRun = {
-                                navController.navigate(Routes.RUNNING)
-                            },
-                            viewModel = viewModel,
-                        )
-                    }
-                    composable(Routes.RUNNING) {
-                        RunningScreen(
-                            viewModel = viewModel,
-                            voiceState = voiceState,
-                            onNavigateHome = {
-                                navController.popBackStack(Routes.LOBBY, inclusive = false)
-                            },
-                            onVoiceToggle = handleVoiceToggle,
-                        )
-                    }
-                    composable(Routes.DEBUG) {
-                        DebugScreen(viewModel = viewModel)
+        if (isLandscape) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (currentRoute != Routes.SETUP) {
+                    DisconnectBanner(connected = wsConnected)
+                }
+                Row(modifier = Modifier.weight(1f)) {
+                    navRail()
+                    Box(modifier = Modifier.weight(1f)) {
+                        navHostContent()
                     }
                 }
             }
-
-            // Tab bar (hidden on setup and running screens)
-            if (currentRoute != Routes.SETUP && currentRoute != Routes.RUNNING) {
-                TabBar(
-                    currentRoute = currentRoute,
-                    voiceState = voiceState,
-                    onNavigate = { route ->
-                        if (route != currentRoute) {
-                            navController.navigate(route) {
-                                popUpTo(Routes.LOBBY)
-                                launchSingleTop = true
-                            }
-                        }
-                    },
-                    onVoiceToggle = { handleVoiceToggle(null) },
-                    onSettingsToggle = {
-                        showSettings = true
-                        scope.launch { settingsSheetState.show() }
-                    },
-                )
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (currentRoute != Routes.SETUP) {
+                    DisconnectBanner(connected = wsConnected)
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    navHostContent()
+                }
+                navRail()
             }
         }
 
@@ -251,8 +270,6 @@ fun AppNavigation(
                 .align(Alignment.TopCenter)
                 .statusBarsPadding(),
         )
-
-        // Voice overlay removed — mic icon glow on RunningScreen serves as indicator
     }
 
     // Settings bottom sheet

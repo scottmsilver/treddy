@@ -1,5 +1,6 @@
 package com.precor.treadmill.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,12 +21,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun TabBar(
+fun NavRail(
     currentRoute: String,
     voiceState: String, // "idle", "listening", "speaking"
     onNavigate: (String) -> Unit,
@@ -33,45 +35,85 @@ fun TabBar(
     onSettingsToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isRunRoute = currentRoute.startsWith("running")
+    val isRunSelected = currentRoute.startsWith("running")
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    // Hide tab bar during running screen (BottomBar takes over)
-    if (isRunRoute) return
-
-    val bottomSafe = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(bottom = bottomSafe)
-            .height(60.dp)
-            .background(Color(0xFF121210))
-            .padding(horizontal = 24.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TabItem(
-            icon = Icons.Default.Home,
-            label = "Home",
-            selected = currentRoute == "lobby",
-            onClick = { onNavigate("lobby") },
-        )
-        TabItem(
-            icon = Icons.AutoMirrored.Filled.DirectionsRun,
-            label = "Run",
-            selected = isRunRoute,
-            onClick = { onNavigate("running") },
-        )
-        // Voice button with state-dependent color and glow
-        VoiceTabItem(
-            voiceState = voiceState,
-            onClick = onVoiceToggle,
-        )
-        TabItem(
-            icon = Icons.Default.Settings,
-            label = "Settings",
-            selected = false,
-            onClick = onSettingsToggle,
-        )
+    if (isLandscape) {
+        val layoutDir = LocalLayoutDirection.current
+        val startSafe = WindowInsets.safeDrawing.asPaddingValues().calculateStartPadding(layoutDir)
+        // Modifier order: bg covers safe area, padding offsets content, then fixed 56dp content width
+        Column(
+            modifier = modifier
+                .fillMaxHeight()
+                .background(Color(0xFF121210))
+                .padding(start = startSafe)
+                .width(56.dp)
+                .padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            TabItem(
+                icon = Icons.Default.Home,
+                label = "Home",
+                selected = currentRoute == "lobby",
+                onClick = { onNavigate("lobby") },
+                showLabel = false,
+            )
+            TabItem(
+                icon = Icons.AutoMirrored.Filled.DirectionsRun,
+                label = "Run",
+                selected = isRunSelected,
+                onClick = { onNavigate("running") },
+                showLabel = false,
+            )
+            VoiceTabItem(
+                voiceState = voiceState,
+                onClick = onVoiceToggle,
+                showLabel = false,
+            )
+            TabItem(
+                icon = Icons.Default.Settings,
+                label = "Settings",
+                selected = false,
+                onClick = onSettingsToggle,
+                showLabel = false,
+            )
+        }
+    } else {
+        val bottomSafe = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .background(Color(0xFF121210))
+                .padding(bottom = bottomSafe)
+                .height(56.dp)
+                .padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TabItem(
+                icon = Icons.Default.Home,
+                label = "Home",
+                selected = currentRoute == "lobby",
+                onClick = { onNavigate("lobby") },
+            )
+            TabItem(
+                icon = Icons.AutoMirrored.Filled.DirectionsRun,
+                label = "Run",
+                selected = isRunSelected,
+                onClick = { onNavigate("running") },
+            )
+            VoiceTabItem(
+                voiceState = voiceState,
+                onClick = onVoiceToggle,
+            )
+            TabItem(
+                icon = Icons.Default.Settings,
+                label = "Settings",
+                selected = false,
+                onClick = onSettingsToggle,
+            )
+        }
     }
 }
 
@@ -82,6 +124,7 @@ private fun TabItem(
     selected: Boolean,
     onClick: () -> Unit,
     tint: Color? = null,
+    showLabel: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val color = tint ?: if (selected) Color(0xFFE8E4DF) else Color(0x59E8E4DF)
@@ -93,7 +136,7 @@ private fun TabItem(
                 indication = null,
                 onClick = onClick,
             )
-            .padding(vertical = 4.dp, horizontal = 12.dp),
+            .padding(vertical = if (showLabel) 4.dp else 10.dp, horizontal = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
@@ -102,12 +145,14 @@ private fun TabItem(
             tint = color,
             modifier = Modifier.size(24.dp),
         )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = label,
-            color = color,
-            fontSize = 10.sp,
-        )
+        if (showLabel) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = label,
+                color = color,
+                fontSize = 10.sp,
+            )
+        }
     }
 }
 
@@ -115,6 +160,7 @@ private fun TabItem(
 private fun VoiceTabItem(
     voiceState: String,
     onClick: () -> Unit,
+    showLabel: Boolean = true,
 ) {
     val active = voiceState == "listening" || voiceState == "speaking"
     val isListening = voiceState == "listening"
@@ -148,7 +194,7 @@ private fun VoiceTabItem(
                 indication = null,
                 onClick = onClick,
             )
-            .padding(vertical = 4.dp, horizontal = 12.dp),
+            .padding(vertical = if (showLabel) 4.dp else 10.dp, horizontal = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
@@ -170,15 +216,17 @@ private fun VoiceTabItem(
                     }
                 },
         )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = when (voiceState) {
-                "listening" -> "Listening"
-                "speaking" -> "Speaking"
-                else -> "Voice"
-            },
-            color = color,
-            fontSize = 10.sp,
-        )
+        if (showLabel) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = when (voiceState) {
+                    "listening" -> "Listening"
+                    "speaking" -> "Speaking"
+                    else -> "Voice"
+                },
+                color = color,
+                fontSize = 10.sp,
+            )
+        }
     }
 }

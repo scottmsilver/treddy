@@ -56,7 +56,8 @@ fun RunningScreen(
     val physicalActive = sess.active || pgm.running
 
     // Delayed visual active state for manual programs
-    var visualActive by remember { mutableStateOf(false) }
+    // Initialize to current state so rotation doesn't re-trigger enter animation
+    var visualActive by remember { mutableStateOf(physicalActive) }
     LaunchedEffect(physicalActive, isManual, status.emuSpeed, status.emuIncline) {
         if (physicalActive && isManual && !visualActive) {
             delay(1200)
@@ -69,6 +70,9 @@ fun RunningScreen(
     }
 
     val isActive = visualActive
+    // Pre-seed transition so rotation doesn't re-trigger enter animation
+    val timerVisible = remember { MutableTransitionState(isActive) }
+    timerVisible.targetState = isActive
     var durationEditOpen by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -78,7 +82,7 @@ fun RunningScreen(
         RunningScreenLandscape(
             viewModel = viewModel,
             onVoiceToggle = onVoiceToggle,
-            isActive = isActive,
+            timerVisible = timerVisible,
             isManual = isManual,
             durationEditOpen = durationEditOpen,
             onDurationEditToggle = { durationEditOpen = !durationEditOpen },
@@ -120,7 +124,7 @@ fun RunningScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 AnimatedVisibility(
-                    visible = isActive,
+                    visibleState = timerVisible,
                     enter = fadeIn() + scaleIn(initialScale = 0.8f),
                     exit = fadeOut() + scaleOut(targetScale = 0.8f),
                 ) {
@@ -255,7 +259,7 @@ fun RunningScreen(
 private fun RunningScreenLandscape(
     viewModel: TreadmillViewModel,
     onVoiceToggle: (String?) -> Unit,
-    isActive: Boolean,
+    timerVisible: MutableTransitionState<Boolean>,
     isManual: Boolean,
     durationEditOpen: Boolean,
     onDurationEditToggle: () -> Unit,
@@ -295,7 +299,7 @@ private fun RunningScreenLandscape(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     AnimatedVisibility(
-                        visible = isActive,
+                        visibleState = timerVisible,
                         enter = fadeIn() + scaleIn(initialScale = 0.8f),
                         exit = fadeOut() + scaleOut(targetScale = 0.8f),
                     ) {

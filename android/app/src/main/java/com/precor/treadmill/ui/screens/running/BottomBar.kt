@@ -25,6 +25,7 @@ import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
 fun BottomBar(
     viewModel: TreadmillViewModel,
     showControls: Boolean = true,
+    externalPadding: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val status by viewModel.status.collectAsState()
@@ -37,12 +38,13 @@ fun BottomBar(
 
     // Use safeDrawing insets for bottom — covers nav bar, display cutouts, and curved screens
     val bottomSafe = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
-    val bottomPad = max(bottomSafe, 8.dp)
+    val bottomPad = if (externalPadding) 0.dp else max(bottomSafe, 8.dp)
+    val topPad = if (externalPadding) 0.dp else 6.dp
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 6.dp)
+            .padding(top = topPad)
             .padding(bottom = bottomPad),
     ) {
         // Speed/Incline controls (hidden in landscape where they're shown separately)

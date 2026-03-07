@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
 
         // Hide system navigation bar — sticky immersive so it auto-hides after swipe
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.hide(WindowInsetsCompat.Type.navigationBars())
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
         insetsController.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
         if (hasFocus) {
             // Re-hide nav bar when focus returns (e.g. after dialog or app switch)
             val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-            insetsController.hide(WindowInsetsCompat.Type.navigationBars())
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }

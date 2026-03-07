@@ -1,6 +1,9 @@
 package com.precor.treadmill.ui.screens.running
 
 import android.content.res.Configuration
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.Typeface
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -13,17 +16,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.core.content.res.ResourcesCompat
+import com.precor.treadmill.R
 import com.precor.treadmill.ui.components.HistoryList
 import com.precor.treadmill.ui.theme.TimerFontFamily
 import com.precor.treadmill.ui.util.glowText
@@ -31,6 +39,35 @@ import com.precor.treadmill.ui.util.timerText
 import com.precor.treadmill.ui.util.haptic
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
 import kotlinx.coroutines.delay
+
+/** Symmetric edge padding for top (via timer trim) and bottom (via Column padding) */
+private val EdgePad = 16.dp
+
+/**
+ * Pre-compute the glyph bounds (pixels above/below baseline) for timer characters,
+ * using the actual font at the given size. These values are combined with
+ * placeable[FirstBaseline] in the layout modifier to compute exact trim amounts.
+ *
+ * Returns (glyphAboveBaseline, glyphBelowBaseline) in pixels.
+ */
+@Composable
+private fun timerGlyphBounds(fontSize: TextUnit): Pair<Int, Int> {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val fontSizePx = with(density) { fontSize.toPx() }
+
+    return remember(fontSizePx) {
+        val typeface = ResourcesCompat.getFont(context, R.font.inter_variable) ?: Typeface.DEFAULT
+        val paint = Paint().apply {
+            textSize = fontSizePx
+            this.typeface = typeface
+        }
+        val bounds = Rect()
+        paint.getTextBounds("0:00", 0, 4, bounds)
+        // bounds.top is negative (above baseline), bounds.bottom is positive (below baseline)
+        (-bounds.top) to bounds.bottom
+    }
+}
 
 @Composable
 fun RunningScreen(
@@ -91,17 +128,22 @@ fun RunningScreen(
         return
     }
 
+    // Edge padding applied to Column bottom; timer trim matches this value
+    val edgePadPx = with(LocalDensity.current) { EdgePad.roundToPx() }
+    val (glyphAbove, glyphBelow) = timerGlyphBounds(96.sp)
+
+    // 3-row layout: top (timer+metrics), middle (HUD), bottom (buttons)
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF121210))
-            .statusBarsPadding(),
+            .padding(top = 0.dp, bottom = EdgePad),
     ) {
-        // Header with hero timer
+        // ROW 1: Timer + Metrics (wraps content)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp, start = 16.dp, end = 16.dp, bottom = 4.dp),
+                .padding(horizontal = 16.dp),
         ) {
             // Ambient glow
             if (isActive) {
@@ -118,7 +160,6 @@ fun RunningScreen(
                 )
             }
 
-            // Hero timer
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -128,7 +169,6 @@ fun RunningScreen(
                     enter = fadeIn() + scaleIn(initialScale = 0.8f),
                     exit = fadeOut() + scaleOut(targetScale = 0.8f),
                 ) {
-                    // Bounce only on timer↔encouragement transition, not on text changes within
                     AnimatedContent(
                         targetState = encouragement != null,
                         transitionSpec = {
@@ -169,6 +209,17 @@ fun RunningScreen(
                                     fontFeatureSettings = "tnum",
                                 ),
                                 modifier = Modifier
+                                    .layout { measurable, constraints ->
+                                        val placeable = measurable.measure(constraints)
+                                        val baseline = placeable[FirstBaseline]
+                                        val visibleTop = baseline - glyphAbove
+                                        val visibleBottom = baseline + glyphBelow
+                                        val trimTop = (visibleTop - edgePadPx).coerceAtLeast(0)
+                                        val trimBottom = (placeable.height - visibleBottom - edgePadPx).coerceAtLeast(0)
+                                        layout(placeable.width, placeable.height - trimTop - trimBottom) {
+                                            placeable.place(0, -trimTop)
+                                        }
+                                    }
                                     .clickable(
                                         enabled = isManual && pgm.running,
                                         interactionSource = remember { MutableInteractionSource() },
@@ -203,10 +254,9 @@ fun RunningScreen(
             }
         }
 
-        // Metrics row
         MetricsRow(viewModel = viewModel)
 
-        // Main content area (HUD / Complete / Idle)
+        // ROW 2: HUD / Complete / Idle (fills remaining space)
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -250,8 +300,8 @@ fun RunningScreen(
             }
         }
 
-        // Bottom bar
-        BottomBar(viewModel = viewModel)
+        // ROW 3: Bottom bar (wraps content, no internal padding)
+        BottomBar(viewModel = viewModel, externalPadding = true)
     }
 }
 
@@ -274,24 +324,31 @@ private fun RunningScreenLandscape(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF121210))
-            .systemBarsPadding(),
+            .background(Color(0xFF121210)),
     ) {
         // Proportional scaling (reference: ~740dp tablet landscape)
         val h = maxHeight.value
         val w = maxWidth.value
         val timerFontSize = (h * 0.14f).coerceIn(48f, 140f).sp
         val encourageFontSize = (h * 0.05f).coerceIn(18f, 42f).sp
-        val timerPadTop = (h * 0.02f).coerceIn(4f, 16f).dp
         val metricsScale = (h / 380f).coerceIn(1f, 2f)
         val controlsWidth = (w * 0.28f).coerceIn(240f, 400f).dp
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Timer — wraps content, proportional font + padding
+        val edgePad = 16.dp
+        val edgePadPx = with(LocalDensity.current) { edgePad.roundToPx() }
+        val (lsGlyphAbove, lsGlyphBelow) = timerGlyphBounds(timerFontSize)
+
+        // 3-row layout: top (timer+metrics), middle (HUD+controls), bottom (buttons)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 0.dp, bottom = EdgePad),
+        ) {
+            // ROW 1: Timer + Metrics (wraps content)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, top = timerPadTop),
+                    .padding(horizontal = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
@@ -340,11 +397,21 @@ private fun RunningScreenLandscape(
                                         letterSpacing = (-0.03).em,
                                         fontFeatureSettings = "tnum",
                                     ),
-                                    modifier = Modifier.clickable(
-                                        enabled = isManual && pgm.running,
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                    ) { onDurationEditToggle(); haptic(context, 10) },
+                                    modifier = Modifier
+                                        .layout { measurable, constraints ->
+                                            val placeable = measurable.measure(constraints)
+                                            val baseline = placeable[FirstBaseline]
+                                            val trimTop = (baseline - lsGlyphAbove - edgePadPx).coerceAtLeast(0)
+                                            val trimBottom = (placeable.height - baseline - lsGlyphBelow - edgePadPx).coerceAtLeast(0)
+                                            layout(placeable.width, placeable.height - trimTop - trimBottom) {
+                                                placeable.place(0, -trimTop)
+                                            }
+                                        }
+                                        .clickable(
+                                            enabled = isManual && pgm.running,
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                        ) { onDurationEditToggle(); haptic(context, 10) },
                                 )
                             }
                         }
@@ -354,9 +421,8 @@ private fun RunningScreenLandscape(
 
             MetricsRow(viewModel = viewModel, scale = metricsScale)
 
-            // HUD (left) + speed/incline controls (right) — aligned top/bottom
+            // ROW 2: HUD + speed/incline controls (fills remaining space)
             Row(modifier = Modifier.weight(1f)) {
-                // HUD / Complete / Idle
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     when {
                         pgm.program != null && pgm.running -> ProgramHUD(viewModel = viewModel, modifier = Modifier.fillMaxSize())
@@ -372,7 +438,6 @@ private fun RunningScreenLandscape(
                     }
                 }
 
-                // Speed/incline controls — vertical padding matches ProgramHUD's internal padding
                 SpeedInclineControls(
                     viewModel = viewModel,
                     vertical = true,
@@ -384,8 +449,8 @@ private fun RunningScreenLandscape(
                 )
             }
 
-            // Stop/Resume spans full width below HUD + controls
-            BottomBar(viewModel = viewModel, showControls = false)
+            // ROW 3: Stop/Resume buttons (wraps content, no internal padding)
+            BottomBar(viewModel = viewModel, showControls = false, externalPadding = true)
         }
     }
 }

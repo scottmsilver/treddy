@@ -13,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -27,7 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
+import com.precor.treadmill.ui.theme.touchFingertip
+import com.precor.treadmill.ui.theme.touchFingerPad
 import com.precor.treadmill.ui.util.haptic
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
 import kotlinx.coroutines.delay
@@ -131,10 +131,8 @@ private fun ControlPanel(
     val smallAmount = if (metricName == "speed") "%.1f mph".format(smallDelta / 10.0) else "%.1f%%".format(smallDelta)
     val largeAmount = if (metricName == "speed") "%.1f mph".format(largeDelta / 10.0) else "%.1f%%".format(largeDelta)
 
-    val config = LocalConfiguration.current
-    val isTablet = minOf(config.screenWidthDp, config.screenHeightDp) >= 600
-    val btnW = if (isTablet) 52.dp else 44.dp
-    val btnH = if (isTablet) 72.dp else 62.dp
+    val btnW = touchFingertip()
+    val btnH = touchFingerPad()
 
     Row(
         modifier = modifier
@@ -177,8 +175,8 @@ private fun ControlPanel(
         }
 
         // Value display
-        val valueFontSize = if (fillHeight) 40.sp else if (isTablet) 32.sp else 26.sp
-        val labelFontSize = if (fillHeight) 14.sp else if (isTablet) 12.sp else 10.sp
+        val valueFontSize = if (fillHeight) 40.sp else (btnH.value * 0.42f).sp
+        val labelFontSize = if (fillHeight) 14.sp else (btnH.value * 0.16f).sp
         Column(
             modifier = Modifier
                 .weight(1f)

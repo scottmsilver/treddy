@@ -5,7 +5,7 @@ import { haptic } from '../utils/haptics';
 import SpeedInclineControls from './SpeedInclineControls';
 
 const actionBtn: React.CSSProperties = {
-  height: 50, borderRadius: 14, border: 'none',
+  height: 'var(--touch-finger-pad)', borderRadius: 14, border: 'none',
   fontWeight: 600, fontFamily: 'inherit',
   cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
 };
@@ -48,6 +48,7 @@ export default function BottomBar(): React.ReactElement {
             disabled={!isRunning}
             style={{
               ...actionBtn, flex: 1, fontSize: 17,
+              height: 'var(--touch-thumb-pad)',
               background: isRunning ? 'var(--red)' : 'var(--fill)',
               color: isRunning ? '#fff' : 'var(--text3)',
               cursor: isRunning ? 'pointer' : 'default',

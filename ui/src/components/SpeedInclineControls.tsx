@@ -36,7 +36,7 @@ function DoubleChevronDown({ sw = 2.5 }: { sw?: number }) {
 
 // Clean pill button — matches Home/Voice style
 const btn: React.CSSProperties = {
-  width: 38, height: 54, borderRadius: 10, boxSizing: 'border-box' as const,
+  width: 'var(--touch-fingertip)', height: 'var(--touch-finger-pad)', borderRadius: 10, boxSizing: 'border-box' as const,
   border: 'none', background: 'var(--fill)',
   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
   WebkitTapHighlightColor: 'transparent',

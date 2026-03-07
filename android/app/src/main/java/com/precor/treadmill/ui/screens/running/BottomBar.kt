@@ -16,7 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
+import com.precor.treadmill.ui.theme.touchFingerPad
+import com.precor.treadmill.ui.theme.touchThumbPad
 import com.precor.treadmill.ui.util.haptic
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
 
@@ -31,7 +32,8 @@ fun BottomBar(
     val context = LocalContext.current
 
     val isRunning = status.emulate && (status.emuSpeed > 0 || (pgm.running && !pgm.paused))
-    val btnHeight = if (LocalConfiguration.current.screenWidthDp >= 600) 58.dp else 50.dp
+    val defaultHeight = touchFingerPad()
+    val stopHeight = touchThumbPad()
 
     // Use safeDrawing insets for bottom — covers nav bar, display cutouts, and curved screens
     val bottomSafe = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
@@ -72,7 +74,7 @@ fun BottomBar(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .weight(2f)
-                        .height(btnHeight),
+                        .height(defaultHeight),
                 ) {
                     Text("Resume", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 }
@@ -88,7 +90,7 @@ fun BottomBar(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .height(btnHeight),
+                        .height(defaultHeight),
                 ) {
                     Text("Reset", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
@@ -111,7 +113,7 @@ fun BottomBar(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .height(btnHeight)
+                        .height(stopHeight)
                         .alpha(if (isRunning) 1f else 0.4f),
                 ) {
                     Text("Stop", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)

@@ -7,15 +7,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -30,7 +26,6 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.precor.treadmill.ui.components.HistoryList
 import com.precor.treadmill.ui.theme.TimerFontFamily
-import com.precor.treadmill.ui.util.fmtDur
 import com.precor.treadmill.ui.util.glowText
 import com.precor.treadmill.ui.util.timerText
 import com.precor.treadmill.ui.util.haptic
@@ -183,17 +178,6 @@ fun RunningScreen(
                     }
                 }
 
-                // Manual remaining time
-                if (isManual && pgm.running) {
-                    Text(
-                        text = timerText("${fmtDur(pgm.totalRemaining.toInt())} remaining of ${fmtDur(pgm.totalDuration.toInt())}"),
-                        color = Color(0x59E8E4DF),
-                        fontSize = 12.sp,
-                        fontFamily = TimerFontFamily,
-                        letterSpacing = (-0.03).em,
-                    )
-                }
-
                 // Duration edit buttons
                 AnimatedVisibility(
                     visible = durationEditOpen && isManual && pgm.running,
@@ -279,12 +263,8 @@ private fun RunningScreenLandscape(
 ) {
     val sess by viewModel.derivedSession.collectAsState()
     val pgm by viewModel.derivedProgram.collectAsState()
-    val status by viewModel.status.collectAsState()
     val encouragement by viewModel.encouragement.collectAsState()
     val context = LocalContext.current
-
-    val bottomSafe = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
-    val isRunning = status.emulate && (status.emuSpeed > 0 || (pgm.running && !pgm.paused))
 
     // Use BoxWithConstraints to scale elements proportionally to available height
     BoxWithConstraints(
@@ -299,10 +279,8 @@ private fun RunningScreenLandscape(
         val timerFontSize = (h * 0.14f).coerceIn(48f, 140f).sp
         val encourageFontSize = (h * 0.05f).coerceIn(18f, 42f).sp
         val timerPadTop = (h * 0.02f).coerceIn(4f, 16f).dp
-        val stopHeight = (h * 0.07f).coerceIn(40f, 56f).dp
-        val stopFontSize = (h * 0.025f).coerceIn(14f, 20f).sp
         val metricsScale = (h / 380f).coerceIn(1f, 2f)
-        val controlsWidth = (w * 0.22f).coerceIn(200f, 340f).dp
+        val controlsWidth = (w * 0.28f).coerceIn(240f, 400f).dp
 
         Column(modifier = Modifier.fillMaxSize()) {
             // Timer — wraps content, proportional font + padding
@@ -403,57 +381,7 @@ private fun RunningScreenLandscape(
             }
 
             // Stop/Resume spans full width below HUD + controls
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .padding(bottom = max(bottomSafe, 4.dp)),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (pgm.paused) {
-                    Button(
-                        onClick = { viewModel.pauseProgram(); haptic(context, 25) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6BC89B),
-                            contentColor = Color.White,
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.weight(2f).height(stopHeight),
-                    ) {
-                        Text("Resume", fontSize = stopFontSize, fontWeight = FontWeight.SemiBold)
-                    }
-                    Button(
-                        onClick = { viewModel.resetAll(); haptic(context, longArrayOf(50, 30, 50)) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFC45C52).copy(alpha = 0.15f),
-                            contentColor = Color(0xFFC45C52),
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.weight(1f).height(stopHeight),
-                    ) {
-                        Text("Reset", fontSize = stopFontSize, fontWeight = FontWeight.SemiBold)
-                    }
-                } else {
-                    Button(
-                        onClick = {
-                            if (isRunning) { viewModel.pauseProgram(); haptic(context, longArrayOf(50, 30, 50)) }
-                        },
-                        enabled = isRunning,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRunning) Color(0xFFC45C52) else Color(0x3D787880),
-                            contentColor = if (isRunning) Color.White else Color(0x59E8E4DF),
-                            disabledContainerColor = Color(0x3D787880),
-                            disabledContentColor = Color(0x59E8E4DF),
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f).height(stopHeight).alpha(if (isRunning) 1f else 0.4f),
-                    ) {
-                        Text("Stop", fontSize = stopFontSize, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
+            BottomBar(viewModel = viewModel, showControls = false)
         }
     }
 }

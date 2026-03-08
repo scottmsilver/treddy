@@ -663,6 +663,79 @@ async fn test_26_concurrent_connections() {
     println!("Daemon survived 5 concurrent connections");
 }
 
+// ---- Kinomap flow tests ----
+// Simulate Kinomap iOS behavior: incline-only control, reads speed passively.
+// The alive signal should provide non-zero data even when the treadmill is idle.
+
+#[tokio::test]
+#[ignore]
+async fn test_30_kinomap_ios_flow_incline_only() {
+    // Kinomap iOS never sends a speed command. It only:
+    // 1. Requests control
+    // 2. Sets incline
+    // 3. Reads treadmill data (speed must be non-zero or it disconnects)
+    let mut client = DebugClient::connect().await;
+
+    // Step 1: Request control (opcode 0x00)
+    let lines = client.send_cmd("cp 00").await;
+    let resp = DebugClient::extract_resp(&lines).expect("should get resp");
+    assert_eq!(resp, "800001", "Request Control should succeed");
+
+    // Step 2: Set incline to 3.0% (30 tenths, 0x001E LE = 1e00)
+    let lines = client.send_cmd("cp 03 1e00").await;
+    let resp = DebugClient::extract_resp(&lines).expect("should get resp");
+    assert!(resp.starts_with("8003"), "Set Incline response");
+    assert!(resp.ends_with("01"), "Set Incline should succeed");
+
+    // Step 3: Read treadmill data — speed should be non-zero (alive signal)
+    sleep(Duration::from_millis(500)).await;
+    let lines = client.send_cmd("td").await;
+    assert_eq!(lines.len(), 1, "td should return one hex line");
+
+    let bytes = hex_to_bytes(&lines[0]);
+    assert_eq!(bytes.len(), 13, "treadmill data should be 13 bytes");
+
+    let speed = u16::from_le_bytes([bytes[2], bytes[3]]);
+    let incline = i16::from_le_bytes([bytes[7], bytes[8]]);
+    let elapsed = u16::from_le_bytes([bytes[11], bytes[12]]);
+
+    println!(
+        "Kinomap iOS flow: speed={} incline={} elapsed={}",
+        speed, incline, elapsed
+    );
+
+    // Key assertion: speed must be non-zero for Kinomap to accept the connection
+    assert!(speed > 0, "alive signal should provide non-zero speed, got {}", speed);
+
+    // Elapsed should be ticking (session uptime) since no real workout elapsed
+    // We just connected so it should be small but may be >0
+    println!("Session elapsed: {}s", elapsed);
+
+    // Cleanup: stop
+    client.send_cmd("cp 08 01").await;
+    sleep(Duration::from_secs(1)).await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_31_treadmill_data_has_alive_signal_at_idle() {
+    // Even with no control commands, treadmill data should have non-zero speed
+    let mut client = DebugClient::connect().await;
+
+    // Read treadmill data immediately — no speed/incline commands sent
+    let lines = client.send_cmd("td").await;
+    assert_eq!(lines.len(), 1, "td should return one hex line");
+
+    let bytes = hex_to_bytes(&lines[0]);
+    assert_eq!(bytes.len(), 13);
+
+    let speed = u16::from_le_bytes([bytes[2], bytes[3]]);
+    println!("Idle treadmill data speed: {} (hundredths km/h)", speed);
+
+    // Alive signal: minimum 50 (0.50 km/h)
+    assert!(speed >= 50, "idle speed should be at least 50 (0.50 km/h), got {}", speed);
+}
+
 // ---- Helpers ----
 
 fn hex_to_bytes(hex: &str) -> Vec<u8> {

@@ -26,6 +26,12 @@ use crate::protocol::{
 };
 use crate::treadmill::TreadmillState;
 
+/// Minimum speed reported over BLE when the treadmill is idle (km/h * 100).
+/// Apps like Kinomap (iOS) only control incline and read speed from the
+/// treadmill; they reject the connection if speed is always zero.
+/// 50 = 0.50 km/h (~0.3 mph) — small enough to not affect real workouts.
+const IDLE_MIN_SPEED_KMH_HUNDREDTHS: u16 = 50;
+
 /// Run the FTMS BLE GATT server. Advertises and notifies at 1 Hz.
 /// `socket_path` is passed through for control point commands that need to send
 /// speed/incline changes back to treadmill_io.
@@ -42,6 +48,36 @@ pub async fn run(
         adapter.name(),
         adapter.address().await?
     );
+
+    // Register a pairing agent that auto-accepts all pairing/authorization
+    // requests. iOS requires successful pairing for BLE GATT access. Setting
+    // confirmation/authorization handlers makes bluer advertise DisplayYesNo
+    // capability, triggering Numeric Comparison on iOS (user taps "Pair" once).
+    // The Pi side auto-confirms so no interaction is needed here.
+    let agent = bluer::agent::Agent {
+        request_default: true,
+        request_confirmation: Some(Box::new(|req| {
+            Box::pin(async move {
+                info!("Auto-accepting pairing confirmation from {}", req.device);
+                Ok(())
+            })
+        })),
+        request_authorization: Some(Box::new(|req| {
+            Box::pin(async move {
+                info!("Auto-accepting authorization from {}", req.device);
+                Ok(())
+            })
+        })),
+        authorize_service: Some(Box::new(|req| {
+            Box::pin(async move {
+                info!("Auto-authorizing service {} from {}", req.service, req.device);
+                Ok(())
+            })
+        })),
+        ..Default::default()
+    };
+    let _agent_handle = session.register_agent(agent).await?;
+    info!("Bluetooth pairing agent registered (auto-accept)");
 
     // --- Advertisement ---
     // Advertise just the service UUID and local name. Omit FTMS service data
@@ -77,6 +113,7 @@ pub async fn run(
                 );
                 let mut notifier = notifier;
                 let mut interval = tokio::time::interval(Duration::from_secs(1));
+                let session_start = std::time::Instant::now();
                 loop {
                     interval.tick().await;
 
@@ -84,7 +121,10 @@ pub async fn run(
                         break;
                     }
 
-                    let data = state.lock().await.encode_ftms_data();
+                    let s = state.lock().await;
+                    let session_secs = session_start.elapsed().as_secs().min(u16::MAX as u64) as u16;
+                    let data = encode_ftms_data_with_alive(&s, session_secs);
+                    drop(s);
 
                     debug!("Treadmill Data notify: {} bytes", data.len());
                     if let Err(err) = notifier.notify(data).await {
@@ -196,7 +236,7 @@ pub async fn run(
                                 let state = state.clone();
                                 async move {
                                     debug!("Treadmill Data characteristic read");
-                                    Ok(state.lock().await.encode_ftms_data())
+                                    Ok(encode_ftms_data_with_alive(&*state.lock().await, 0))
                                 }
                                 .boxed()
                             }
@@ -512,6 +552,25 @@ pub async fn handle_control_command(
     }
 }
 
+/// Encode FTMS Treadmill Data with idle-state alive signal.
+///
+/// When the treadmill is idle (speed=0, no workout elapsed), substitutes a
+/// minimum speed and the given session uptime so BLE clients see active data.
+/// This is required for apps like Kinomap (iOS) that read speed passively.
+pub(crate) fn encode_ftms_data_with_alive(state: &TreadmillState, session_elapsed_secs: u16) -> Vec<u8> {
+    let mut speed_kmh = protocol::mph_tenths_to_kmh_hundredths(state.speed_tenths_mph);
+    let incline_tenths = (state.incline_half_pct as i16) * 5;
+    if speed_kmh == 0 {
+        speed_kmh = IDLE_MIN_SPEED_KMH_HUNDREDTHS;
+    }
+    let elapsed = if state.elapsed_secs > 0 {
+        state.elapsed_secs
+    } else {
+        session_elapsed_secs
+    };
+    protocol::encode_treadmill_data(speed_kmh, incline_tenths, state.distance_meters, elapsed)
+}
+
 /// Encode a Training Status notification for start/stop state changes.
 ///
 /// Training Status format: [flags(1), status(1)]
@@ -557,5 +616,95 @@ fn encode_status_notification(cmd: &protocol::ControlCommand) -> Option<Vec<u8>>
             Some(vec![0x02, *param]) // Stopped or Paused
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::treadmill::TreadmillState;
+
+    /// Parse the 13-byte FTMS Treadmill Data characteristic value.
+    fn parse_treadmill_data(data: &[u8]) -> (u16, u16, u32, i16, u16) {
+        assert_eq!(data.len(), 13);
+        let flags = u16::from_le_bytes([data[0], data[1]]);
+        let speed = u16::from_le_bytes([data[2], data[3]]);
+        let distance = u32::from_le_bytes([data[4], data[5], data[6], 0]);
+        let incline = i16::from_le_bytes([data[7], data[8]]);
+        let elapsed = u16::from_le_bytes([data[11], data[12]]);
+        (flags, speed, distance, incline, elapsed)
+    }
+
+    #[test]
+    fn test_alive_signal_idle_state() {
+        let state = TreadmillState::default();
+        let data = encode_ftms_data_with_alive(&state, 42);
+        let (flags, speed, _dist, incline, elapsed) = parse_treadmill_data(&data);
+
+        assert_eq!(flags, 0x040C); // standard FTMS treadmill data flags
+        assert_eq!(speed, IDLE_MIN_SPEED_KMH_HUNDREDTHS); // alive signal speed
+        assert_eq!(incline, 0);
+        assert_eq!(elapsed, 42); // session elapsed substituted
+    }
+
+    #[test]
+    fn test_alive_signal_real_speed_passes_through() {
+        let state = TreadmillState {
+            speed_tenths_mph: 30, // 3.0 mph
+            ..Default::default()
+        };
+        let data = encode_ftms_data_with_alive(&state, 10);
+        let (_flags, speed, _dist, _incline, _elapsed) = parse_treadmill_data(&data);
+
+        // 3.0 mph = 4.828 km/h = 483 hundredths
+        assert!(speed > IDLE_MIN_SPEED_KMH_HUNDREDTHS);
+        assert_eq!(speed, protocol::mph_tenths_to_kmh_hundredths(30));
+    }
+
+    #[test]
+    fn test_alive_signal_incline_only_kinomap_flow() {
+        // Simulates Kinomap iOS: sets incline but no speed command.
+        // Treadmill is idle so speed=0, but alive signal kicks in.
+        let state = TreadmillState {
+            incline_half_pct: 10, // 5.0%
+            ..Default::default()
+        };
+        let data = encode_ftms_data_with_alive(&state, 5);
+        let (_flags, speed, _dist, incline, elapsed) = parse_treadmill_data(&data);
+
+        assert_eq!(speed, IDLE_MIN_SPEED_KMH_HUNDREDTHS); // alive signal
+        assert_eq!(incline, 50); // 10 half-pct * 5 = 50 tenths
+        assert_eq!(elapsed, 5); // session elapsed
+    }
+
+    #[test]
+    fn test_alive_signal_zero_session_elapsed() {
+        // Read handler passes session_elapsed=0 (no session tracking on reads)
+        let state = TreadmillState::default();
+        let data = encode_ftms_data_with_alive(&state, 0);
+        let (_flags, speed, _dist, _incline, elapsed) = parse_treadmill_data(&data);
+
+        assert_eq!(speed, IDLE_MIN_SPEED_KMH_HUNDREDTHS);
+        assert_eq!(elapsed, 0); // no substitution when session_elapsed is 0
+    }
+
+    #[test]
+    fn test_alive_signal_real_elapsed_overrides_session() {
+        // When the treadmill reports real elapsed time, use it over session uptime
+        let state = TreadmillState {
+            elapsed_secs: 120, // 2 minutes of real workout
+            speed_tenths_mph: 50,
+            ..Default::default()
+        };
+        let data = encode_ftms_data_with_alive(&state, 300);
+        let (_flags, _speed, _dist, _incline, elapsed) = parse_treadmill_data(&data);
+
+        assert_eq!(elapsed, 120); // real elapsed wins over session_elapsed
+    }
+
+    #[test]
+    fn test_alive_signal_minimum_speed_value() {
+        // Verify the alive speed is 0.50 km/h (reasonable "connected" signal)
+        assert_eq!(IDLE_MIN_SPEED_KMH_HUNDREDTHS, 50);
     }
 }

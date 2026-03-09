@@ -680,8 +680,8 @@ class TreadmillViewModel(
         const val ELEV_PADDING = ELEV_PAD
 
         /** Ramp width in chart units — represents incline transition time.
-         *  Capped so the ramp never exceeds 40% of the shorter neighboring interval. */
-        private const val RAMP_W = 6f
+         *  The ramp starts at the interval boundary and slopes into the next interval. */
+        private const val RAMP_W = 8f
 
         /** Evaluate staircase-with-ramps Y at a given x position. */
         fun evalStaircaseY(segments: List<ElevationSegment>, x: Float): Float {
@@ -694,19 +694,14 @@ class TreadmillViewModel(
                 val next = segments[i + 1]
                 val boundary = seg.x + seg.w
 
-                if (seg.y == next.y) {
-                    if (x <= boundary) return seg.y
-                    continue
-                }
+                if (x <= boundary) return seg.y
 
-                val ramp = minOf(RAMP_W, seg.w * 0.4f, next.w * 0.4f)
-                val rampStart = boundary - ramp
-                val rampEnd = boundary + ramp
-
-                if (x <= rampStart) return seg.y
-                if (x < rampEnd) {
-                    val t = (x - rampStart) / (rampEnd - rampStart)
-                    return seg.y + t * (next.y - seg.y)
+                if (seg.y != next.y) {
+                    val ramp = minOf(RAMP_W, next.w * 0.3f)
+                    if (x < boundary + ramp) {
+                        val t = (x - boundary) / ramp
+                        return seg.y + t * (next.y - seg.y)
+                    }
                 }
             }
 

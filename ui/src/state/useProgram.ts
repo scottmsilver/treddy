@@ -5,12 +5,14 @@ import type { Interval } from './types';
 const W = 400, H = 140, PAD = 10;
 
 /** Ramp width in chart units — represents incline transition time.
- *  Capped so the ramp never exceeds 40% of the shorter neighboring interval. */
-const RAMP_W = 6;
+ *  The ramp starts at the interval boundary and slopes into the next interval.
+ *  Capped so the ramp never exceeds 30% of the next interval's width. */
+const RAMP_W = 8;
 
 /** Build staircase-with-ramps SVG paths from interval data.
- *  Each interval is a flat segment; transitions between different inclines
- *  get a short linear ramp rather than a vertical jump. */
+ *  Each interval is flat at its incline. At the boundary, the line holds
+ *  the old incline right up to the boundary, then ramps into the next
+ *  interval's incline over a short distance. */
 function staircasePaths(
   segments: { x: number; w: number; y: number }[],
 ): { outline: string; area: string } {
@@ -23,34 +25,22 @@ function staircasePaths(
   }
 
   let outline = `M0,${segments[0].y}`;
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < n - 1; i++) {
     const seg = segments[i];
-    if (i === 0) {
-      // First segment: flat to the ramp point
-      const next = segments[1];
-      if (seg.y === next.y) {
-        outline += ` L${seg.x + seg.w},${seg.y}`;
-      } else {
-        const ramp = Math.min(RAMP_W, seg.w * 0.4, next.w * 0.4);
-        outline += ` L${seg.x + seg.w - ramp},${seg.y}`;
-        outline += ` L${seg.x + seg.w + ramp},${next.y}`;
-      }
-    } else if (i === n - 1) {
-      // Last segment: already at correct y from previous ramp, extend to end
-      outline += ` L${seg.x + seg.w},${seg.y}`;
-    } else {
-      // Middle segment: extend flat, then ramp to next
-      const next = segments[i + 1];
-      if (seg.y === next.y) {
-        outline += ` L${seg.x + seg.w},${seg.y}`;
-      } else {
-        const ramp = Math.min(RAMP_W, seg.w * 0.4, next.w * 0.4);
-        outline += ` L${seg.x + seg.w - ramp},${seg.y}`;
-        outline += ` L${seg.x + seg.w + ramp},${next.y}`;
-      }
+    const next = segments[i + 1];
+    const boundary = seg.x + seg.w;
+
+    // Flat at current incline all the way to boundary
+    outline += ` L${boundary},${seg.y}`;
+
+    if (seg.y !== next.y) {
+      // Ramp into next interval's incline
+      const ramp = Math.min(RAMP_W, next.w * 0.3);
+      outline += ` L${boundary + ramp},${next.y}`;
     }
   }
-  // Extend to right edge
+  // Last segment extends flat to end
+  outline += ` L${segments[n - 1].x + segments[n - 1].w},${segments[n - 1].y}`;
   outline += ` L${W},${segments[n - 1].y}`;
 
   const area = outline + ` L${W},${H} L0,${H} Z`;
@@ -71,21 +61,14 @@ function evalStaircaseY(
     const next = segments[i + 1];
     const boundary = seg.x + seg.w;
 
-    if (seg.y === next.y) {
-      // No ramp needed — same incline
-      if (x <= boundary) return seg.y;
-      continue;
-    }
+    if (x <= boundary) return seg.y;
 
-    const ramp = Math.min(RAMP_W, seg.w * 0.4, next.w * 0.4);
-    const rampStart = boundary - ramp;
-    const rampEnd = boundary + ramp;
-
-    if (x <= rampStart) return seg.y;
-    if (x < rampEnd) {
-      // Linear interpolation through ramp
-      const t = (x - rampStart) / (rampEnd - rampStart);
-      return seg.y + t * (next.y - seg.y);
+    if (seg.y !== next.y) {
+      const ramp = Math.min(RAMP_W, next.w * 0.3);
+      if (x < boundary + ramp) {
+        const t = (x - boundary) / ramp;
+        return seg.y + t * (next.y - seg.y);
+      }
     }
   }
 

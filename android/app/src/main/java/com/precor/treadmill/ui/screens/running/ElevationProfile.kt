@@ -221,8 +221,9 @@ fun ElevationProfile(
     }
 }
 
-/** Ramp width in chart units — represents incline transition time. */
-private const val RAMP_W = 6f
+/** Ramp width in chart units — represents incline transition time.
+ *  The ramp starts at the interval boundary and slopes into the next interval. */
+private const val RAMP_W = 8f
 
 /** Build a staircase-with-ramps path from segments. */
 private fun buildStaircasePath(
@@ -240,25 +241,25 @@ private fun buildStaircasePath(
 
     path.moveTo(cx(0f), cy(segments[0].y))
 
-    for (i in 0 until n) {
+    for (i in 0 until n - 1) {
         val seg = segments[i]
-        if (i == n - 1) {
-            // Last segment: extend flat to end
-            path.lineTo(cx(seg.x + seg.w), cy(seg.y))
-        } else {
-            val next = segments[i + 1]
-            if (seg.y == next.y) {
-                path.lineTo(cx(seg.x + seg.w), cy(seg.y))
-            } else {
-                val ramp = minOf(RAMP_W, seg.w * 0.4f, next.w * 0.4f)
-                path.lineTo(cx(seg.x + seg.w - ramp), cy(seg.y))
-                path.lineTo(cx(seg.x + seg.w + ramp), cy(next.y))
-            }
+        val next = segments[i + 1]
+        val boundary = seg.x + seg.w
+
+        // Flat at current incline all the way to boundary
+        path.lineTo(cx(boundary), cy(seg.y))
+
+        if (seg.y != next.y) {
+            // Ramp into next interval's incline
+            val ramp = minOf(RAMP_W, next.w * 0.3f)
+            path.lineTo(cx(boundary + ramp), cy(next.y))
         }
     }
 
-    // Extend to right edge
-    path.lineTo(cx(W), cy(segments[n - 1].y))
+    // Last segment extends flat to end
+    val last = segments[n - 1]
+    path.lineTo(cx(last.x + last.w), cy(last.y))
+    path.lineTo(cx(W), cy(last.y))
 
     return path
 }

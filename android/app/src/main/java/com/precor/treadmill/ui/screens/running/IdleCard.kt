@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.precor.treadmill.ui.components.HistoryList
+import com.precor.treadmill.ui.components.ProgramBrowser
 import com.precor.treadmill.ui.theme.LocalPrecorColors
 import com.precor.treadmill.ui.util.haptic
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
@@ -86,7 +86,7 @@ fun IdleCard(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 8.dp),
         ) {
-            HistoryList(
+            ProgramBrowser(
                 variant = "lobby",
                 onAfterLoad = {
                     viewModel.startProgram()

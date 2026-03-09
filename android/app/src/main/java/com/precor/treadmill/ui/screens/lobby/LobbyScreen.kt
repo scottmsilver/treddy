@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,9 +13,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.precor.treadmill.ui.components.HistoryList
 import com.precor.treadmill.ui.components.MiniStatusCard
-import com.precor.treadmill.ui.components.WorkoutList
+import com.precor.treadmill.ui.components.ProgramBrowser
 import com.precor.treadmill.ui.theme.LocalPrecorColors
 import com.precor.treadmill.ui.theme.PillShape
 import com.precor.treadmill.ui.util.haptic
@@ -48,8 +46,6 @@ fun LobbyScreen(
     val tablet = isTablet(configuration.screenWidthDp)
 
     val workoutActive = session.active || program.running
-    var workoutListKey by remember { mutableIntStateOf(0) }
-    var historyListKey by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -133,41 +129,13 @@ fun LobbyScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Text(
-                text = "MY WORKOUTS",
-                color = colors.text3,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.3.sp,
-                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 8.dp),
-            )
-            WorkoutList(
+            ProgramBrowser(
                 variant = "lobby",
-                refreshKey = workoutListKey,
                 onAfterLoad = {
                     viewModel.startProgram()
                     haptic(context, longArrayOf(25, 30, 25))
                     onNavigateToRun()
                 },
-                onWorkoutDeleted = { historyListKey++ },
-            )
-            Text(
-                text = "YOUR PROGRAMS",
-                color = colors.text3,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.3.sp,
-                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 8.dp),
-            )
-            HistoryList(
-                variant = "lobby",
-                refreshKey = historyListKey,
-                onAfterLoad = {
-                    viewModel.startProgram()
-                    haptic(context, longArrayOf(25, 30, 25))
-                    onNavigateToRun()
-                },
-                onWorkoutSaved = { workoutListKey++ },
             )
             Spacer(Modifier.height(16.dp))
         }

@@ -5,8 +5,7 @@ import { useProgram } from '../state/useProgram';
 import * as api from '../state/api';
 import { haptic } from '../utils/haptics';
 import MiniStatusCard from '../components/MiniStatusCard';
-import HistoryList from '../components/HistoryList';
-import WorkoutList from '../components/WorkoutList';
+import ProgramBrowser from '../components/ProgramBrowser';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -31,9 +30,6 @@ export default function Lobby(): React.ReactElement {
 
   const workoutActive = session.active || program.running;
   const quickStartGuard = useRef(false);
-  const [workoutListKey, setWorkoutListKey] = React.useState(0);
-  const [historyListKey, setHistoryListKey] = React.useState(0);
-
   return (
     <div className="lobby-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Greeting + action buttons */}
@@ -96,31 +92,11 @@ export default function Lobby(): React.ReactElement {
 
       {/* Workouts + History */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
-        <div style={{
-          fontSize: 13, fontWeight: 600, color: 'var(--text3)',
-          textTransform: 'uppercase' as const, letterSpacing: '0.02em',
-          padding: '12px 16px 8px',
-        }}>
-          My Workouts
-        </div>
-        <WorkoutList key={workoutListKey} onAfterLoad={() => {
+        <ProgramBrowser variant="lobby" onAfterLoad={() => {
           actions.startProgram();
           haptic([25, 30, 25]);
           setLocation('/run');
-        }} onWorkoutDeleted={() => setHistoryListKey(k => k + 1)} />
-
-        <div style={{
-          fontSize: 13, fontWeight: 600, color: 'var(--text3)',
-          textTransform: 'uppercase' as const, letterSpacing: '0.02em',
-          padding: '12px 16px 8px',
-        }}>
-          Your Programs
-        </div>
-        <HistoryList key={historyListKey} variant="lobby" onAfterLoad={() => {
-          actions.startProgram();
-          haptic([25, 30, 25]);
-          setLocation('/run');
-        }} onWorkoutSaved={() => setWorkoutListKey(k => k + 1)} />
+        }} />
       </div>
 
     </div>

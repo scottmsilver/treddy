@@ -4,7 +4,7 @@ import { useTreadmillActions } from '../state/TreadmillContext';
 import { useMotivation } from '../state/useMotivation';
 import { haptic } from '../utils/haptics';
 import { renderGlowText } from './Toast';
-import HistoryList from './HistoryList';
+import ProgramBrowser from './ProgramBrowser';
 
 interface IdleCardProps {
   onVoice?: (prompt?: string) => void;
@@ -47,7 +47,7 @@ export default function IdleCard({ onVoice }: IdleCardProps): React.ReactElement
         WebkitOverflowScrolling: 'touch',
         paddingBottom: 8,
       }}>
-        <HistoryList variant="lobby" onVoice={onVoice} onAfterLoad={() => {
+        <ProgramBrowser variant="lobby" onVoice={onVoice} onAfterLoad={() => {
           actions.startProgram();
           haptic([25, 30, 25]);
           setLocation('/run');

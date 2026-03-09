@@ -12,7 +12,7 @@ import MetricsRow from '../components/MetricsRow';
 import ProgramHUD from '../components/ProgramHUD';
 import ProgramComplete from '../components/ProgramComplete';
 import IdleCard from '../components/IdleCard';
-import HistoryList from '../components/HistoryList';
+import ProgramBrowser from '../components/ProgramBrowser';
 import BottomBar from '../components/BottomBar';
 
 const spring = { type: 'spring' as const, stiffness: 400, damping: 28 };
@@ -237,7 +237,7 @@ export default function Running(): React.ReactElement {
       </div>
 
       {pgm.completed && !pgm.running && (
-        <HistoryList variant="compact" />
+        <ProgramBrowser variant="compact" />
       )}
 
       <BottomBar />

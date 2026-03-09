@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
 import com.precor.treadmill.R
-import com.precor.treadmill.ui.components.HistoryList
+import com.precor.treadmill.ui.components.ProgramBrowser
 import com.precor.treadmill.ui.theme.TimerFontFamily
 import com.precor.treadmill.ui.util.glowText
 import com.precor.treadmill.ui.util.timerText
@@ -284,7 +284,7 @@ fun RunningScreen(
                                 onVoice = { haptic(context, 20); onVoiceToggle(null) },
                                 modifier = Modifier.weight(1f),
                             )
-                            HistoryList(
+                            ProgramBrowser(
                                 variant = "compact",
                             )
                         }

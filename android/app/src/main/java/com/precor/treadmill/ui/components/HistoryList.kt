@@ -5,10 +5,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -16,8 +22,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.precor.treadmill.data.remote.TreadmillApi
 import com.precor.treadmill.data.remote.models.HistoryEntry
+import com.precor.treadmill.data.remote.models.SaveWorkoutRequest
 import com.precor.treadmill.ui.theme.LocalPrecorColors
 import com.precor.treadmill.ui.util.fmtDur
+import android.widget.Toast
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -25,14 +33,17 @@ import org.koin.compose.koinInject
 fun HistoryList(
     variant: String, // "lobby" or "compact"
     onAfterLoad: () -> Unit = {},
+    onWorkoutSaved: () -> Unit = {},
+    refreshKey: Int = 0,
     modifier: Modifier = Modifier,
     api: TreadmillApi = koinInject(),
 ) {
     val colors = LocalPrecorColors.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var history by remember { mutableStateOf<List<HistoryEntry>>(emptyList()) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         runCatching { history = api.getHistory() }
     }
 
@@ -41,6 +52,8 @@ fun HistoryList(
             runCatching {
                 val res = api.loadFromHistory(id)
                 if (res.ok) onAfterLoad()
+            }.onFailure {
+                Toast.makeText(context, "Failed to load program", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -50,6 +63,24 @@ fun HistoryList(
             runCatching {
                 api.resumeFromHistory(id)
                 onAfterLoad()
+            }.onFailure {
+                Toast.makeText(context, "Failed to resume program", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val handleSave: (String) -> Unit = { id ->
+        scope.launch {
+            runCatching {
+                val res = api.saveWorkout(SaveWorkoutRequest(historyId = id))
+                if (res.ok) {
+                    history = api.getHistory()
+                    onWorkoutSaved()
+                } else {
+                    Toast.makeText(context, "Failed to save workout", Toast.LENGTH_SHORT).show()
+                }
+            }.onFailure {
+                Toast.makeText(context, "Failed to save workout", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -65,6 +96,7 @@ fun HistoryList(
                     variant = "lobby",
                     onLoad = handleLoad,
                     onResume = handleResume,
+                    onSave = handleSave,
                 )
             }
         }
@@ -97,6 +129,7 @@ fun HistoryList(
                         variant = "compact",
                         onLoad = handleLoad,
                         onResume = handleResume,
+                        onSave = handleSave,
                     )
                 }
             }
@@ -110,6 +143,7 @@ private fun HistoryCard(
     variant: String,
     onLoad: (String) -> Unit,
     onResume: (String) -> Unit = {},
+    onSave: (String) -> Unit = {},
 ) {
     val colors = LocalPrecorColors.current
     val name = entry.program.name.ifBlank { "Workout" }
@@ -146,6 +180,17 @@ private fun HistoryCard(
                     text = "$duration \u00B7 $intervals intervals",
                     color = colors.text3,
                     fontSize = 12.sp,
+                )
+            }
+            IconButton(
+                onClick = { onSave(entry.id) },
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    imageVector = if (entry.saved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = if (entry.saved) "Saved" else "Save workout",
+                    tint = if (entry.saved) colors.pink else colors.text3,
+                    modifier = Modifier.size(20.dp),
                 )
             }
             if (canResume) {

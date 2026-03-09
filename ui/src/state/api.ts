@@ -1,4 +1,4 @@
-import type { ChatResponse, HistoryEntry, StatusMessage, ProgramMessage, SessionMessage, AppConfig } from './types';
+import type { ChatResponse, HistoryEntry, StatusMessage, ProgramMessage, SessionMessage, AppConfig, SavedWorkout, Program } from './types';
 
 function apiBase(): string {
   return '';  // same origin; Vite proxy handles in dev
@@ -18,6 +18,26 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${apiBase()}${path}`);
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function put<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${apiBase()}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function del<T>(path: string): Promise<T> {
+  const res = await fetch(`${apiBase()}${path}`, { method: 'DELETE' });
   if (!res.ok) {
     throw new Error(`API error: ${res.status}`);
   }
@@ -108,6 +128,28 @@ export async function loadFromHistory(id: string): Promise<{ ok: boolean; progra
 
 export async function resumeFromHistory(id: string): Promise<{ ok: boolean; error?: string }> {
   return post(`/api/programs/history/${id}/resume`, {});
+}
+
+// --- Workouts ---
+
+export async function getWorkouts(): Promise<SavedWorkout[]> {
+  return get('/api/workouts');
+}
+
+export async function saveWorkout(body: { history_id: string } | { program: Program; source: string; prompt: string }): Promise<{ ok: boolean; workout?: SavedWorkout; error?: string }> {
+  return post('/api/workouts', body);
+}
+
+export async function renameWorkout(id: string, name: string): Promise<{ ok: boolean }> {
+  return put(`/api/workouts/${id}`, { name });
+}
+
+export async function deleteWorkout(id: string): Promise<{ ok: boolean }> {
+  return del(`/api/workouts/${id}`);
+}
+
+export async function loadWorkout(id: string): Promise<{ ok: boolean; program?: unknown; error?: string }> {
+  return post(`/api/workouts/${id}/load`, {});
 }
 
 // --- GPX ---

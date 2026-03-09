@@ -150,6 +150,10 @@ A Rust daemon (`hrm/`) that acts as a BLE GATT client, scanning for and connecti
 
 Recently generated/loaded programs are saved to `program_history.json` (max 10 entries). Programs are deduplicated by name. History is accessible via REST API and shown as a horizontal scroll in the UI.
 
+### Saved Workouts
+
+Users can save favorite programs from history to `saved_workouts.json` for permanent access. Saved workouts persist independently of the rolling history window and track usage stats (times used, last used). Accessible via REST API and shown in a "My Workouts" section in both web and Android UIs.
+
 ### Auto Proxy/Emulate Mode
 
 The C binary auto-detects mode transitions (no manual toggle needed):
@@ -231,6 +235,15 @@ Note: `make test` automatically stops the `treadmill-io` service before running 
 | `/api/programs/history` | GET | List recent programs (max 10) |
 | `/api/programs/history/{id}/load` | POST | Reload a saved program |
 | `/api/gpx/upload` | POST | Upload GPX route file (multipart form) |
+
+### Saved Workouts
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/workouts` | GET | List all saved workouts |
+| `/api/workouts` | POST | Save a workout. Body: `{"history_id": "<id>"}` or `{"program": {...}, "source": "...", "prompt": "..."}` |
+| `/api/workouts/{id}` | PUT | Rename a workout. Body: `{"name": "..."}` |
+| `/api/workouts/{id}` | DELETE | Delete a saved workout |
+| `/api/workouts/{id}/load` | POST | Load a saved workout into the program engine |
 
 ### Heart Rate Monitor
 | Endpoint | Method | Description |

@@ -8,9 +8,10 @@ interface HistoryCardProps {
   variant: 'lobby' | 'compact';
   onLoad: (id: string) => void;
   onResume?: (id: string) => void;
+  onSave?: (id: string) => void;
 }
 
-export default function HistoryCard({ entry, variant, onLoad, onResume }: HistoryCardProps): React.ReactElement {
+export default function HistoryCard({ entry, variant, onLoad, onResume, onSave }: HistoryCardProps): React.ReactElement {
   const name = entry.program?.name || 'Workout';
   const intervals = entry.program?.intervals?.length || 0;
   const duration = fmtDur(entry.total_duration);
@@ -37,16 +38,31 @@ export default function HistoryCard({ entry, variant, onLoad, onResume }: Histor
             {duration} &middot; {intervals} intervals
           </div>
         </div>
+        {onSave && (
+          <button
+            aria-label={entry.saved ? 'Saved to My Workouts' : 'Save to My Workouts'}
+            disabled={entry.saved}
+            onClick={(e) => { e.stopPropagation(); if (!entry.saved) { onSave(entry.id); haptic(15); } }}
+            style={{
+              fontSize: 18, padding: '4px 6px', cursor: entry.saved ? 'default' : 'pointer',
+              color: entry.saved ? 'var(--accent, #e07)' : 'var(--text3)',
+              opacity: entry.saved ? 1 : 0.5, flexShrink: 0, lineHeight: 1,
+              background: 'none', border: 'none', fontFamily: 'inherit',
+            }}
+          >{entry.saved ? '\u2764' : '\u2661'}</button>
+        )}
         {canResume && onResume && (
-          <div
+          <button
+            aria-label={`Resume ${name}`}
             onClick={(e) => { e.stopPropagation(); onResume(entry.id); haptic(25); }}
             style={{
               fontSize: 12, fontWeight: 600, color: 'var(--green)',
               padding: '4px 10px', borderRadius: 'var(--r-sm)',
               background: 'rgba(107,200,155,0.12)',
               whiteSpace: 'nowrap', marginLeft: 8,
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
             }}
-          >{resumeLabel}</div>
+          >{resumeLabel}</button>
         )}
       </div>
     );

@@ -69,6 +69,23 @@ interface TreadmillApi {
     @POST("/api/programs/history/{id}/resume")
     suspend fun resumeFromHistory(@Path("id") id: String): ProgramMessage
 
+    // --- Workouts ---
+
+    @GET("/api/workouts")
+    suspend fun getWorkouts(): List<SavedWorkout>
+
+    @POST("/api/workouts")
+    suspend fun saveWorkout(@Body request: SaveWorkoutRequest): SaveWorkoutResponse
+
+    @PUT("/api/workouts/{id}")
+    suspend fun renameWorkout(@Path("id") id: String, @Body request: RenameWorkoutRequest): GenericOkResponse
+
+    @DELETE("/api/workouts/{id}")
+    suspend fun deleteWorkout(@Path("id") id: String): GenericOkResponse
+
+    @POST("/api/workouts/{id}/load")
+    suspend fun loadWorkout(@Path("id") id: String): LoadHistoryResponse
+
     // --- GPX ---
 
     @Multipart

@@ -131,7 +131,39 @@ data class HistoryEntry(
     val completed: Boolean = false,
     @SerialName("last_interval") val lastInterval: Int = 0,
     @SerialName("last_elapsed") val lastElapsed: Int = 0,
+    val saved: Boolean = false,
 )
+
+@Serializable
+data class SavedWorkout(
+    val id: String,
+    val name: String,
+    val program: Program,
+    @SerialName("created_at") val createdAt: String,
+    val source: String,
+    val prompt: String = "",
+    @SerialName("times_used") val timesUsed: Int = 0,
+    @SerialName("last_used") val lastUsed: String? = null,
+    @SerialName("total_duration") val totalDuration: Int = 0,
+)
+
+@Serializable
+data class SaveWorkoutRequest(
+    @SerialName("history_id") val historyId: String? = null,
+    val program: Program? = null,
+    val source: String? = null,
+    val prompt: String? = null,
+)
+
+@Serializable
+data class SaveWorkoutResponse(
+    val ok: Boolean,
+    val workout: SavedWorkout? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class RenameWorkoutRequest(val name: String)
 
 @Serializable
 data class AppConfig(

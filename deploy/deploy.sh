@@ -78,7 +78,8 @@ deploy_full() {
     rsync -az --delete \
         --exclude='*.o' --exclude='*.d' --exclude='*.test.o' \
         --exclude='.gemini_key' --exclude='*.pem' \
-        --exclude='program_history.json' --exclude='__pycache__' \
+        --exclude='program_history.json' --exclude='saved_workouts.json' \
+        --exclude='__pycache__' \
         build/ "$PI_HOST":~/$PI_DIR/
 
     # Build C binary on Pi

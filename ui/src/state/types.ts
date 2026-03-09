@@ -144,6 +144,18 @@ export interface HistoryEntry {
   completed?: boolean;
   last_interval?: number;
   last_elapsed?: number;
+  saved?: boolean;
+}
+
+export interface SavedWorkout {
+  id: string;
+  name: string;
+  program: Program;
+  created_at: string;
+  source: 'generated' | 'gpx' | 'manual';
+  prompt: string;
+  times_used: number;
+  last_used: string | null;
 }
 
 // --- Chat ---

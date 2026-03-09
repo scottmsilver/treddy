@@ -1,5 +1,6 @@
 """Integration tests for server endpoints with mocked treadmill hardware."""
 
+import copy
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -1504,3 +1505,463 @@ class TestVoiceStateGuard:
         for event, state, activated in speaking_ends:
             assert state == "listening", f"Should stay listening while user activated, got '{state}'"
             assert activated is True
+
+
+class TestSavedWorkouts:
+    """Tests for the My Workouts (saved workouts) feature."""
+
+    SAMPLE_PROGRAM = {
+        "name": "Morning Run",
+        "intervals": [
+            {"speed": 3.0, "incline": 1, "duration": 300},
+            {"speed": 5.0, "incline": 2, "duration": 600},
+        ],
+    }
+
+    SAMPLE_PROGRAM_2 = {
+        "name": "Hill Climber",
+        "intervals": [
+            {"speed": 4.0, "incline": 5, "duration": 300},
+            {"speed": 3.5, "incline": 10, "duration": 300},
+        ],
+    }
+
+    def test_save_from_history(self, test_app):
+        """POST /api/workouts with history_id saves the program from history."""
+        client, server, _ = test_app
+        with (
+            patch.object(
+                server,
+                "_load_history",
+                return_value=[
+                    {
+                        "id": "111",
+                        "prompt": "a quick run",
+                        "program": self.SAMPLE_PROGRAM,
+                        "created_at": "2026-03-08T10:00:00",
+                        "total_duration": 900,
+                        "completed": False,
+                        "last_interval": 0,
+                        "last_elapsed": 0,
+                    }
+                ],
+            ),
+            patch.object(server, "_load_workouts", return_value=[]),
+            patch.object(server, "_save_workouts") as mock_save,
+        ):
+            resp = client.post("/api/workouts", json={"history_id": "111"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is True
+            assert data["workout"]["name"] == "Morning Run"
+            assert data["workout"]["source"] == "generated"
+            assert data["workout"]["prompt"] == "a quick run"
+            # Verify _save_workouts was called
+            mock_save.assert_called_once()
+            saved = mock_save.call_args[0][0]
+            assert len(saved) == 1
+            assert saved[0]["program"]["name"] == "Morning Run"
+
+    def test_save_direct(self, test_app):
+        """POST /api/workouts with program dict saves directly."""
+        client, server, _ = test_app
+        with (
+            patch.object(server, "_load_workouts", return_value=[]),
+            patch.object(server, "_save_workouts") as mock_save,
+        ):
+            resp = client.post(
+                "/api/workouts",
+                json={
+                    "program": self.SAMPLE_PROGRAM,
+                    "source": "generated",
+                    "prompt": "morning workout",
+                },
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is True
+            assert data["workout"]["name"] == "Morning Run"
+            assert data["workout"]["source"] == "generated"
+            assert data["workout"]["prompt"] == "morning workout"
+            mock_save.assert_called_once()
+
+    def test_list_workouts_sorted(self, test_app):
+        """GET /api/workouts returns workouts sorted by last_used desc."""
+        client, server, _ = test_app
+        workouts = [
+            {
+                "id": "1",
+                "name": "Old Run",
+                "program": self.SAMPLE_PROGRAM,
+                "source": "generated",
+                "prompt": "",
+                "created_at": "2026-03-01T10:00:00",
+                "last_used": "2026-03-01T10:00:00",
+                "times_used": 1,
+                "total_duration": 900,
+            },
+            {
+                "id": "2",
+                "name": "Recent Run",
+                "program": self.SAMPLE_PROGRAM_2,
+                "source": "generated",
+                "prompt": "",
+                "created_at": "2026-03-05T10:00:00",
+                "last_used": "2026-03-07T10:00:00",
+                "times_used": 3,
+                "total_duration": 600,
+            },
+            {
+                "id": "3",
+                "name": "Never Used",
+                "program": self.SAMPLE_PROGRAM,
+                "source": "manual",
+                "prompt": "",
+                "created_at": "2026-03-06T10:00:00",
+                "last_used": None,
+                "times_used": 0,
+                "total_duration": 900,
+            },
+        ]
+        with patch.object(server, "_load_workouts", return_value=workouts):
+            resp = client.get("/api/workouts")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data) == 3
+            # Recent first, then old, then never-used at end
+            assert data[0]["name"] == "Recent Run"
+            assert data[1]["name"] == "Old Run"
+            assert data[2]["name"] == "Never Used"
+
+    def test_rename_workout(self, test_app):
+        """PUT /api/workouts/{id} renames the workout."""
+        client, server, _ = test_app
+        workouts = [
+            {
+                "id": "42",
+                "name": "Old Name",
+                "program": copy.deepcopy(self.SAMPLE_PROGRAM),
+                "source": "generated",
+                "prompt": "",
+                "created_at": "2026-03-08T10:00:00",
+                "last_used": None,
+                "times_used": 0,
+                "total_duration": 900,
+            },
+        ]
+        with (
+            patch.object(server, "_load_workouts", return_value=workouts),
+            patch.object(server, "_save_workouts") as mock_save,
+        ):
+            resp = client.put("/api/workouts/42", json={"name": "My Favorite"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is True
+            assert data["workout"]["name"] == "My Favorite"
+            # Program name should also be updated
+            saved = mock_save.call_args[0][0]
+            assert saved[0]["program"]["name"] == "My Favorite"
+
+    def test_delete_workout(self, test_app):
+        """DELETE /api/workouts/{id} removes the workout."""
+        client, server, _ = test_app
+        workouts = [
+            {
+                "id": "42",
+                "name": "To Delete",
+                "program": self.SAMPLE_PROGRAM,
+                "source": "generated",
+                "prompt": "",
+                "created_at": "2026-03-08T10:00:00",
+                "last_used": None,
+                "times_used": 0,
+                "total_duration": 900,
+            },
+        ]
+        with (
+            patch.object(server, "_load_workouts", return_value=workouts),
+            patch.object(server, "_save_workouts") as mock_save,
+        ):
+            resp = client.delete("/api/workouts/42")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is True
+            saved = mock_save.call_args[0][0]
+            assert len(saved) == 0
+
+    def test_load_workout_increments_usage(self, test_app):
+        """POST /api/workouts/{id}/load increments times_used and sets last_used."""
+        client, server, _ = test_app
+        workouts = [
+            {
+                "id": "42",
+                "name": "Morning Run",
+                "program": self.SAMPLE_PROGRAM,
+                "source": "generated",
+                "prompt": "",
+                "created_at": "2026-03-08T10:00:00",
+                "last_used": None,
+                "times_used": 0,
+                "total_duration": 900,
+            },
+        ]
+        with (
+            patch.object(server, "_load_workouts", return_value=workouts),
+            patch.object(server, "_save_workouts") as mock_save,
+            patch.object(server, "_add_to_history"),
+        ):
+            resp = client.post("/api/workouts/42/load")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is True
+            assert data["program"]["name"] == "Morning Run"
+            # Check that times_used incremented and last_used set
+            saved = mock_save.call_args[0][0]
+            assert saved[0]["times_used"] == 1
+            assert saved[0]["last_used"] is not None
+
+    def test_load_adds_to_history(self, test_app):
+        """Loading a saved workout also adds it to program history."""
+        client, server, _ = test_app
+        workouts = [
+            {
+                "id": "42",
+                "name": "Morning Run",
+                "program": self.SAMPLE_PROGRAM,
+                "source": "generated",
+                "prompt": "morning workout",
+                "created_at": "2026-03-08T10:00:00",
+                "last_used": None,
+                "times_used": 0,
+                "total_duration": 900,
+            },
+        ]
+        with (
+            patch.object(server, "_load_workouts", return_value=workouts),
+            patch.object(server, "_save_workouts"),
+            patch.object(server, "_add_to_history") as mock_add,
+        ):
+            resp = client.post("/api/workouts/42/load")
+            assert resp.status_code == 200
+            mock_add.assert_called_once_with(self.SAMPLE_PROGRAM, prompt="morning workout")
+
+    def test_save_not_found(self, test_app):
+        """POST /api/workouts with nonexistent history_id returns error."""
+        client, server, _ = test_app
+        with patch.object(server, "_load_history", return_value=[]):
+            resp = client.post("/api/workouts", json={"history_id": "999"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is False
+            assert "error" in data
+
+    def test_delete_not_found(self, test_app):
+        """DELETE nonexistent workout returns error."""
+        client, server, _ = test_app
+        with patch.object(server, "_load_workouts", return_value=[]):
+            resp = client.delete("/api/workouts/999")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is False
+            assert "error" in data
+
+    def test_history_saved_flag(self, test_app):
+        """GET /api/programs/history includes saved=True/False per entry."""
+        client, server, _ = test_app
+        history = [
+            {
+                "id": "111",
+                "prompt": "",
+                "program": {"name": "Morning Run", "intervals": []},
+                "created_at": "2026-03-08T10:00:00",
+                "total_duration": 0,
+                "completed": False,
+                "last_interval": 0,
+                "last_elapsed": 0,
+            },
+            {
+                "id": "222",
+                "prompt": "",
+                "program": {"name": "Not Saved", "intervals": []},
+                "created_at": "2026-03-08T10:00:00",
+                "total_duration": 0,
+                "completed": False,
+                "last_interval": 0,
+                "last_elapsed": 0,
+            },
+        ]
+        saved_workouts = [
+            {
+                "id": "1",
+                "name": "Morning Run",
+                "program": {"name": "Morning Run", "intervals": []},
+                "source": "generated",
+                "prompt": "",
+                "created_at": "2026-03-08T10:00:00",
+                "last_used": None,
+                "times_used": 0,
+                "total_duration": 0,
+            },
+        ]
+        with (
+            patch.object(server, "_load_history", return_value=history),
+            patch.object(server, "_load_workouts", return_value=saved_workouts),
+        ):
+            resp = client.get("/api/programs/history")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data) == 2
+            # Morning Run is saved
+            assert data[0]["saved"] is True
+            # Not Saved is not
+            assert data[1]["saved"] is False
+
+    def test_save_gpx_source_inference(self, test_app):
+        """Saving from history with GPX: prefix prompt infers gpx source."""
+        client, server, _ = test_app
+        with (
+            patch.object(
+                server,
+                "_load_history",
+                return_value=[
+                    {
+                        "id": "111",
+                        "prompt": "GPX: mountain_trail.gpx",
+                        "program": self.SAMPLE_PROGRAM,
+                        "created_at": "2026-03-08T10:00:00",
+                        "total_duration": 900,
+                        "completed": False,
+                        "last_interval": 0,
+                        "last_elapsed": 0,
+                    }
+                ],
+            ),
+            patch.object(server, "_load_workouts", return_value=[]),
+            patch.object(server, "_save_workouts") as mock_save,
+        ):
+            resp = client.post("/api/workouts", json={"history_id": "111"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is True
+            assert data["workout"]["source"] == "gpx"
+
+    def test_save_manual_source_inference(self, test_app):
+        """Saving from history with manual program infers manual source."""
+        client, server, _ = test_app
+        manual_program = {**self.SAMPLE_PROGRAM, "manual": True}
+        with (
+            patch.object(
+                server,
+                "_load_history",
+                return_value=[
+                    {
+                        "id": "222",
+                        "prompt": "",
+                        "program": manual_program,
+                        "created_at": "2026-03-08T10:00:00",
+                        "total_duration": 900,
+                        "completed": False,
+                        "last_interval": 0,
+                        "last_elapsed": 0,
+                    }
+                ],
+            ),
+            patch.object(server, "_load_workouts", return_value=[]),
+            patch.object(server, "_save_workouts") as mock_save,
+        ):
+            resp = client.post("/api/workouts", json={"history_id": "222"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is True
+            assert data["workout"]["source"] == "manual"
+
+    def test_rename_not_found(self, test_app):
+        """PUT /api/workouts/999 returns error for nonexistent workout."""
+        client, server, _ = test_app
+        with patch.object(server, "_load_workouts", return_value=[]):
+            resp = client.put("/api/workouts/999", json={"name": "New Name"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is False
+            assert "error" in data
+
+    def test_load_not_found(self, test_app):
+        """POST /api/workouts/999/load returns error for nonexistent workout."""
+        client, server, _ = test_app
+        with patch.object(server, "_load_workouts", return_value=[]):
+            resp = client.post("/api/workouts/999/load")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is False
+            assert "error" in data
+
+    def test_save_empty_body(self, test_app):
+        """POST /api/workouts with empty body returns validation error."""
+        client, server, _ = test_app
+        resp = client.post("/api/workouts", json={})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is False
+
+    def test_rename_empty_name(self, test_app):
+        """PUT /api/workouts/{id} with empty name returns validation error."""
+        client, server, _ = test_app
+        resp = client.put("/api/workouts/42", json={"name": ""})
+        assert resp.status_code == 422  # Pydantic validation error
+
+    def test_save_invalid_source(self, test_app):
+        """POST /api/workouts with invalid source returns validation error."""
+        client, server, _ = test_app
+        resp = client.post(
+            "/api/workouts",
+            json={
+                "program": self.SAMPLE_PROGRAM,
+                "source": "invalid_source",
+            },
+        )
+        assert resp.status_code == 422  # Pydantic validation error
+
+    def test_max_workouts_cap(self, test_app):
+        """Saving beyond MAX_SAVED_WORKOUTS truncates the list."""
+        client, server, _ = test_app
+        existing = [
+            {
+                "id": str(i),
+                "name": f"Workout {i}",
+                "program": self.SAMPLE_PROGRAM,
+                "source": "generated",
+                "prompt": "",
+                "created_at": "2026-03-08T10:00:00",
+                "last_used": None,
+                "times_used": 0,
+                "total_duration": 900,
+            }
+            for i in range(100)
+        ]
+        with (
+            patch.object(server, "_load_workouts", return_value=existing),
+            patch.object(server, "_save_workouts") as mock_save,
+            patch.object(
+                server,
+                "_load_history",
+                return_value=[
+                    {
+                        "id": "new",
+                        "prompt": "",
+                        "program": self.SAMPLE_PROGRAM_2,
+                        "created_at": "2026-03-08T10:00:00",
+                        "total_duration": 600,
+                        "completed": False,
+                        "last_interval": 0,
+                        "last_elapsed": 0,
+                    }
+                ],
+            ),
+        ):
+            resp = client.post("/api/workouts", json={"history_id": "new"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["ok"] is True
+            # Should be capped at MAX_SAVED_WORKOUTS (100)
+            saved = mock_save.call_args[0][0]
+            assert len(saved) <= 100

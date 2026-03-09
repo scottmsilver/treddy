@@ -315,6 +315,42 @@ def _update_history_position(program_name, interval, elapsed, completed=False):
     _save_history(history)
 
 
+WORKOUTS_FILE = "saved_workouts.json"
+MAX_SAVED_WORKOUTS = 100
+
+
+def _load_workouts():
+    try:
+        with open(WORKOUTS_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _save_workouts(workouts):
+    with open(WORKOUTS_FILE, "w") as f:
+        json.dump(workouts, f, indent=2)
+
+
+def _save_workout(program, source="generated", prompt=""):
+    workouts = _load_workouts()
+    entry = {
+        "id": f"{time.time_ns()}",
+        "name": program.get("name", "Untitled"),
+        "program": program,
+        "source": source,
+        "prompt": prompt,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "last_used": None,
+        "times_used": 0,
+        "total_duration": sum(iv["duration"] for iv in program.get("intervals", [])),
+    }
+    workouts.append(entry)
+    workouts = workouts[:MAX_SAVED_WORKOUTS]
+    _save_workouts(workouts)
+    return entry
+
+
 def _enqueue(msg):
     try:
         msg_queue.put_nowait(msg)
@@ -498,6 +534,24 @@ class VoiceChatRequest(BaseModel):
 class TTSRequest(BaseModel):
     text: str = Field(max_length=5000)
     voice: str = "Kore"
+
+
+class SaveWorkoutRequest(BaseModel):
+    history_id: str | None = None
+    program: dict | None = None
+    source: str = "generated"
+    prompt: str = ""
+
+    @field_validator("source")
+    @classmethod
+    def valid_source(cls, v):
+        if v not in ("generated", "gpx", "manual"):
+            raise ValueError("source must be generated, gpx, or manual")
+        return v
+
+
+class RenameWorkoutRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
 
 
 # --- Async wrappers for blocking treadmill_client calls ---
@@ -937,7 +991,11 @@ async def api_get_program():
 
 @app.get("/api/programs/history")
 async def api_get_history():
-    return _load_history()
+    history = _load_history()
+    saved_names = {w["name"] for w in _load_workouts()}
+    for entry in history:
+        entry["saved"] = entry["program"].get("name", "") in saved_names
+    return history
 
 
 @app.post("/api/programs/history/{entry_id}/load")
@@ -969,6 +1027,81 @@ async def api_resume_from_history(entry_id: str):
         resume_elapsed=resume_elapsed,
     )
     return {"ok": True, **sess.prog.to_dict()}
+
+
+# --- Saved Workouts ---
+
+
+@app.get("/api/workouts")
+async def api_list_workouts():
+    workouts = _load_workouts()
+    # Sort by last_used desc, None sorts to end
+    workouts.sort(key=lambda w: w.get("last_used") or "", reverse=True)
+    return workouts
+
+
+@app.post("/api/workouts")
+async def api_save_workout(req: SaveWorkoutRequest):
+    if req.history_id:
+        history = _load_history()
+        entry = next((h for h in history if h["id"] == req.history_id), None)
+        if not entry:
+            return {"ok": False, "error": "History entry not found"}
+        program = entry["program"]
+        prompt = entry.get("prompt", "")
+        # Infer source
+        if prompt.startswith("GPX:"):
+            source = "gpx"
+        elif program.get("manual"):
+            source = "manual"
+        else:
+            source = "generated"
+    elif req.program:
+        program = req.program
+        source = req.source
+        prompt = req.prompt
+    else:
+        return {"ok": False, "error": "Provide history_id or program"}
+
+    workout = _save_workout(program, source=source, prompt=prompt)
+    return {"ok": True, "workout": workout}
+
+
+@app.put("/api/workouts/{workout_id}")
+async def api_rename_workout(workout_id: str, req: RenameWorkoutRequest):
+    workouts = _load_workouts()
+    workout = next((w for w in workouts if w["id"] == workout_id), None)
+    if not workout:
+        return {"ok": False, "error": "Not found"}
+    workout["name"] = req.name
+    workout["program"]["name"] = req.name
+    _save_workouts(workouts)
+    return {"ok": True, "workout": workout}
+
+
+@app.delete("/api/workouts/{workout_id}")
+async def api_delete_workout(workout_id: str):
+    workouts = _load_workouts()
+    before = len(workouts)
+    workouts = [w for w in workouts if w["id"] != workout_id]
+    if len(workouts) == before:
+        return {"ok": False, "error": "Not found"}
+    _save_workouts(workouts)
+    return {"ok": True}
+
+
+@app.post("/api/workouts/{workout_id}/load")
+async def api_load_workout(workout_id: str):
+    workouts = _load_workouts()
+    workout = next((w for w in workouts if w["id"] == workout_id), None)
+    if not workout:
+        return {"ok": False, "error": "Not found"}
+    workout["times_used"] = workout.get("times_used", 0) + 1
+    workout["last_used"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    _save_workouts(workouts)
+    sess.prog.load(workout["program"])
+    _add_to_history(workout["program"], prompt=workout.get("prompt", ""))
+    return {"ok": True, "program": workout["program"]}
 
 
 # --- GPX upload ---

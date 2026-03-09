@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.precor.treadmill.ui.components.HistoryList
 import com.precor.treadmill.ui.components.MiniStatusCard
+import com.precor.treadmill.ui.components.WorkoutList
 import com.precor.treadmill.ui.theme.LocalPrecorColors
 import com.precor.treadmill.ui.theme.PillShape
 import com.precor.treadmill.ui.util.haptic
@@ -47,6 +48,8 @@ fun LobbyScreen(
     val tablet = isTablet(configuration.screenWidthDp)
 
     val workoutActive = session.active || program.running
+    var workoutListKey by remember { mutableIntStateOf(0) }
+    var historyListKey by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -124,12 +127,30 @@ fun LobbyScreen(
         // Mini status card
         MiniStatusCard(onClick = onNavigateToRun)
 
-        // History list
+        // Workouts + History
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
+            Text(
+                text = "MY WORKOUTS",
+                color = colors.text3,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.3.sp,
+                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 8.dp),
+            )
+            WorkoutList(
+                variant = "lobby",
+                refreshKey = workoutListKey,
+                onAfterLoad = {
+                    viewModel.startProgram()
+                    haptic(context, longArrayOf(25, 30, 25))
+                    onNavigateToRun()
+                },
+                onWorkoutDeleted = { historyListKey++ },
+            )
             Text(
                 text = "YOUR PROGRAMS",
                 color = colors.text3,
@@ -140,11 +161,13 @@ fun LobbyScreen(
             )
             HistoryList(
                 variant = "lobby",
+                refreshKey = historyListKey,
                 onAfterLoad = {
                     viewModel.startProgram()
                     haptic(context, longArrayOf(25, 30, 25))
                     onNavigateToRun()
                 },
+                onWorkoutSaved = { workoutListKey++ },
             )
             Spacer(Modifier.height(16.dp))
         }

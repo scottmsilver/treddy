@@ -10,14 +10,17 @@ interface HistoryListProps {
   variant: 'lobby' | 'compact';
   onAfterLoad?: () => void;
   onVoice?: (prompt?: string) => void;
+  onWorkoutSaved?: () => void;
 }
 
-export default function HistoryList({ variant, onAfterLoad, onVoice }: HistoryListProps): React.ReactElement | null {
+export default function HistoryList({ variant, onAfterLoad, onVoice, onWorkoutSaved }: HistoryListProps): React.ReactElement | null {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const showToast = useToast();
 
   useEffect(() => {
-    api.getHistory().then(setHistory).catch(() => {});
+    let stale = false;
+    api.getHistory().then(h => { if (!stale) setHistory(h); }).catch(() => {});
+    return () => { stale = true; };
   }, []);
 
   const handleLoad = useCallback(async (id: string) => {
@@ -45,6 +48,22 @@ export default function HistoryList({ variant, onAfterLoad, onVoice }: HistoryLi
       showToast('Failed to resume program');
     }
   }, [showToast, onAfterLoad]);
+
+  const handleSave = useCallback(async (id: string) => {
+    try {
+      const res = await api.saveWorkout({ history_id: id });
+      if (res?.ok) {
+        // Refetch history to update saved flag
+        api.getHistory().then(setHistory).catch(() => {});
+        onWorkoutSaved?.();
+        haptic(25);
+      } else {
+        showToast(res?.error || 'Failed to save workout');
+      }
+    } catch (_e) {
+      showToast('Failed to save workout');
+    }
+  }, [showToast, onWorkoutSaved]);
 
   const handleCustomWorkout = useCallback(async () => {
     if (!onVoice) return;
@@ -91,7 +110,7 @@ export default function HistoryList({ variant, onAfterLoad, onVoice }: HistoryLi
           </div>
         )}
         {history.map(h => (
-          <HistoryCard key={h.id} entry={h} variant="lobby" onLoad={handleLoad} onResume={handleResume} />
+          <HistoryCard key={h.id} entry={h} variant="lobby" onLoad={handleLoad} onResume={handleResume} onSave={handleSave} />
         ))}
       </div>
     );
@@ -116,7 +135,7 @@ export default function HistoryList({ variant, onAfterLoad, onVoice }: HistoryLi
         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
       }}>
         {history.map(h => (
-          <HistoryCard key={h.id} entry={h} variant="compact" onLoad={handleLoad} onResume={handleResume} />
+          <HistoryCard key={h.id} entry={h} variant="compact" onLoad={handleLoad} onResume={handleResume} onSave={handleSave} />
         ))}
       </div>
     </div>

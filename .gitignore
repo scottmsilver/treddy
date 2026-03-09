@@ -29,6 +29,7 @@ key.pem
 
 # Runtime data
 program_history.json
+saved_workouts.json
 
 # C++ build artifacts
 *.o

@@ -12,7 +12,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.precor.treadmill.ui.viewmodel.ElevationPoint
+import com.precor.treadmill.ui.viewmodel.ElevationSegment
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
 import kotlin.math.roundToInt
 
@@ -150,9 +150,9 @@ fun ElevationProfile(
             drawText(result, topLeft = Offset(cx(svgX) - result.size.width / 2f, cy(MT + H + TICK + 1)))
         }
 
-        // Build spline path
-        if (pgm.points.isNotEmpty()) {
-            val path = buildSplinePath(pgm.points, pgm.tangents, scaleX, scaleY)
+        // Build staircase path
+        if (pgm.segments.isNotEmpty()) {
+            val path = buildStaircasePath(pgm.segments, scaleX, scaleY)
             val areaPath = Path().apply {
                 addPath(path)
                 lineTo(cx(ML + W), cy(MT + H))
@@ -221,39 +221,44 @@ fun ElevationProfile(
     }
 }
 
-/** Build a cubic bezier path from points using Hermite→Bezier conversion. */
-private fun buildSplinePath(
-    points: List<ElevationPoint>,
-    tangents: FloatArray,
+/** Ramp width in chart units — represents incline transition time. */
+private const val RAMP_W = 6f
+
+/** Build a staircase-with-ramps path from segments. */
+private fun buildStaircasePath(
+    segments: List<ElevationSegment>,
     scaleX: Float,
     scaleY: Float,
 ): Path {
     fun cx(x: Float) = (ML + x) * scaleX
     fun cy(y: Float) = (MT + y) * scaleY
 
-    val n = points.size
+    val n = segments.size
     val path = Path()
 
     if (n == 0) return path
 
-    // Start at left edge
-    path.moveTo(cx(0f), cy(points[0].y))
-    path.lineTo(cx(points[0].x), cy(points[0].y))
+    path.moveTo(cx(0f), cy(segments[0].y))
 
-    // Cubic bezier segments
-    for (i in 0 until n - 1) {
-        val p0 = points[i]
-        val p1 = points[i + 1]
-        val d = p1.x - p0.x
-        val cp1x = p0.x + d / 3
-        val cp1y = p0.y + (tangents[i] * d) / 3
-        val cp2x = p1.x - d / 3
-        val cp2y = p1.y - (tangents[i + 1] * d) / 3
-        path.cubicTo(cx(cp1x), cy(cp1y), cx(cp2x), cy(cp2y), cx(p1.x), cy(p1.y))
+    for (i in 0 until n) {
+        val seg = segments[i]
+        if (i == n - 1) {
+            // Last segment: extend flat to end
+            path.lineTo(cx(seg.x + seg.w), cy(seg.y))
+        } else {
+            val next = segments[i + 1]
+            if (seg.y == next.y) {
+                path.lineTo(cx(seg.x + seg.w), cy(seg.y))
+            } else {
+                val ramp = minOf(RAMP_W, seg.w * 0.4f, next.w * 0.4f)
+                path.lineTo(cx(seg.x + seg.w - ramp), cy(seg.y))
+                path.lineTo(cx(seg.x + seg.w + ramp), cy(next.y))
+            }
+        }
     }
 
     // Extend to right edge
-    path.lineTo(cx(W), cy(points[n - 1].y))
+    path.lineTo(cx(W), cy(segments[n - 1].y))
 
     return path
 }

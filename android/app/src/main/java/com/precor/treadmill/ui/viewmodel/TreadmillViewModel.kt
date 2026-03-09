@@ -75,7 +75,7 @@ data class DerivedSession(
     val endReason: String?,
 )
 
-data class ElevationPoint(val x: Float, val y: Float)
+data class ElevationSegment(val x: Float, val w: Float, val y: Float)
 
 data class DerivedProgram(
     val program: Program?,
@@ -93,8 +93,7 @@ data class DerivedProgram(
     val ivPct: Double,
     val timelinePos: Double,
     // Elevation profile data
-    val points: List<ElevationPoint>,
-    val tangents: FloatArray,
+    val segments: List<ElevationSegment>,
     val elevPosX: Float,
     val elevPosY: Float,
     val maxIncline: Double,
@@ -111,8 +110,8 @@ data class DerivedProgram(
                 totalDuration == other.totalDuration && currentIv == other.currentIv &&
                 nextIv == other.nextIv && ivRemaining == other.ivRemaining &&
                 totalRemaining == other.totalRemaining && ivPct == other.ivPct &&
-                timelinePos == other.timelinePos && points == other.points &&
-                tangents.contentEquals(other.tangents) && elevPosX == other.elevPosX &&
+                timelinePos == other.timelinePos && segments == other.segments &&
+                elevPosX == other.elevPosX &&
                 elevPosY == other.elevPosY && maxIncline == other.maxIncline && yAxisMax == other.yAxisMax &&
                 intervalCount == other.intervalCount &&
                 intervalBoundaryXs.contentEquals(other.intervalBoundaryXs)
@@ -600,9 +599,9 @@ class TreadmillViewModel(
         val intervals = pgm.program?.intervals ?: emptyList()
         val totalDur = if (pgm.totalDuration > 0) pgm.totalDuration else intervals.sumOf { it.duration.toDouble() }
 
-        // Build data points at interval midpoints
+        // Build staircase segments: one per interval with x, width, y
         var x = 0f
-        val points = mutableListOf<ElevationPoint>()
+        val segments = mutableListOf<ElevationSegment>()
         var maxInc = 0.0
         if (totalDur > 0) {
             for (iv in intervals) {
@@ -619,14 +618,11 @@ class TreadmillViewModel(
         if (totalDur > 0) {
             for (iv in intervals) {
                 val segW = (iv.duration / totalDur * ELEV_W).toFloat()
-                val midX = x + segW / 2
                 val y = (ELEV_H - ELEV_PAD - (iv.incline / yAxisMax) * (ELEV_H - ELEV_PAD * 2)).toFloat()
-                points.add(ElevationPoint(midX, y))
+                segments.add(ElevationSegment(x, segW, y))
                 x += segW
             }
         }
-
-        val tangents = computeTangents(points)
 
         val intervalBoundaryXs = if (totalDur > 0 && intervals.isNotEmpty()) {
             val xs = FloatArray(intervals.size + 1)
@@ -651,7 +647,7 @@ class TreadmillViewModel(
             min(100.0, pgm.intervalElapsed / currentIv.duration * 100) else 0.0
         val timelinePos = if (totalDur > 0) min(100.0, pgm.totalElapsed / totalDur * 100) else 0.0
         val elevPosX = min(ELEV_W, (timelinePos / 100 * ELEV_W).toFloat())
-        val elevPosY = if (points.isNotEmpty()) evalSplineY(points, tangents, elevPosX) else ELEV_H / 2
+        val elevPosY = if (segments.isNotEmpty()) evalStaircaseY(segments, elevPosX) else ELEV_H / 2
 
         return DerivedProgram(
             program = pgm.program,
@@ -668,8 +664,7 @@ class TreadmillViewModel(
             totalRemaining = totalRemaining,
             ivPct = ivPct,
             timelinePos = timelinePos,
-            points = points,
-            tangents = tangents,
+            segments = segments,
             elevPosX = elevPosX,
             elevPosY = elevPosY,
             maxIncline = maxInc,
@@ -684,72 +679,38 @@ class TreadmillViewModel(
         const val ELEV_HEIGHT = ELEV_H
         const val ELEV_PADDING = ELEV_PAD
 
-        /** Fritsch-Carlson monotone cubic tangent computation. */
-        fun computeTangents(points: List<ElevationPoint>): FloatArray {
-            val n = points.size
-            if (n < 2) return FloatArray(n) { 0f }
+        /** Ramp width in chart units — represents incline transition time.
+         *  Capped so the ramp never exceeds 40% of the shorter neighboring interval. */
+        private const val RAMP_W = 6f
 
-            val m = FloatArray(n - 1)
-            val dx = FloatArray(n - 1)
+        /** Evaluate staircase-with-ramps Y at a given x position. */
+        fun evalStaircaseY(segments: List<ElevationSegment>, x: Float): Float {
+            val n = segments.size
+            if (n == 0) return ELEV_H / 2
+            if (n == 1) return segments[0].y
+
             for (i in 0 until n - 1) {
-                val d = points[i + 1].x - points[i].x
-                dx[i] = d
-                m[i] = if (d == 0f) 0f else (points[i + 1].y - points[i].y) / d
-            }
+                val seg = segments[i]
+                val next = segments[i + 1]
+                val boundary = seg.x + seg.w
 
-            val tangents = FloatArray(n)
-            tangents[0] = m[0]
-            tangents[n - 1] = m[n - 2]
-            for (i in 1 until n - 1) {
-                tangents[i] = if (m[i - 1] * m[i] <= 0) 0f else (m[i - 1] + m[i]) / 2
-            }
+                if (seg.y == next.y) {
+                    if (x <= boundary) return seg.y
+                    continue
+                }
 
-            // Fritsch-Carlson: clamp tangents for monotonicity
-            for (i in 0 until n - 1) {
-                if (m[i] == 0f) {
-                    tangents[i] = 0f
-                    tangents[i + 1] = 0f
-                } else {
-                    val alpha = tangents[i] / m[i]
-                    val beta = tangents[i + 1] / m[i]
-                    val s = alpha * alpha + beta * beta
-                    if (s > 9) {
-                        val tau = 3f / sqrt(s)
-                        tangents[i] = tau * alpha * m[i]
-                        tangents[i + 1] = tau * beta * m[i]
-                    }
+                val ramp = minOf(RAMP_W, seg.w * 0.4f, next.w * 0.4f)
+                val rampStart = boundary - ramp
+                val rampEnd = boundary + ramp
+
+                if (x <= rampStart) return seg.y
+                if (x < rampEnd) {
+                    val t = (x - rampStart) / (rampEnd - rampStart)
+                    return seg.y + t * (next.y - seg.y)
                 }
             }
 
-            return tangents
-        }
-
-        /** Evaluate the monotone cubic spline at a given x position. */
-        fun evalSplineY(points: List<ElevationPoint>, tangents: FloatArray, x: Float): Float {
-            val n = points.size
-            if (n == 0) return ELEV_H / 2
-            if (x <= points[0].x) return points[0].y
-            if (x >= points[n - 1].x) return points[n - 1].y
-
-            // Find segment
-            var i = 0
-            while (i < n - 2 && x >= points[i + 1].x) i++
-
-            val p0 = points[i]
-            val p1 = points[i + 1]
-            val d = p1.x - p0.x
-            if (d == 0f) return p0.y
-
-            // Hermite basis evaluation
-            val t = (x - p0.x) / d
-            val t2 = t * t
-            val t3 = t2 * t
-            val h00 = 2 * t3 - 3 * t2 + 1
-            val h10 = t3 - 2 * t2 + t
-            val h01 = -2 * t3 + 3 * t2
-            val h11 = t3 - t2
-
-            return h00 * p0.y + h10 * (tangents[i] * d) + h01 * p1.y + h11 * (tangents[i + 1] * d)
+            return segments[n - 1].y
         }
     }
 }

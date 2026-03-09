@@ -156,6 +156,7 @@ export interface SavedWorkout {
   prompt: string;
   times_used: number;
   last_used: string | null;
+  total_duration: number;
 }
 
 // --- Chat ---

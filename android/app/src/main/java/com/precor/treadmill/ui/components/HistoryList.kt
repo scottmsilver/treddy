@@ -13,6 +13,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
@@ -44,7 +45,9 @@ fun HistoryList(
     var history by remember { mutableStateOf<List<HistoryEntry>>(emptyList()) }
 
     LaunchedEffect(refreshKey) {
-        runCatching { history = api.getHistory() }
+        runCatching { history = api.getHistory() }.onFailure {
+            Toast.makeText(context, "Failed to load history", Toast.LENGTH_SHORT).show()
+        }
     }
 
     val handleLoad: (String) -> Unit = { id ->
@@ -91,13 +94,15 @@ fun HistoryList(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             history.forEach { entry ->
-                HistoryCard(
-                    entry = entry,
-                    variant = "lobby",
-                    onLoad = handleLoad,
-                    onResume = handleResume,
-                    onSave = handleSave,
-                )
+                key(entry.id) {
+                    HistoryCard(
+                        entry = entry,
+                        variant = "lobby",
+                        onLoad = handleLoad,
+                        onResume = handleResume,
+                        onSave = handleSave,
+                    )
+                }
             }
         }
     } else {
@@ -124,13 +129,15 @@ fun HistoryList(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 history.forEach { entry ->
-                    HistoryCard(
-                        entry = entry,
-                        variant = "compact",
-                        onLoad = handleLoad,
-                        onResume = handleResume,
-                        onSave = handleSave,
-                    )
+                    key(entry.id) {
+                        HistoryCard(
+                            entry = entry,
+                            variant = "compact",
+                            onLoad = handleLoad,
+                            onResume = handleResume,
+                            onSave = handleSave,
+                        )
+                    }
                 }
             }
         }
@@ -177,13 +184,14 @@ private fun HistoryCard(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "$duration \u00B7 $intervals intervals",
+                    text = "$duration \u00B7 $intervals interval${if (intervals != 1) "s" else ""}",
                     color = colors.text3,
                     fontSize = 12.sp,
                 )
             }
             IconButton(
-                onClick = { onSave(entry.id) },
+                onClick = { if (!entry.saved) onSave(entry.id) },
+                enabled = !entry.saved,
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
@@ -230,7 +238,7 @@ private fun HistoryCard(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = if (canResume) resumeLabel ?: "" else "$duration \u00B7 $intervals intervals",
+                text = if (canResume) resumeLabel ?: "" else "$duration \u00B7 $intervals interval${if (intervals != 1) "s" else ""}",
                 color = if (canResume) colors.green else colors.text3,
                 fontSize = 11.sp,
             )

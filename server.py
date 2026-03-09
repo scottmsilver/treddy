@@ -277,8 +277,10 @@ def _load_history():
 
 
 def _save_history(history):
-    with open(HISTORY_FILE, "w") as f:
+    tmp = HISTORY_FILE + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(history, f, indent=2)
+    os.replace(tmp, HISTORY_FILE)
 
 
 def _add_to_history(program, prompt=""):
@@ -328,8 +330,31 @@ def _load_workouts():
 
 
 def _save_workouts(workouts):
-    with open(WORKOUTS_FILE, "w") as f:
+    tmp = WORKOUTS_FILE + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(workouts, f, indent=2)
+    os.replace(tmp, WORKOUTS_FILE)
+
+
+def _program_fingerprint(program):
+    """Stable fingerprint from interval data, ignoring name."""
+    intervals = program.get("intervals", [])
+    return "|".join(f"{iv.get('speed', 0)},{iv.get('incline', 0)},{iv.get('duration', 0)}" for iv in intervals)
+
+
+def _validate_program(program):
+    """Check that a program dict has valid structure. Returns error string or None."""
+    if not isinstance(program, dict):
+        return "program must be a dict"
+    intervals = program.get("intervals")
+    if not isinstance(intervals, list):
+        return "program must have an intervals list"
+    for i, iv in enumerate(intervals):
+        if not isinstance(iv, dict):
+            return f"interval {i} must be a dict"
+        if "duration" not in iv or not isinstance(iv["duration"], (int, float)):
+            return f"interval {i} must have a numeric duration"
+    return None
 
 
 def _save_workout(program, source="generated", prompt=""):
@@ -346,7 +371,8 @@ def _save_workout(program, source="generated", prompt=""):
         "total_duration": sum(iv["duration"] for iv in program.get("intervals", [])),
     }
     workouts.append(entry)
-    workouts = workouts[:MAX_SAVED_WORKOUTS]
+    if len(workouts) > MAX_SAVED_WORKOUTS:
+        workouts = workouts[-MAX_SAVED_WORKOUTS:]
     _save_workouts(workouts)
     return entry
 
@@ -537,10 +563,10 @@ class TTSRequest(BaseModel):
 
 
 class SaveWorkoutRequest(BaseModel):
-    history_id: str | None = None
+    history_id: str | None = Field(default=None, max_length=50)
     program: dict | None = None
     source: str = "generated"
-    prompt: str = ""
+    prompt: str = Field(default="", max_length=5000)
 
     @field_validator("source")
     @classmethod
@@ -992,9 +1018,9 @@ async def api_get_program():
 @app.get("/api/programs/history")
 async def api_get_history():
     history = _load_history()
-    saved_names = {w["name"] for w in _load_workouts()}
+    saved_fps = {_program_fingerprint(w["program"]) for w in _load_workouts()}
     for entry in history:
-        entry["saved"] = entry["program"].get("name", "") in saved_names
+        entry["saved"] = _program_fingerprint(entry["program"]) in saved_fps
     return history
 
 
@@ -1057,6 +1083,9 @@ async def api_save_workout(req: SaveWorkoutRequest):
         else:
             source = "generated"
     elif req.program:
+        err = _validate_program(req.program)
+        if err:
+            return {"ok": False, "error": err}
         program = req.program
         source = req.source
         prompt = req.prompt

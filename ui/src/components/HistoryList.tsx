@@ -16,11 +16,12 @@ interface HistoryListProps {
 export default function HistoryList({ variant, onAfterLoad, onVoice, onWorkoutSaved }: HistoryListProps): React.ReactElement | null {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const showToast = useToast();
+  const mountedRef = React.useRef(true);
 
   useEffect(() => {
-    let stale = false;
-    api.getHistory().then(h => { if (!stale) setHistory(h); }).catch(() => {});
-    return () => { stale = true; };
+    mountedRef.current = true;
+    api.getHistory().then(h => { if (mountedRef.current) setHistory(h); }).catch(() => {});
+    return () => { mountedRef.current = false; };
   }, []);
 
   const handleLoad = useCallback(async (id: string) => {
@@ -54,7 +55,7 @@ export default function HistoryList({ variant, onAfterLoad, onVoice, onWorkoutSa
       const res = await api.saveWorkout({ history_id: id });
       if (res?.ok) {
         // Refetch history to update saved flag
-        api.getHistory().then(setHistory).catch(() => {});
+        api.getHistory().then(h => { if (mountedRef.current) setHistory(h); }).catch(() => {});
         onWorkoutSaved?.();
         haptic(25);
       } else {

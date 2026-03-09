@@ -1772,9 +1772,9 @@ class TestSavedWorkouts:
             {
                 "id": "111",
                 "prompt": "",
-                "program": {"name": "Morning Run", "intervals": []},
+                "program": self.SAMPLE_PROGRAM,
                 "created_at": "2026-03-08T10:00:00",
-                "total_duration": 0,
+                "total_duration": 900,
                 "completed": False,
                 "last_interval": 0,
                 "last_elapsed": 0,
@@ -1782,9 +1782,9 @@ class TestSavedWorkouts:
             {
                 "id": "222",
                 "prompt": "",
-                "program": {"name": "Not Saved", "intervals": []},
+                "program": self.SAMPLE_PROGRAM_2,
                 "created_at": "2026-03-08T10:00:00",
-                "total_duration": 0,
+                "total_duration": 600,
                 "completed": False,
                 "last_interval": 0,
                 "last_elapsed": 0,
@@ -1794,13 +1794,13 @@ class TestSavedWorkouts:
             {
                 "id": "1",
                 "name": "Morning Run",
-                "program": {"name": "Morning Run", "intervals": []},
+                "program": self.SAMPLE_PROGRAM,
                 "source": "generated",
                 "prompt": "",
                 "created_at": "2026-03-08T10:00:00",
                 "last_used": None,
                 "times_used": 0,
-                "total_duration": 0,
+                "total_duration": 900,
             },
         ]
         with (
@@ -1811,9 +1811,9 @@ class TestSavedWorkouts:
             assert resp.status_code == 200
             data = resp.json()
             assert len(data) == 2
-            # Morning Run is saved
+            # Morning Run is saved (same intervals fingerprint)
             assert data[0]["saved"] is True
-            # Not Saved is not
+            # Hill Climber is not saved (different intervals)
             assert data[1]["saved"] is False
 
     def test_save_gpx_source_inference(self, test_app):
@@ -1964,4 +1964,70 @@ class TestSavedWorkouts:
             assert data["ok"] is True
             # Should be capped at MAX_SAVED_WORKOUTS (100)
             saved = mock_save.call_args[0][0]
-            assert len(saved) <= 100
+            assert len(saved) == 100
+            # The newly saved entry must be present (last item)
+            assert saved[-1]["program"]["name"] == "Hill Climber"
+
+    def test_save_invalid_program(self, test_app):
+        """POST /api/workouts with invalid program returns error."""
+        client, server, _ = test_app
+        # Missing intervals
+        resp = client.post(
+            "/api/workouts",
+            json={"program": {"name": "Bad"}, "source": "generated"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is False
+        assert "intervals" in data["error"]
+
+    def test_saved_flag_uses_fingerprint_not_name(self, test_app):
+        """After renaming a saved workout, history still shows saved=True."""
+        client, server, _ = test_app
+        program = {
+            "name": "Renamed Run",
+            "intervals": [
+                {"speed": 3.0, "incline": 1, "duration": 300},
+                {"speed": 5.0, "incline": 2, "duration": 600},
+            ],
+        }
+        history = [
+            {
+                "id": "111",
+                "prompt": "",
+                "program": {
+                    "name": "Morning Run",
+                    "intervals": [
+                        {"speed": 3.0, "incline": 1, "duration": 300},
+                        {"speed": 5.0, "incline": 2, "duration": 600},
+                    ],
+                },
+                "created_at": "2026-03-08T10:00:00",
+                "total_duration": 900,
+                "completed": False,
+                "last_interval": 0,
+                "last_elapsed": 0,
+            },
+        ]
+        saved_workouts = [
+            {
+                "id": "1",
+                "name": "Renamed Run",
+                "program": program,
+                "source": "generated",
+                "prompt": "",
+                "created_at": "2026-03-08T10:00:00",
+                "last_used": None,
+                "times_used": 0,
+                "total_duration": 900,
+            },
+        ]
+        with (
+            patch.object(server, "_load_history", return_value=history),
+            patch.object(server, "_load_workouts", return_value=saved_workouts),
+        ):
+            resp = client.get("/api/programs/history")
+            assert resp.status_code == 200
+            data = resp.json()
+            # Same intervals → still saved even though name differs
+            assert data[0]["saved"] is True

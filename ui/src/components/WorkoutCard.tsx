@@ -45,7 +45,7 @@ export default function WorkoutCard({ workout, onLoad, onDelete, onRename }: Wor
         transition: 'transform 100ms var(--ease), opacity 100ms var(--ease)',
       }}
     >
-      <div onClick={() => { onLoad(workout.id); haptic(25); }} style={{ flex: 1, minWidth: 0 }}>
+      <div role="button" tabIndex={0} onClick={() => { onLoad(workout.id); }} style={{ flex: 1, minWidth: 0 }}>
         <div
           onClick={(e) => {
             e.stopPropagation();
@@ -69,7 +69,7 @@ export default function WorkoutCard({ workout, onLoad, onDelete, onRename }: Wor
       </div>
       <button
         aria-label={`Delete ${workout.name}`}
-        onClick={(e) => { e.stopPropagation(); onDelete(workout.id); haptic(15); }}
+        onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete "${workout.name}"?`)) onDelete(workout.id); }}
         style={{
           fontSize: 16, color: 'var(--text3)', padding: '4px 8px',
           cursor: 'pointer', opacity: 0.6, marginLeft: 8, flexShrink: 0,

@@ -29,13 +29,13 @@ export default function HistoryCard({ entry, variant, onLoad, onResume, onSave }
           transition: 'transform 100ms var(--ease), opacity 100ms var(--ease)',
         }}
       >
-        <div onClick={() => { onLoad(entry.id); haptic(25); }} style={{ flex: 1, minWidth: 0 }}>
+        <div role="button" tabIndex={0} onClick={() => { onLoad(entry.id); haptic(25); }} style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 15, fontWeight: 600, marginBottom: 4,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>{name}{entry.completed ? ' \u2713' : ''}</div>
           <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-            {duration} &middot; {intervals} intervals
+            {duration} &middot; {intervals} interval{intervals !== 1 ? 's' : ''}
           </div>
         </div>
         {onSave && (
@@ -71,6 +71,8 @@ export default function HistoryCard({ entry, variant, onLoad, onResume, onSave }
   // compact (horizontal scroll)
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => { (canResume && onResume) ? onResume(entry.id) : onLoad(entry.id); haptic(25); }}
       style={{
         flexShrink: 0, width: 140, background: 'var(--card)',
@@ -84,7 +86,7 @@ export default function HistoryCard({ entry, variant, onLoad, onResume, onSave }
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>{name}{entry.completed ? ' \u2713' : ''}</div>
       <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-        {canResume ? resumeLabel : `${duration} \u00b7 ${intervals} intervals`}
+        {canResume ? resumeLabel : `${duration} \u00b7 ${intervals} interval${intervals !== 1 ? 's' : ''}`}
       </div>
     </div>
   );

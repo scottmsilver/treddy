@@ -40,7 +40,9 @@ fun WorkoutList(
     var workouts by remember { mutableStateOf<List<SavedWorkout>>(emptyList()) }
 
     LaunchedEffect(refreshKey) {
-        runCatching { workouts = api.getWorkouts() }
+        runCatching { workouts = api.getWorkouts() }.onFailure {
+            Toast.makeText(context, "Failed to load workouts", Toast.LENGTH_SHORT).show()
+        }
     }
 
     val handleLoad: (String) -> Unit = { id ->
@@ -83,11 +85,13 @@ fun WorkoutList(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         workouts.forEach { workout ->
-            WorkoutCard(
-                workout = workout,
-                onLoad = { handleLoad(workout.id) },
-                onDelete = { handleDelete(workout.id) },
-            )
+            key(workout.id) {
+                WorkoutCard(
+                    workout = workout,
+                    onLoad = { handleLoad(workout.id) },
+                    onDelete = { handleDelete(workout.id) },
+                )
+            }
         }
     }
 }
@@ -129,7 +133,7 @@ private fun WorkoutCard(
             Spacer(Modifier.height(4.dp))
             Text(
                 text = buildString {
-                    append("$duration \u00B7 $intervals intervals")
+                    append("$duration \u00B7 $intervals interval${if (intervals != 1) "s" else ""}")
                     if (workout.timesUsed > 0) {
                         append(" \u00B7 Used ${workout.timesUsed}x")
                     }

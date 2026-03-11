@@ -177,7 +177,7 @@ fun RunningScreen(
                                 initialScale = 0.85f,
                             ) + fadeIn()) togetherWith (scaleOut(
                                 targetScale = 0.85f,
-                            ) + fadeOut()) using SizeTransform(clip = false)
+                            ) + fadeOut()) using SizeTransform(clip = false) { _, _ -> snap() }
                         },
                         contentAlignment = Alignment.Center,
                         label = "hero-bounce",
@@ -368,7 +368,7 @@ private fun RunningScreenLandscape(
                                     initialScale = 0.85f,
                                 ) + fadeIn()) togetherWith (scaleOut(
                                     targetScale = 0.85f,
-                                ) + fadeOut()) using SizeTransform(clip = false)
+                                ) + fadeOut()) using SizeTransform(clip = false) { _, _ -> snap() }
                             },
                             contentAlignment = Alignment.Center,
                             label = "hero-bounce-landscape",

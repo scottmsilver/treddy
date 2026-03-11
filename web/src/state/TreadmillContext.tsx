@@ -262,6 +262,7 @@ type BounceMessageFn = (message: string, durationMs?: number) => void;
 let _bounceMessageFn: BounceMessageFn = () => {};
 export function registerBounceMessage(fn: BounceMessageFn) { _bounceMessageFn = fn; }
 export function showBounceMessage(msg: string, durationMs?: number) { _bounceMessageFn(msg, durationMs); }
+(window as any).__showBounce = (msg: string, ms?: number) => _bounceMessageFn(msg, ms);
 
 // Back-compat alias
 export function registerEncouragement(fn: BounceMessageFn) { _bounceMessageFn = fn; }

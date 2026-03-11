@@ -100,11 +100,11 @@ export default function Running(): React.ReactElement {
           willChange: 'opacity',
         }} />
         <motion.div
-          animate={{ height: isActive ? 'auto' : 0, opacity: isActive ? 1 : 0 }}
+          animate={{ height: isActive ? 96 : 0, opacity: isActive ? 1 : 0 }}
           transition={spring}
           style={{ overflow: 'hidden', position: 'relative', zIndex: 1 }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: isActive ? 96 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 96 }}>
             {isActive && (
               <AnimatePresence mode="wait">
                 {encouragement ? (

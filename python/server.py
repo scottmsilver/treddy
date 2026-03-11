@@ -12,6 +12,7 @@ Usage:
 """
 
 import asyncio
+import datetime
 import json
 import logging
 import os
@@ -125,6 +126,7 @@ async def lifespan(application):
                     lambda t: log.error(f"Auto-pause on disconnect failed: {t.exception()}") if t.exception() else None
                 )
             if sess.active:
+                _save_run_record("disconnect")
                 sess.end("disconnect")
                 _enqueue(sess.to_dict())
             _enqueue({"type": "connection", "connected": False})
@@ -339,6 +341,128 @@ def _program_fingerprint(program):
     """Stable fingerprint from interval data, ignoring name."""
     intervals = program.get("intervals", [])
     return "|".join(f"{iv.get('speed', 0)},{iv.get('incline', 0)},{iv.get('duration', 0)}" for iv in intervals)
+
+
+# --- Run History (completed/stopped runs) ---
+
+RUNS_FILE = "run_history.json"
+MAX_RUNS = 200
+
+
+def _load_runs():
+    try:
+        with open(RUNS_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _save_runs(runs):
+    tmp = RUNS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(runs, f, indent=2)
+    os.replace(tmp, RUNS_FILE)
+
+
+def _save_run_record(reason):
+    """Persist a run record when a session ends. Call before sess.end()."""
+    if not sess.active or sess.elapsed < 5:
+        return  # skip zero-length or trivial sessions
+    prog = sess.prog.program
+    record = {
+        "id": f"{time.time_ns()}",
+        "started_at": sess.wall_started_at,
+        "ended_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "elapsed": round(sess.elapsed, 1),
+        "distance": round(sess.distance, 3),
+        "vert_feet": round(sess.vert_feet, 1),
+        "end_reason": reason,
+        "program_name": prog.get("name") if prog else None,
+        "program_fingerprint": _program_fingerprint(prog) if prog else None,
+        "program_completed": sess.prog.completed,
+        "is_manual": sess.prog.is_manual,
+    }
+    runs = _load_runs()
+    runs.insert(0, record)
+    if len(runs) > MAX_RUNS:
+        runs = runs[:MAX_RUNS]
+    _save_runs(runs)
+
+
+def _last_run_by_fingerprint():
+    """Build a lookup of most recent run per program fingerprint."""
+    runs = _load_runs()
+    by_fp = {}
+    for r in runs:
+        fp = r.get("program_fingerprint")
+        if fp and fp not in by_fp:
+            by_fp[fp] = r  # runs are newest-first, so first seen wins
+    return by_fp
+
+
+def _relative_time(date_str):
+    """Relative time string like '2d ago', '3h ago'."""
+    if not date_str:
+        return ""
+    try:
+        then = datetime.datetime.fromisoformat(date_str)
+        now = datetime.datetime.now()
+        diff = now - then
+        mins = int(diff.total_seconds() / 60)
+    except (ValueError, TypeError):
+        return ""
+    if mins < 1:  # also handles negative (future dates from clock skew)
+        return "just now"
+    if mins < 60:
+        return f"{mins}m ago"
+    hours = mins // 60
+    if hours < 24:
+        return f"{hours}h ago"
+    days = hours // 24
+    if days == 1:
+        return "yesterday"
+    if days < 30:
+        return f"{days}d ago"
+    months = days // 30
+    return f"{months}mo ago"
+
+
+def _fmt_dur(secs):
+    """Format seconds as m:ss or h:mm:ss."""
+    s = max(0, int(secs or 0))
+    m = s // 60
+    sec = s % 60
+    if m >= 60:
+        h = m // 60
+        return f"{h}:{(m % 60):02d}:{sec:02d}"
+    return f"{m}:{sec:02d}"
+
+
+def _last_run_text(run):
+    """Format a run record as 'Last run: 2d ago \u00b7 24:30 \u00b7 1.2 mi'."""
+    if not run:
+        return ""
+    when = _relative_time(run.get("ended_at"))
+    dist = f"{run.get('distance', 0):.2f} mi" if run.get("distance", 0) >= 0.01 else ""
+    dur = _fmt_dur(run.get("elapsed", 0))
+    parts = [p for p in (when, dur, dist) if p]
+    return f"Last run: {' \u00b7 '.join(parts)}" if parts else ""
+
+
+def _usage_text(workout, run):
+    """Compute usage text for a saved workout."""
+    run_text = _last_run_text(run)
+    times = workout.get("times_used", 0)
+    if run_text:
+        text = run_text
+        if times > 1:
+            text += f" \u00b7 {times} runs total"
+        return text
+    if times > 0:
+        last = _relative_time(workout.get("last_used"))
+        suffix = f" \u00b7 last {last}" if last else ""
+        return f"Used {times} time{'s' if times != 1 else ''}{suffix}"
+    return "Never used"
 
 
 def _validate_program(program):
@@ -631,6 +755,7 @@ async def _apply_speed(mph):
     elif mph == 0 and sess.active:
         if sess.prog.running:
             await sess.prog.stop()
+        _save_run_record("user_stop")
         sess.end("user_stop")
         await manager.broadcast(sess.to_dict())
     # Split manual program interval to record course
@@ -682,6 +807,7 @@ async def _apply_stop():
     state["emu_speed"] = 0
     state["emu_incline"] = 0
     if sess.active:
+        _save_run_record("user_stop")
         sess.end("user_stop")
         await manager.broadcast(sess.to_dict())
     await _hw_set_speed(0)
@@ -1018,8 +1144,13 @@ async def api_get_program():
 async def api_get_history():
     history = _load_history()
     saved_fps = {_program_fingerprint(w["program"]) for w in _load_workouts()}
+    run_by_fp = _last_run_by_fingerprint()
     for entry in history:
-        entry["saved"] = _program_fingerprint(entry["program"]) in saved_fps
+        fp = _program_fingerprint(entry["program"])
+        entry["saved"] = fp in saved_fps
+        run = run_by_fp.get(fp)
+        entry["last_run"] = run
+        entry["last_run_text"] = _last_run_text(run)
     return history
 
 
@@ -1062,7 +1193,18 @@ async def api_list_workouts():
     workouts = _load_workouts()
     # Sort by last_used desc, None sorts to end
     workouts.sort(key=lambda w: w.get("last_used") or "", reverse=True)
+    run_by_fp = _last_run_by_fingerprint()
+    for w in workouts:
+        run = run_by_fp.get(_program_fingerprint(w["program"]))
+        w["last_run"] = run
+        w["last_run_text"] = _last_run_text(run)
+        w["usage_text"] = _usage_text(w, run)
     return workouts
+
+
+@app.get("/api/runs")
+async def api_list_runs():
+    return _load_runs()
 
 
 @app.post("/api/workouts")
@@ -1297,6 +1439,7 @@ def _prog_on_update():
             await _hw_set_speed(0)
             await _hw_set_incline(0)
             if sess.active:
+                _save_run_record("program_complete")
                 sess.end("program_complete")
                 await manager.broadcast(sess.to_dict())
             await broadcast_status()

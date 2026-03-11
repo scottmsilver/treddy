@@ -30,6 +30,7 @@ key.pem
 # Runtime data
 program_history.json
 saved_workouts.json
+run_history.json
 
 # C++ build artifacts
 *.o
@@ -60,6 +61,7 @@ node_modules/
 
 # Gradle build cache (Android)
 android/.gradle/
+kotlin/.gradle/
 
 # Vite build output (hashed filenames)
 static/assets/*.js

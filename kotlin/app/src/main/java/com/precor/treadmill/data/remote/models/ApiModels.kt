@@ -122,6 +122,20 @@ data class ExtractIntentResponse(
 )
 
 @Serializable
+data class RunRecord(
+    val id: String,
+    @SerialName("started_at") val startedAt: String,
+    @SerialName("ended_at") val endedAt: String,
+    val elapsed: Double = 0.0,
+    val distance: Double = 0.0,
+    @SerialName("vert_feet") val vertFeet: Double = 0.0,
+    @SerialName("end_reason") val endReason: String = "",
+    @SerialName("program_name") val programName: String? = null,
+    @SerialName("program_completed") val programCompleted: Boolean = false,
+    @SerialName("is_manual") val isManual: Boolean = false,
+)
+
+@Serializable
 data class HistoryEntry(
     val id: String,
     val prompt: String,
@@ -132,6 +146,8 @@ data class HistoryEntry(
     @SerialName("last_interval") val lastInterval: Int = 0,
     @SerialName("last_elapsed") val lastElapsed: Int = 0,
     val saved: Boolean = false,
+    @SerialName("last_run") val lastRun: RunRecord? = null,
+    @SerialName("last_run_text") val lastRunText: String = "",
 )
 
 @Serializable
@@ -145,6 +161,9 @@ data class SavedWorkout(
     @SerialName("times_used") val timesUsed: Int = 0,
     @SerialName("last_used") val lastUsed: String? = null,
     @SerialName("total_duration") val totalDuration: Int = 0,
+    @SerialName("last_run") val lastRun: RunRecord? = null,
+    @SerialName("last_run_text") val lastRunText: String = "",
+    @SerialName("usage_text") val usageText: String = "",
 )
 
 @Serializable

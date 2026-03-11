@@ -132,14 +132,15 @@ private fun WorkoutCard(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = buildString {
-                    append("$duration \u00B7 $intervals interval${if (intervals != 1) "s" else ""}")
-                    if (workout.timesUsed > 0) {
-                        append(" \u00B7 Used ${workout.timesUsed}x")
-                    }
-                },
+                text = "$duration \u00B7 $intervals interval${if (intervals != 1) "s" else ""}",
                 color = colors.text3,
                 fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = workout.usageText.ifBlank { "Never used" },
+                color = colors.text3,
+                fontSize = 11.sp,
             )
         }
         IconButton(

@@ -17,6 +17,7 @@ export default function HistoryCard({ entry, variant, onLoad, onResume, onSave }
   const duration = fmtDur(entry.total_duration);
   const canResume = !entry.completed && (entry.last_elapsed ?? 0) > 0;
   const resumeLabel = canResume ? `Resume from ${fmtDur(entry.last_elapsed ?? 0)}` : null;
+  const runInfo = entry.last_run_text || '';
 
   if (variant === 'lobby') {
     return (
@@ -37,6 +38,11 @@ export default function HistoryCard({ entry, variant, onLoad, onResume, onSave }
           <div style={{ fontSize: 12, color: 'var(--text3)' }}>
             {duration} &middot; {intervals} interval{intervals !== 1 ? 's' : ''}
           </div>
+          {runInfo && (
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+              {runInfo}
+            </div>
+          )}
         </div>
         {onSave && (
           <button

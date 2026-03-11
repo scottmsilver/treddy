@@ -188,6 +188,14 @@ private fun HistoryCard(
                     color = colors.text3,
                     fontSize = 12.sp,
                 )
+                if (entry.lastRunText.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = entry.lastRunText,
+                        color = colors.text3,
+                        fontSize = 11.sp,
+                    )
+                }
             }
             IconButton(
                 onClick = { if (!entry.saved) onSave(entry.id) },

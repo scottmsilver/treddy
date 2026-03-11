@@ -11,7 +11,6 @@ import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import kotlin.math.floor
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.round
 
 /** Raise colons for vertical centering in timer displays. */

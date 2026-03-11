@@ -10,30 +10,12 @@ interface WorkoutCardProps {
   onRename: (id: string, name: string) => void;
 }
 
-function relativeTime(dateStr: string | null): string {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return 'yesterday';
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
-
 export default function WorkoutCard({ workout, onLoad, onDelete, onRename }: WorkoutCardProps): React.ReactElement {
   const intervals = workout.program?.intervals?.length || 0;
   const duration = fmtDur(
     workout.program?.intervals?.reduce((s, i) => s + i.duration, 0) ?? 0
   );
-
-  const usageText = workout.times_used > 0
-    ? `Used ${workout.times_used} time${workout.times_used !== 1 ? 's' : ''}${workout.last_used ? ' \u00b7 last ' + relativeTime(workout.last_used) : ''}`
-    : 'Never used';
+  const usageText = workout.usage_text || 'Never used';
 
   return (
     <div

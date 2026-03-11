@@ -133,6 +133,21 @@ export interface KVEntry {
   value: string;
 }
 
+// --- Run History ---
+
+export interface RunRecord {
+  id: string;
+  started_at: string;
+  ended_at: string;
+  elapsed: number;
+  distance: number;
+  vert_feet: number;
+  end_reason: string;
+  program_name: string | null;
+  program_completed: boolean;
+  is_manual: boolean;
+}
+
 // --- History ---
 
 export interface HistoryEntry {
@@ -145,6 +160,8 @@ export interface HistoryEntry {
   last_interval?: number;
   last_elapsed?: number;
   saved?: boolean;
+  last_run?: RunRecord | null;
+  last_run_text?: string;
 }
 
 export interface SavedWorkout {
@@ -157,6 +174,9 @@ export interface SavedWorkout {
   times_used: number;
   last_used: string | null;
   total_duration: number;
+  last_run?: RunRecord | null;
+  last_run_text?: string;
+  usage_text?: string;
 }
 
 // --- Chat ---

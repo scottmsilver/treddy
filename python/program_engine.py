@@ -471,9 +471,11 @@ class ProgramState:
         if remaining <= 30:
             if remaining >= 1:
                 self._pending_encouragement = f"<<{remaining}>>s {suffix}"
-        elif remaining <= 600:
-            if remaining % 60 == 0:
-                minutes = remaining // 60
+        elif remaining <= 610:
+            # Trigger 10s early so message lands right at the minute mark
+            adjusted = remaining - 10
+            if adjusted > 0 and adjusted % 60 == 0:
+                minutes = adjusted // 60
                 unit = "minute" if minutes == 1 else "minutes"
                 self._pending_encouragement = f"<<{minutes}>> {unit} {suffix}"
 

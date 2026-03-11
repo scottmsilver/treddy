@@ -4,9 +4,8 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from tests.helpers import FakeClock, make_program
-
 from program_engine import ProgramState
+from tests.helpers import FakeClock, make_program
 
 
 class TestLoadProgram:
@@ -918,18 +917,18 @@ class TestIntervalCountdown:
         assert prog._pending_encouragement is None
 
     def test_minute_callout_shows_next_info(self):
-        """At exactly N minutes remaining, shows next interval info."""
+        """At N minutes + 10s remaining, shows next interval info (triggers 10s early)."""
         prog = self._make_countdown_prog(duration=300)
-        prog.total_elapsed = 60
-        prog.interval_elapsed = 60  # 300 - 60 = 240 = 4 min
+        prog.total_elapsed = 50
+        prog.interval_elapsed = 50  # 300 - 50 = 250 remaining, 250-10=240=4 min
         prog._check_encouragement()
         assert prog._pending_encouragement == "<<4>> minutes til 2mph and 0%"
 
     def test_no_callout_between_minutes(self):
         """Between whole minutes (>30s), no message."""
         prog = self._make_countdown_prog(duration=300)
-        prog.total_elapsed = 61
-        prog.interval_elapsed = 61  # 300 - 61 = 239 remaining
+        prog.total_elapsed = 51
+        prog.interval_elapsed = 51  # 300 - 51 = 249 remaining, 249-10=239 not on minute
         prog._check_encouragement()
         assert prog._pending_encouragement is None
 
@@ -1003,10 +1002,10 @@ class TestIntervalCountdown:
         ]
 
     def test_minute_callout_singular(self):
-        """At exactly 1 minute remaining, uses singular 'minute'."""
+        """At 1 minute + 10s remaining, uses singular 'minute' (triggers 10s early)."""
         prog = self._make_countdown_prog(duration=120)
-        prog.total_elapsed = 60
-        prog.interval_elapsed = 60  # 120 - 60 = 60 = 1 min
+        prog.total_elapsed = 50
+        prog.interval_elapsed = 50  # 120 - 50 = 70 remaining, 70-10=60=1 min
         prog._check_encouragement()
         assert prog._pending_encouragement == "<<1>> minute til 2mph and 0%"
 

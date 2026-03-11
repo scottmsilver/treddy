@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# Install C binary (built by `make -C src` into build/)
+# Install C binary (built by `make -C cpp` into build/)
 echo "Installing treadmill_io..."
 sudo install -m 755 build/treadmill_io /usr/local/bin/
 

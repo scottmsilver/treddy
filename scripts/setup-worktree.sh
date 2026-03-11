@@ -89,10 +89,10 @@ EOF
 
 # --- npm install ---
 
-if [ -d "$PROJECT_ROOT/ui" ] && [ -f "$PROJECT_ROOT/ui/package.json" ]; then
+if [ -d "$PROJECT_ROOT/web" ] && [ -f "$PROJECT_ROOT/web/package.json" ]; then
     echo ""
     echo "Installing UI dependencies..."
-    (cd "$PROJECT_ROOT/ui" && npm install --silent)
+    (cd "$PROJECT_ROOT/web" && npm install --silent)
 fi
 
 # --- Summary ---

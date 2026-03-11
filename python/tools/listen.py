@@ -12,7 +12,11 @@ Usage:
 """
 
 import argparse
+import os
+import sys
 import threading
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from treadmill_client import SOCK_PATH, TreadmillClient
 

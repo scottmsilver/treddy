@@ -9,14 +9,16 @@ OBJ_DIR = $(BUILD)/obj
 OBJ_TEST_DIR = $(BUILD)/obj_test
 TEST_DIR = $(BUILD)/tests
 
-# Source files (production)
-SRCS = treadmill_io.cpp kv_protocol.cpp ipc_protocol.cpp \
-       mode_state.cpp ipc_server.cpp
+# Source files (production) — with subdirectory paths
+SRCS = treadmill_io.cpp \
+       protocol/kv_protocol.cpp protocol/ipc_protocol.cpp \
+       engine/mode_state.cpp \
+       ipc/ipc_server.cpp
 OBJS = $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SRCS))
 
 # Shared library sources for tests (no gpio_pigpio.h, no main())
-TEST_LIB_SRCS = kv_protocol.cpp ipc_protocol.cpp \
-                mode_state.cpp ipc_server.cpp
+TEST_LIB_SRCS = protocol/kv_protocol.cpp protocol/ipc_protocol.cpp \
+                engine/mode_state.cpp ipc/ipc_server.cpp
 TEST_LIB_OBJS = $(patsubst %.cpp,$(OBJ_TEST_DIR)/%.test.o,$(TEST_LIB_SRCS))
 
 # Individual test binaries (each has its own main via doctest)
@@ -42,19 +44,19 @@ test: $(TEST_BINS)
 	 [ $$failed -eq 0 ] && echo "=== All tests passed ===" || exit 1
 
 # Individual test binaries
-$(TEST_DIR)/test_kv_protocol: $(TEST_DIR)/test_kv_protocol.o $(OBJ_TEST_DIR)/kv_protocol.test.o | $(TEST_DIR)
+$(TEST_DIR)/test_kv_protocol: $(TEST_DIR)/test_kv_protocol.o $(OBJ_TEST_DIR)/protocol/kv_protocol.test.o | $(TEST_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
 
-$(TEST_DIR)/test_ipc_protocol: $(TEST_DIR)/test_ipc_protocol.o $(OBJ_TEST_DIR)/kv_protocol.test.o $(OBJ_TEST_DIR)/ipc_protocol.test.o | $(TEST_DIR)
+$(TEST_DIR)/test_ipc_protocol: $(TEST_DIR)/test_ipc_protocol.o $(OBJ_TEST_DIR)/protocol/kv_protocol.test.o $(OBJ_TEST_DIR)/protocol/ipc_protocol.test.o | $(TEST_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
 
 $(TEST_DIR)/test_ring_buffer: $(TEST_DIR)/test_ring_buffer.o | $(TEST_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
 
-$(TEST_DIR)/test_mode_state: $(TEST_DIR)/test_mode_state.o $(OBJ_TEST_DIR)/mode_state.test.o | $(TEST_DIR)
+$(TEST_DIR)/test_mode_state: $(TEST_DIR)/test_mode_state.o $(OBJ_TEST_DIR)/engine/mode_state.test.o | $(TEST_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
 
-$(TEST_DIR)/test_emulation: $(TEST_DIR)/test_emulation.o $(OBJ_TEST_DIR)/kv_protocol.test.o $(OBJ_TEST_DIR)/mode_state.test.o | $(TEST_DIR)
+$(TEST_DIR)/test_emulation: $(TEST_DIR)/test_emulation.o $(OBJ_TEST_DIR)/protocol/kv_protocol.test.o $(OBJ_TEST_DIR)/engine/mode_state.test.o | $(TEST_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
 
 $(TEST_DIR)/test_integration: $(TEST_DIR)/test_integration.o $(TEST_LIB_OBJS) | $(TEST_DIR)
@@ -67,15 +69,17 @@ $(TEST_DIR)/test_controller_live: $(TEST_DIR)/test_controller_live.o $(TEST_LIB_
 	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
 
 # Directory creation
-$(BUILD) $(OBJ_DIR) $(OBJ_TEST_DIR) $(TEST_DIR):
+$(BUILD) $(TEST_DIR):
 	mkdir -p $@
 
-# Production object files
-$(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
+# Production object files (mkdir -p handles subdirectory creation)
+$(OBJ_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c -o $@ $<
 
 # Test library object files (different suffix to avoid conflict with production .o)
-$(OBJ_TEST_DIR)/%.test.o: %.cpp | $(OBJ_TEST_DIR)
+$(OBJ_TEST_DIR)/%.test.o: %.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DTESTING -c -o $@ $<
 
 # Test object files
@@ -85,7 +89,7 @@ $(TEST_DIR)/%.o: tests/%.cpp | $(TEST_DIR)
 clean:
 	rm -rf $(BUILD)
 
-# Auto-generated header dependencies
--include $(OBJ_DIR)/*.d $(OBJ_TEST_DIR)/*.d $(TEST_DIR)/*.d
+# Auto-generated header dependencies (including subdirectories)
+-include $(OBJ_DIR)/*.d $(OBJ_DIR)/*/*.d $(OBJ_TEST_DIR)/*.d $(OBJ_TEST_DIR)/*/*.d $(TEST_DIR)/*.d
 
 .PHONY: all clean test

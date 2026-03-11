@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <mutex>
 #include <functional>
-#include "kv_protocol.h"
+#include "protocol/kv_protocol.h"
 
 // gpioPulse_t: provided by pigpio.h (production) or gpio_mock.h (test).
 // Define a compatible struct only if neither has been included yet.

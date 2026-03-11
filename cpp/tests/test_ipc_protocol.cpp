@@ -5,7 +5,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define DOCTEST_CONFIG_NO_EXCEPTIONS
 #include <doctest.h>
-#include "ipc_protocol.h"
+#include "protocol/ipc_protocol.h"
 #include <string>
 
 // ── Command parsing tests ───────────────────────────────────────────

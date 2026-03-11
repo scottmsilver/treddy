@@ -9,7 +9,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define DOCTEST_CONFIG_NO_EXCEPTIONS
 #include <doctest.h>
-#include "gpio_mock.h"
+#include "gpio/gpio_mock.h"
 #include "treadmill_io.h"
 
 #include <sys/socket.h>

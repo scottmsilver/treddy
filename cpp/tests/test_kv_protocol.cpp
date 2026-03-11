@@ -5,7 +5,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define DOCTEST_CONFIG_NO_EXCEPTIONS
 #include <doctest.h>
-#include "kv_protocol.h"
+#include "protocol/kv_protocol.h"
 #include <span>
 
 // ── kv_parse tests ──────────────────────────────────────────────────

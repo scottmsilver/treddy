@@ -5,9 +5,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define DOCTEST_CONFIG_NO_EXCEPTIONS
 #include <doctest.h>
-#include "gpio_mock.h"
-#include "serial_io.h"
-#include "emulation_engine.h"
+#include "gpio/gpio_mock.h"
+#include "engine/serial_io.h"
+#include "engine/emulation_engine.h"
 #include <thread>
 #include <chrono>
 #include <vector>

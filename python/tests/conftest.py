@@ -3,11 +3,10 @@
 import os
 import sys
 
-# Add project root to path so tests can import program_engine, server, etc.
+# Add python/ to path so tests can import program_engine, server, etc.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-
 from program_engine import ProgramState
 from tests.helpers import make_program
 

@@ -4,15 +4,15 @@
 
 | Tier | Speed | Requires | Run with |
 |------|-------|----------|----------|
-| Unit | <1s | Nothing (mocked I/O) | `pytest tests/test_program_engine.py tests/test_server_integration.py -v` |
-| Live | ~45s | Real `asyncio.sleep` | `pytest tests/test_live_program.py -v` |
+| Unit | <1s | Nothing (mocked I/O) | `pytest python/tests/test_program_engine.py python/tests/test_server_integration.py -v` |
+| Live | ~45s | Real `asyncio.sleep` | `pytest python/tests/test_live_program.py -v` |
 | Hardware | ~10s | Pi + treadmill powered on | `make test-pi` |
 | Voice | ~15min | Gemini API key | `pytest -m voice -v -s` |
-| Intent | ~20s | Gemini API key | `pytest tests/test_extract_intent.py -v -s` |
+| Intent | ~20s | Gemini API key | `pytest python/tests/test_extract_intent.py -v -s` |
 
-Run all non-hardware Python tests: `pytest -m "not hardware" -v`
+Run all non-hardware Python tests: `pytest python/tests -m "not hardware" -v`
 
-Filter by category: `pytest tests/test_voice_commands.py --voice-category=speed`
+Filter by category: `pytest python/tests/test_voice_commands.py --voice-category=speed`
 
 Filter by test name: `pytest -k "speed_set_5"`
 
@@ -32,7 +32,7 @@ Filter by test name: `pytest -k "speed_set_5"`
 
 ## C++ Tests
 
-C++ tests live in `src/tests/` (not here). Built by `make test`, use doctest. See `src/tests/*.cpp`.
+C++ tests live in `cpp/tests/` (not here). Built by `make test`, use doctest. See `cpp/tests/*.cpp`.
 
 ## Voice Test Conventions
 

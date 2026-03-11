@@ -23,14 +23,16 @@ stage() {
     echo "=== Staging build/ ==="
     rm -rf build && mkdir -p build/services build/static
 
-    # C++ source + build system (built on Pi via `make -C src`)
-    cp -r src/ build/src/
+    # C++ source + build system (built on Pi via `make -C cpp`)
+    cp -r cpp/ build/cpp/
     cp -r third_party/ build/third_party/
     cp gpio.json build/
 
     # Python
-    cp server.py workout_session.py program_engine.py \
-       treadmill_client.py hrm_client.py pyproject.toml build/
+    mkdir -p build/python
+    cp python/server.py python/workout_session.py python/program_engine.py \
+       python/treadmill_client.py python/hrm_client.py build/python/
+    cp pyproject.toml build/
 
     # Setup script
     cp deploy/setup.sh build/
@@ -39,17 +41,17 @@ stage() {
     # UI
     echo "Building UI..."
     rm -rf static/assets && mkdir -p static/assets
-    (cd ui && npx vite build)
+    (cd web && npx vite build)
     cp -r static/index.html static/assets build/static/
 
     # FTMS binary (if cross-compiled)
-    FTMS_BIN="ftms/target/aarch64-unknown-linux-gnu/release/ftms-daemon"
+    FTMS_BIN="rust/ftms/target/aarch64-unknown-linux-gnu/release/ftms-daemon"
     if [ -f "$FTMS_BIN" ]; then
         cp "$FTMS_BIN" build/
     fi
 
     # HRM binary (if cross-compiled)
-    HRM_BIN="hrm/target/aarch64-unknown-linux-gnu/release/hrm-daemon"
+    HRM_BIN="rust/hrm/target/aarch64-unknown-linux-gnu/release/hrm-daemon"
     if [ -f "$HRM_BIN" ]; then
         cp "$HRM_BIN" build/
     fi
@@ -84,7 +86,7 @@ deploy_full() {
 
     # Build C binary on Pi
     echo "Building on Pi..."
-    ssh "$PI_HOST" "cd ~/$PI_DIR && make -C src"
+    ssh "$PI_HOST" "cd ~/$PI_DIR && make -C cpp"
 
     # Run setup (installs binaries, services, restarts)
     echo "Running setup..."
@@ -98,7 +100,7 @@ deploy_full() {
 deploy_ui() {
     echo "=== Deploying UI to $PI_HOST ==="
     rm -rf static/assets && mkdir -p static/assets build/static
-    (cd ui && npx vite build)
+    (cd web && npx vite build)
     cp -r static/index.html static/assets build/static/
 
     ssh "$PI_HOST" "rm -rf ~/$PI_DIR/static/assets && mkdir -p ~/$PI_DIR/static/assets"

@@ -26,8 +26,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
-from pydantic import BaseModel, Field, field_validator
-
 from hrm_client import HrmClient
 from program_engine import (
     CHAT_SYSTEM_PROMPT,
@@ -43,6 +41,7 @@ from program_engine import (
     read_api_key,
     validate_interval,
 )
+from pydantic import BaseModel, Field, field_validator
 from treadmill_client import MAX_INCLINE, MAX_SPEED_TENTHS, TreadmillClient
 from workout_session import WorkoutSession
 
@@ -1647,7 +1646,7 @@ app.mount("/assets", StaticFiles(directory="static/assets"), name="static-assets
 @app.get("/{full_path:path}")
 async def spa_catch_all(request: Request, full_path: str):
     """Serve static files or fall back to index.html for SPA routing."""
-    static_dir = os.path.realpath(os.path.join(os.path.dirname(__file__) or ".", "static"))
+    static_dir = os.path.realpath("static")
     file_path = os.path.realpath(os.path.join(static_dir, full_path))
     # Prevent path traversal — file must be inside static_dir
     if not file_path.startswith(static_dir + os.sep) and file_path != static_dir:
@@ -1662,8 +1661,8 @@ async def spa_catch_all(request: Request, full_path: str):
 
 if __name__ == "__main__":
     ssl_args = {}
-    cert = os.path.join(os.path.dirname(__file__) or ".", "cert.pem")
-    key = os.path.join(os.path.dirname(__file__) or ".", "key.pem")
+    cert = "cert.pem"
+    key = "key.pem"
     if os.path.isfile(cert) and os.path.isfile(key):
         ssl_args = {"ssl_keyfile": key, "ssl_certfile": cert}
         log.info("HTTPS enabled (cert.pem + key.pem)")

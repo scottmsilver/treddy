@@ -102,7 +102,7 @@ The `inc` key encodes incline as **half-percent units in uppercase hex**. The in
 
 These serial lines use RS-485 signaling, which idles LOW. Standard UART idles HIGH. If you connect a normal TTL serial adapter, you'll see what looks like binary garbage — it's actually the KV text with every bit flipped, and byte boundaries shifted because the start/stop bits are inverted too.
 
-The full forensic investigation is in [`RS485_DISCOVERY.md`](src/captures/RS485_DISCOVERY.md). The short version: we spent days analyzing a "binary protocol" that turned out to be regular ASCII read with the wrong polarity.
+The full forensic investigation is in [`RS485_DISCOVERY.md`](cpp/captures/RS485_DISCOVERY.md). The short version: we spent days analyzing a "binary protocol" that turned out to be regular ASCII read with the wrong polarity.
 
 ---
 
@@ -140,9 +140,9 @@ If we only tapped pin 6, we could listen but not control anything. Cutting gives
 
 If you're investigating the protocol or something isn't working:
 
-- **Logic analyzer** + [`analyze_logic.py`](src/captures/analyze_logic.py) / [`decode_inverted.py`](src/captures/decode_inverted.py) — decode captured CSV traces. `decode_inverted.py` handles the RS-485 polarity inversion automatically. Raw captures and parsers live in [`src/captures/`](src/captures/).
-- **`dual_monitor.py`** — live curses TUI showing both channels side-by-side. Console commands on the left, motor responses on the right.
-- **`listen.py`** — simple CLI listener. Use `--changes` to only show value changes, `--source motor` to filter by direction.
+- **Logic analyzer** + [`analyze_logic.py`](cpp/captures/analyze_logic.py) / [`decode_inverted.py`](cpp/captures/decode_inverted.py) — decode captured CSV traces. `decode_inverted.py` handles the RS-485 polarity inversion automatically. Raw captures and parsers live in [`cpp/captures/`](cpp/captures/).
+- **`python/tools/dual_monitor.py`** — live curses TUI showing both channels side-by-side. Console commands on the left, motor responses on the right.
+- **`python/tools/listen.py`** — simple CLI listener. Use `--changes` to only show value changes, `--source motor` to filter by direction.
 
 ---
 
@@ -191,7 +191,7 @@ Turn a 20-year-old dumb treadmill into a smart one — phone control, interval p
 
 ### Why These Layers
 
-**C++ binary** ([`src/`](src/)) — The safety-critical layer. Handles bit-banged serial I/O at 9600 baud and nothing else. Safety features live here so they work even if the server crashes:
+**C++ binary** ([`cpp/`](cpp/)) — The safety-critical layer. Handles bit-banged serial I/O at 9600 baud and nothing else. Safety features live here so they work even if the server crashes:
 
 - **3-hour timeout:** If no speed/incline change for 3 hours, belt stops.
 - **IPC watchdog:** If the Python server disconnects for 4 seconds, belt stops.
@@ -200,17 +200,17 @@ Turn a 20-year-old dumb treadmill into a smart one — phone control, interval p
 
 C++20 compiled with `-fno-exceptions -fno-rtti`. Hot paths (serial read/write) are zero-allocation — stack buffers only.
 
-**Python client** ([`treadmill_client.py`](treadmill_client.py)) — Thin wrapper over the Unix socket. Auto-reconnects with exponential backoff. Sends heartbeats on a background thread.
+**Python client** ([`python/treadmill_client.py`](python/treadmill_client.py)) — Thin wrapper over the Unix socket. Auto-reconnects with exponential backoff. Sends heartbeats on a background thread.
 
-**Workout session** ([`workout_session.py`](workout_session.py)) — Owns the session lifecycle: start, end, pause, resume. Tracks elapsed time (wall clock minus pauses), distance (cumulative from speed ticks), and vertical feet (from incline). Owns the ProgramState instance. No HTTP, no GPIO.
+**Workout session** ([`python/workout_session.py`](python/workout_session.py)) — Owns the session lifecycle: start, end, pause, resume. Tracks elapsed time (wall clock minus pauses), distance (cumulative from speed ticks), and vertical feet (from incline). Owns the ProgramState instance. No HTTP, no GPIO.
 
-**Program engine** ([`program_engine.py`](program_engine.py)) — Interval program execution and Gemini AI calls. 1-second tick loop, interval progress tracking, encouragement at 25/50/75% milestones. No HTTP, no GPIO.
+**Program engine** ([`python/program_engine.py`](python/program_engine.py)) — Interval program execution and Gemini AI calls. 1-second tick loop, interval progress tracking, encouragement at 25/50/75% milestones. No HTTP, no GPIO.
 
-**Server** ([`server.py`](server.py)) — FastAPI on port 8000. Single source of truth for all application state. Coordinates workout sessions, program engine, and treadmill client. Multiple clients (web UI, future watch app) all go through the same server.
+**Server** ([`python/server.py`](python/server.py)) — FastAPI on port 8000. Single source of truth for all application state. Coordinates workout sessions, program engine, and treadmill client. Multiple clients (web UI, future watch app) all go through the same server.
 
-**FTMS daemon** ([`ftms/`](ftms/)) — Rust binary that exposes the treadmill as a Bluetooth FTMS (Fitness Machine Service) device. Connects to the Python server via REST, advertises BLE GATT characteristics for speed, incline, distance, and elapsed time. Fitness apps like Zwift and Peloton see it as a standard smart treadmill.
+**FTMS daemon** ([`rust/ftms/`](rust/ftms/)) — Rust binary that exposes the treadmill as a Bluetooth FTMS (Fitness Machine Service) device. Connects to the Python server via REST, advertises BLE GATT characteristics for speed, incline, distance, and elapsed time. Fitness apps like Zwift and Peloton see it as a standard smart treadmill.
 
-**Web UI** ([`ui/`](ui/)) — React 19 + TypeScript + Vite. Display layer only — every decision happens server-side. Touch-first, designed for a phone or tablet mounted on the treadmill console. Warm dark palette with Quicksand font. Framer Motion for layout animations and crossfade transitions.
+**Web UI** ([`web/`](web/)) — React 19 + TypeScript + Vite. Display layer only — every decision happens server-side. Touch-first, designed for a phone or tablet mounted on the treadmill console. Warm dark palette with Quicksand font. Framer Motion for layout animations and crossfade transitions.
 
 ### Proxy vs Emulate
 
@@ -264,7 +264,7 @@ For the AI coach, create a `.gemini_key` file with your Gemini API key.
 ```bash
 make                    # Build C++ binary (output in build/)
 sudo ./build/treadmill_io  # Start I/O (must be root, pigpiod must NOT be running)
-python3 server.py       # Start server — http://<pi-ip>:8000
+python3 python/server.py  # Start server — http://<pi-ip>:8000
 ```
 
 ### Deploy to Pi
@@ -285,16 +285,16 @@ This deploys to `~/treadmill/` on the Pi and manages three systemd services:
 ### Build the UI
 
 ```bash
-cd ui && npm install && npx vite build   # Outputs to static/
+cd web && npm install && npx vite build  # Outputs to static/
 ```
 
 ### Other Tools
 
 ```bash
-python3 dual_monitor.py              # Curses TUI — both channels live
-python3 listen.py                    # Simple CLI listener
-python3 listen.py --changes          # Only show value changes
-python3 listen.py --source motor     # Motor responses only
+python3 python/tools/dual_monitor.py   # Curses TUI — both channels live
+python3 python/tools/listen.py        # Simple CLI listener
+python3 python/tools/listen.py --changes       # Only show value changes
+python3 python/tools/listen.py --source motor  # Motor responses only
 ```
 
 ## Testing
@@ -310,11 +310,11 @@ make test-pi
 make test-all
 
 # Python tests (mocked, <1s)
-python3 -m pytest tests/test_program_engine.py tests/test_server_integration.py \
-                  tests/test_workout_session.py tests/test_session.py -v
+python3 -m pytest python/tests/test_program_engine.py python/tests/test_server_integration.py \
+                  python/tests/test_workout_session.py python/tests/test_session.py -v
 
 # Python live integration tests (real timing, ~45s)
-python3 -m pytest tests/test_live_program.py -v
+python3 -m pytest python/tests/test_live_program.py -v
 
 # FTMS Rust tests
 make test-ftms

@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <ctime>
 
-#include "gpio_pigpio.h"
+#include "gpio/gpio_pigpio.h"
 #include "treadmill_io.h"
 #include "config.h"
 

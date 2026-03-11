@@ -38,13 +38,13 @@ Handles the RS-485 inverted polarity automatically. Tries both normal and invert
 
 ```bash
 # Decode all active channels
-python3 src/captures/decode_inverted.py src/captures/try6.csv
+python3 cpp/captures/decode_inverted.py cpp/captures/try6.csv
 
 # Decode just pin 6 (Console → Motor)
-python3 src/captures/decode_inverted.py src/captures/try6.csv 5
+python3 cpp/captures/decode_inverted.py cpp/captures/try6.csv 5
 
 # Decode just pin 3 (Motor → Console)
-python3 src/captures/decode_inverted.py src/captures/try6.csv 2
+python3 cpp/captures/decode_inverted.py cpp/captures/try6.csv 2
 ```
 
 Output shows decoded `[key:value]` messages with timestamps.
@@ -54,7 +54,7 @@ Output shows decoded `[key:value]` messages with timestamps.
 Standard-polarity decoder with frame grouping and timing analysis. Useful for understanding the burst/cycle structure.
 
 ```bash
-python3 src/captures/analyze_logic.py src/captures/try6.csv
+python3 cpp/captures/analyze_logic.py cpp/captures/try6.csv
 ```
 
 Shows frame grouping, hex dumps, ASCII representations, and timing between bursts.

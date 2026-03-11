@@ -9,9 +9,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define DOCTEST_CONFIG_NO_EXCEPTIONS
 #include <doctest.h>
-#include "ipc_server.h"
-#include "ipc_protocol.h"
-#include "ring_buffer.h"
+#include "ipc/ipc_server.h"
+#include "protocol/ipc_protocol.h"
+#include "ipc/ring_buffer.h"
 
 #include <sys/socket.h>
 #include <sys/un.h>

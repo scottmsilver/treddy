@@ -15,7 +15,7 @@
 #include <thread>
 #include <atomic>
 #include <functional>
-#include "kv_protocol.h"
+#include "protocol/kv_protocol.h"
 #include "mode_state.h"
 #include "serial_io.h"
 

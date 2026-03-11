@@ -15,7 +15,7 @@
 #include <string_view>
 #include <array>
 #include <functional>
-#include "ipc_protocol.h"
+#include "protocol/ipc_protocol.h"
 #include "ring_buffer.h"
 
 constexpr int MAX_CLIENTS = 4;

@@ -1,20 +1,20 @@
 PI_HOST ?= rpi
 VENV_DIR ?= .venv
 FTMS_TARGET = aarch64-unknown-linux-gnu
-FTMS_BIN = ftms/target/$(FTMS_TARGET)/release/ftms-daemon
+FTMS_BIN = rust/ftms/target/$(FTMS_TARGET)/release/ftms-daemon
 HRM_TARGET = aarch64-unknown-linux-gnu
-HRM_BIN = hrm/target/$(HRM_TARGET)/release/hrm-daemon
+HRM_BIN = rust/hrm/target/$(HRM_TARGET)/release/hrm-daemon
 
 .PHONY: all clean test stage deploy ftms deploy-ftms test-ftms test-ftms-ble hrm deploy-hrm test-hrm test-pi test-all
 
 all:
-	$(MAKE) -C src
+	$(MAKE) -C cpp
 
 test:
-	$(MAKE) -C src test
+	$(MAKE) -C cpp test
 
 clean:
-	$(MAKE) -C src clean
+	$(MAKE) -C cpp clean
 	rm -rf build/
 
 stage: all
@@ -24,7 +24,7 @@ deploy:
 	deploy/deploy.sh
 
 ftms:
-	cd ftms && cross build --release --target $(FTMS_TARGET)
+	cd rust/ftms && cross build --release --target $(FTMS_TARGET)
 
 deploy-ftms: ftms
 	ssh $(PI_HOST) 'sudo systemctl stop ftms 2>/dev/null || true'
@@ -32,13 +32,13 @@ deploy-ftms: ftms
 	ssh $(PI_HOST) 'sudo install -m 755 /tmp/ftms-daemon /usr/local/bin/ && sudo systemctl restart ftms'
 
 test-ftms:
-	cd ftms && cargo test
+	cd rust/ftms && cargo test
 
 test-ftms-ble:
-	ssh $(PI_HOST) 'sudo bash ~/treadmill/ftms/tests/ble_integration.sh'
+	ssh $(PI_HOST) 'sudo bash ~/treadmill/rust/ftms/tests/ble_integration.sh'
 
 hrm:
-	cd hrm && cross build --release --target $(HRM_TARGET)
+	cd rust/hrm && cross build --release --target $(HRM_TARGET)
 
 deploy-hrm: hrm
 	ssh $(PI_HOST) 'sudo systemctl stop hrm 2>/dev/null || true'
@@ -46,13 +46,13 @@ deploy-hrm: hrm
 	ssh $(PI_HOST) 'sudo install -m 755 /tmp/hrm-daemon /usr/local/bin/ && sudo systemctl restart hrm'
 
 test-hrm:
-	cd hrm && cargo test
+	cd rust/hrm && cargo test
 
 # Deploy to Pi, build, restart binary, run hardware tests
 test-pi: test
 	@echo "=== Deploying to Pi ==="
 	deploy/deploy.sh
 	@echo "=== Running hardware tests ==="
-	ssh $(PI_HOST) 'cd ~/treadmill && source $(VENV_DIR)/bin/activate && pytest tests/test_hardware_integration.py -v -s -m hardware'
+	ssh $(PI_HOST) 'cd ~/treadmill && source $(VENV_DIR)/bin/activate && pytest python/tests/test_hardware_integration.py -v -s -m hardware'
 
 test-all: test test-pi

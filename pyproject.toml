@@ -11,6 +11,7 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
+testpaths = ["python/tests"]
 asyncio_mode = "auto"
 markers = [
     "hardware: marks tests that require Pi hardware (deselect with '-m \"not hardware\"')",

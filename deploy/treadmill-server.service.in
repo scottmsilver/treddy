@@ -7,7 +7,7 @@ Wants=treadmill-io.service
 Type=simple
 User=@USER@
 WorkingDirectory=/home/@USER@/@DEPLOY_DIR@
-ExecStart=/home/@USER@/@VENV_DIR@/bin/python3 server.py
+ExecStart=/home/@USER@/@VENV_DIR@/bin/python3 python/server.py
 Restart=always
 RestartSec=3
 

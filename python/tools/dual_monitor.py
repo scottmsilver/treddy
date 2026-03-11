@@ -16,9 +16,13 @@ Usage:
 
 import argparse
 import curses
+import os
+import sys
 import threading
 import time
 from collections import deque
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from treadmill_client import MAX_INCLINE, MAX_SPEED_TENTHS, SOCK_PATH, TreadmillClient
 

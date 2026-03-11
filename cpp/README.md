@@ -134,10 +134,10 @@ Clients connect to `/tmp/treadmill_io.sock` and exchange newline-delimited JSON.
 ## Building
 
 ```bash
-# From project root (delegates to src/Makefile, output in build/)
+# From project root (delegates to cpp/Makefile, output in build/)
 make
 
-# From src/ directly
+# From cpp/ directly
 make            # -> ../build/treadmill_io
 
 # Run (must be root, pigpiod must NOT be running)

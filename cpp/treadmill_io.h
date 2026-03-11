@@ -18,13 +18,13 @@
 #include <thread>
 #include <atomic>
 
-#include "ring_buffer.h"
-#include "mode_state.h"
-#include "serial_io.h"
-#include "emulation_engine.h"
-#include "ipc_server.h"
-#include "ipc_protocol.h"
-#include "kv_protocol.h"
+#include "ipc/ring_buffer.h"
+#include "engine/mode_state.h"
+#include "engine/serial_io.h"
+#include "engine/emulation_engine.h"
+#include "ipc/ipc_server.h"
+#include "protocol/ipc_protocol.h"
+#include "protocol/kv_protocol.h"
 #include "config.h"
 
 // Heartbeat watchdog timeout: if emulating and no command received

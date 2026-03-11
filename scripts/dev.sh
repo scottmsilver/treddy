@@ -31,9 +31,9 @@ trap 'kill 0 2>/dev/null; exit' EXIT INT TERM
 caddy run --config "$PROJECT_ROOT/Caddyfile.dev" --adapter caddyfile &
 
 # Start server.py
-(cd "$PROJECT_ROOT" && python3 server.py) &
+(cd "$PROJECT_ROOT" && python3 python/server.py) &
 
 # Start Vite dev server
-(cd "$PROJECT_ROOT/ui" && npx vite --port "$VITE_SERVER_PORT" --strictPort) &
+(cd "$PROJECT_ROOT/web" && npx vite --port "$VITE_SERVER_PORT" --strictPort) &
 
 wait

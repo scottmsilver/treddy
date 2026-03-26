@@ -38,11 +38,16 @@ except ImportError:
     websockets = None
 
 # Gemini Live constants
-GEMINI_WS_URL = (
+GEMINI_WS_V1BETA = (
     "wss://generativelanguage.googleapis.com/ws/"
     "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
 )
-LIVE_MODEL = "gemini-2.5-flash-native-audio-latest"
+GEMINI_WS_V1ALPHA = (
+    "wss://generativelanguage.googleapis.com/ws/"
+    "google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained"
+)
+MODEL_31_FLASH_LIVE = "gemini-3.1-flash-live-preview"
+LIVE_MODEL = MODEL_31_FLASH_LIVE
 VOICE = "Kore"
 
 # TTS produces 24kHz PCM, but Gemini Live expects 16kHz input.
@@ -152,23 +157,28 @@ def _build_system_prompt() -> str:
 
 
 def _build_setup_message() -> dict:
-    """Build the Gemini Live setup message matching GeminiLiveClient.ts."""
+    """Build the Gemini Live setup message matching GeminiLiveClient.kt."""
     # program_engine wraps as [{"functionDeclarations": [...]}],
     # but Live API expects tools: [{"function_declarations": [...]}]
     func_decls = TOOL_DECLARATIONS[0]["functionDeclarations"]
+
+    generation_config = {
+        "temperature": 0.3,
+        "speech_config": {
+            "voice_config": {"prebuilt_voice_config": {"voice_name": VOICE}},
+        },
+        "response_modalities": ["AUDIO"],
+    }
+
+    if LIVE_MODEL == MODEL_31_FLASH_LIVE:
+        generation_config["thinking_config"] = {"thinking_level": "minimal"}
 
     return {
         "setup": {
             "model": f"models/{LIVE_MODEL}",
             "system_instruction": {"parts": [{"text": _build_system_prompt()}]},
             "tools": [{"function_declarations": func_decls}],
-            "generation_config": {
-                "temperature": 0.3,
-                "speech_config": {
-                    "voice_config": {"prebuilt_voice_config": {"voice_name": VOICE}},
-                },
-                "response_modalities": ["AUDIO"],
-            },
+            "generation_config": generation_config,
         },
     }
 
@@ -182,13 +192,13 @@ def _build_audio_chunks(pcm_16k: bytes, chunk_size: int = 8000) -> list[dict]:
     for i in range(0, len(pcm_16k), chunk_size):
         chunk = pcm_16k[i : i + chunk_size]
         b64 = base64.b64encode(chunk).decode("ascii")
-        messages.append(
-            {
-                "realtimeInput": {
-                    "mediaChunks": [{"mimeType": "audio/pcm;rate=16000", "data": b64}],
-                },
-            }
-        )
+        if LIVE_MODEL == MODEL_31_FLASH_LIVE:
+            # 3.1: mediaChunks deprecated, use audio directly
+            audio_payload = {"audio": {"mimeType": "audio/pcm;rate=16000", "data": b64}}
+        else:
+            # 2.5: uses mediaChunks array
+            audio_payload = {"mediaChunks": [{"mimeType": "audio/pcm;rate=16000", "data": b64}]}
+        messages.append({"realtimeInput": audio_payload})
     return messages
 
 
@@ -216,7 +226,8 @@ async def run_voice_test(api_key: str, audio_path: str) -> dict:
     # 1 second of silence so Gemini's VAD detects end of speech
     pcm_16k += b"\x00" * (LIVE_INPUT_RATE * 2)
 
-    url = f"{GEMINI_WS_URL}?key={api_key}"
+    ws_base = GEMINI_WS_V1BETA if LIVE_MODEL == MODEL_31_FLASH_LIVE else GEMINI_WS_V1ALPHA
+    url = f"{ws_base}?key={api_key}"
     ssl_ctx = ssl.create_default_context()
 
     tool_calls = []
@@ -495,3 +506,103 @@ def test_voice_command(test_case, api_key, audio_files):
             print(f"{prefix} RETRY (model non-determinism)")
 
     raise last_error
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for version-aware message construction
+# ---------------------------------------------------------------------------
+
+
+class TestSetupMessageStructure:
+    """Verify setup message JSON is correct for each model version."""
+
+    def test_31_setup_uses_thinking_level(self, monkeypatch):
+        """3.1 setup message should use thinking_level, not thinking_budget."""
+        import tests.test_voice_commands as mod
+
+        monkeypatch.setattr(mod, "LIVE_MODEL", MODEL_31_FLASH_LIVE)
+        msg = _build_setup_message()
+        gen_cfg = msg["setup"]["generation_config"]
+        assert "thinking_config" in gen_cfg
+        assert gen_cfg["thinking_config"] == {"thinking_level": "minimal"}
+
+    def test_25_setup_has_no_thinking_config(self, monkeypatch):
+        """2.5 setup message should not include thinking_config."""
+        import tests.test_voice_commands as mod
+
+        monkeypatch.setattr(mod, "LIVE_MODEL", "gemini-2.5-flash-native-audio-latest")
+        msg = _build_setup_message()
+        gen_cfg = msg["setup"]["generation_config"]
+        assert "thinking_config" not in gen_cfg
+
+    def test_31_ws_url_uses_v1beta(self, monkeypatch):
+        """3.1 should use v1beta BidiGenerateContent endpoint."""
+        import tests.test_voice_commands as mod
+
+        monkeypatch.setattr(mod, "LIVE_MODEL", MODEL_31_FLASH_LIVE)
+        ws_base = GEMINI_WS_V1BETA if mod.LIVE_MODEL == MODEL_31_FLASH_LIVE else GEMINI_WS_V1ALPHA
+        assert "v1beta" in ws_base
+        assert "BidiGenerateContent" in ws_base
+        assert "Constrained" not in ws_base
+
+    def test_25_ws_url_uses_v1alpha(self, monkeypatch):
+        """2.5 should use v1alpha BidiGenerateContentConstrained endpoint."""
+        import tests.test_voice_commands as mod
+
+        monkeypatch.setattr(mod, "LIVE_MODEL", "gemini-2.5-flash-native-audio-latest")
+        ws_base = GEMINI_WS_V1BETA if mod.LIVE_MODEL == MODEL_31_FLASH_LIVE else GEMINI_WS_V1ALPHA
+        assert "v1alpha" in ws_base
+        assert "Constrained" in ws_base
+
+
+# ---------------------------------------------------------------------------
+# Gemini 3.1 Flash Live smoke tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.voice
+class TestGemini31Smoke:
+    """Smoke tests that connect to Gemini 3.1 Flash Live and verify basic protocol."""
+
+    def test_31_connects_and_gets_setup_complete(self, api_key):
+        """Connect to 3.1, send setup, verify setupComplete response."""
+
+        async def _run():
+            if websockets is None:
+                pytest.skip("websockets package required")
+
+            ws_url = f"{GEMINI_WS_V1BETA}?key={api_key}"
+            ssl_ctx = ssl.create_default_context()
+
+            # Build a minimal 3.1 setup message
+            func_decls = TOOL_DECLARATIONS[0]["functionDeclarations"]
+            setup = {
+                "setup": {
+                    "model": f"models/{MODEL_31_FLASH_LIVE}",
+                    "system_instruction": {"parts": [{"text": "You are a test assistant."}]},
+                    "tools": [{"function_declarations": func_decls}],
+                    "generation_config": {
+                        "speech_config": {
+                            "voice_config": {"prebuilt_voice_config": {"voice_name": VOICE}},
+                        },
+                        "response_modalities": ["AUDIO"],
+                        "thinking_config": {"thinking_level": "minimal"},
+                    },
+                },
+            }
+
+            async with websockets.connect(ws_url, ssl=ssl_ctx, max_size=10 * 1024 * 1024) as ws:
+                await ws.send(json.dumps(setup))
+
+                # Wait for setupComplete
+                deadline = asyncio.get_event_loop().time() + SETUP_TIMEOUT
+                while True:
+                    remaining = deadline - asyncio.get_event_loop().time()
+                    if remaining <= 0:
+                        raise TimeoutError("Timed out waiting for setupComplete from 3.1")
+                    raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
+                    msg = json.loads(raw)
+                    if "setupComplete" in msg or "setup_complete" in msg:
+                        return  # success
+
+        asyncio.run(_run())

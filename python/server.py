@@ -845,7 +845,7 @@ async def get_session():
     return sess.to_dict()
 
 
-GEMINI_LIVE_MODEL = "gemini-2.5-flash-native-audio-latest"
+GEMINI_LIVE_MODEL = "gemini-3.1-flash-live-preview"
 
 # Voice prompts — injected into Gemini Live session as user text turns
 VOICE_PROMPTS = {

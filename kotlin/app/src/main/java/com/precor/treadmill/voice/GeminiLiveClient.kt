@@ -43,11 +43,14 @@ class GeminiLiveClient(
 ) {
     companion object {
         private const val TAG = "GeminiLive"
+        // Ephemeral tokens require v1alpha/Constrained — v1beta rejects them
         private const val GEMINI_WS_BASE =
             "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained"
+        private const val MODEL_31_FLASH_LIVE = "gemini-3.1-flash-live-preview"
         private const val TURN_COMPLETE_DELAY_MS = 200L
     }
 
+    private val isV31: Boolean = model == MODEL_31_FLASH_LIVE
     private val json = Json { ignoreUnknownKeys = true }
     private var ws: WebSocket? = null
     private var ownedClient: OkHttpClient? = null  // only created if no injected client
@@ -85,19 +88,29 @@ class GeminiLiveClient(
 
     private fun sendStateUpdate(ctx: String) {
         if (ws == null || !setupDone) return
-        val msg = buildJsonObject {
-            putJsonObject("client_content") {
-                putJsonArray("turns") {
-                    addJsonObject {
-                        put("role", "user")
-                        putJsonArray("parts") {
-                            addJsonObject {
-                                put("text", "[State update — do not respond]\n$ctx")
+        val msg = if (isV31) {
+            // 3.1: mid-session text goes through realtimeInput
+            buildJsonObject {
+                putJsonObject("realtimeInput") {
+                    put("text", "[State update — do not respond]\n$ctx")
+                }
+            }
+        } else {
+            // 2.5: mid-session text goes through client_content
+            buildJsonObject {
+                putJsonObject("client_content") {
+                    putJsonArray("turns") {
+                        addJsonObject {
+                            put("role", "user")
+                            putJsonArray("parts") {
+                                addJsonObject {
+                                    put("text", "[State update — do not respond]\n$ctx")
+                                }
                             }
                         }
                     }
+                    put("turn_complete", true)
                 }
-                put("turn_complete", true)
             }
         }
         ws?.send(msg.toString())
@@ -241,7 +254,11 @@ class GeminiLiveClient(
                     putJsonArray("response_modalities") { add("AUDIO") }
                     // Disable thinking/reasoning to reduce latency (~800ms savings)
                     putJsonObject("thinking_config") {
-                        put("thinking_budget", 0)
+                        if (isV31) {
+                            put("thinking_level", "minimal")
+                        } else {
+                            put("thinking_budget", 0)
+                        }
                     }
                 }
                 putJsonObject("realtime_input_config") {
@@ -425,17 +442,27 @@ class GeminiLiveClient(
             Log.w(TAG, "sendTextPrompt skipped: ws=${ws != null}, setupDone=$setupDone")
             return
         }
-        val msg = buildJsonObject {
-            putJsonObject("client_content") {
-                putJsonArray("turns") {
-                    addJsonObject {
-                        put("role", "user")
-                        putJsonArray("parts") {
-                            addJsonObject { put("text", text) }
+        val msg = if (isV31) {
+            // 3.1: text goes through realtimeInput
+            buildJsonObject {
+                putJsonObject("realtimeInput") {
+                    put("text", text)
+                }
+            }
+        } else {
+            // 2.5: text goes through client_content
+            buildJsonObject {
+                putJsonObject("client_content") {
+                    putJsonArray("turns") {
+                        addJsonObject {
+                            put("role", "user")
+                            putJsonArray("parts") {
+                                addJsonObject { put("text", text) }
+                            }
                         }
                     }
+                    put("turn_complete", true)
                 }
-                put("turn_complete", true)
             }
         }
         Log.d(TAG, "Sending text prompt: $text")
@@ -448,10 +475,19 @@ class GeminiLiveClient(
         lastAudioSentMs = SystemClock.elapsedRealtime()
         val msg = buildJsonObject {
             putJsonObject("realtimeInput") {
-                putJsonArray("mediaChunks") {
-                    addJsonObject {
+                if (isV31) {
+                    // 3.1: mediaChunks deprecated, use audio directly
+                    putJsonObject("audio") {
                         put("mimeType", "audio/pcm;rate=16000")
                         put("data", pcmBase64)
+                    }
+                } else {
+                    // 2.5: uses mediaChunks array
+                    putJsonArray("mediaChunks") {
+                        addJsonObject {
+                            put("mimeType", "audio/pcm;rate=16000")
+                            put("data", pcmBase64)
+                        }
                     }
                 }
             }

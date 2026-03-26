@@ -135,7 +135,7 @@ class VoiceViewModel(
 
             val client = GeminiLiveClient(
                 apiKey = cfg.geminiApiKey,
-                model = cfg.geminiLiveModel.ifEmpty { "gemini-2.5-flash-native-audio-latest" },
+                model = cfg.geminiLiveModel.ifEmpty { "gemini-3.1-flash-live-preview" },
                 voice = cfg.geminiVoice.ifEmpty { "Kore" },
                 callbacks = backgroundCallbacks(player),
                 functionBridge = functionBridge,
@@ -145,7 +145,7 @@ class VoiceViewModel(
             )
             geminiClient = client
             client.speechEndTimestampProvider = { audioCapture?.silenceStartMs ?: 0L }
-            Log.d(TAG, "Opening background Gemini connection (model=${cfg.geminiLiveModel.ifEmpty { "gemini-2.5-flash-native-audio-latest" }})")
+            Log.d(TAG, "Opening background Gemini connection (model=${cfg.geminiLiveModel.ifEmpty { "gemini-3.1-flash-live-preview" }})")
             client.connect()
 
             startTokenRefresh()

@@ -93,7 +93,10 @@ def build_setup(args, api_key):
 
     # Disable thinking/reasoning to reduce latency
     if args.no_think:
-        gen_config["thinking_config"] = {"thinking_budget": 0}
+        if args.model == "gemini-3.1-flash-live-preview":
+            gen_config["thinking_config"] = {"thinking_level": "minimal"}
+        else:
+            gen_config["thinking_config"] = {"thinking_budget": 0}
 
     setup = {
         "setup": {

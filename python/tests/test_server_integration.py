@@ -550,7 +550,7 @@ class TestConfigEndpoint:
         mock_auth_client.auth_tokens.create.assert_called_once()
         call_kwargs = mock_auth_client.auth_tokens.create.call_args
         config = call_kwargs[1]["config"] if "config" in call_kwargs[1] else call_kwargs[0][0]
-        assert config["uses"] == 1
+        assert config["uses"] == 5
         assert config["http_options"]["api_version"] == "v1alpha"
 
     def test_create_ephemeral_token_no_key(self, test_app):
@@ -2031,3 +2031,13 @@ class TestSavedWorkouts:
             data = resp.json()
             # Same intervals → still saved even though name differs
             assert data[0]["saved"] is True
+
+
+def test_config_returns_gemini_31_live_model(test_app):
+    """Verify /api/config serves the 3.1 Flash Live model string."""
+    client, server, _ = test_app
+    response = client.get("/api/config")
+    assert response.status_code == 200
+    data = response.json()
+    assert "gemini_live_model" in data
+    assert data["gemini_live_model"] == "gemini-3.1-flash-live-preview"

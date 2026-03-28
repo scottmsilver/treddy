@@ -144,13 +144,18 @@ A Rust daemon (`rust/hrm/`) that acts as a BLE GATT client, scanning for and con
 
 `python/program_engine.py` handles Gemini API calls and interval program execution:
 - **Gemini model**: `gemini-2.5-flash` via REST API with function calling
-- **Tools**: `set_speed`, `set_incline`, `start_workout`, `stop_treadmill`, `pause/resume/skip`, `extend_interval`, `add_time`
+- **Tools**: `set_speed`, `set_incline`, `start_workout`, `stop_treadmill`, `pause/resume/skip`, `extend_interval`, `add_time`, `load_workout`, `query_workout_data`
+- **Workout query**: `query_workout_data` gives Gemini a read-only SQL interface to an in-memory SQLite DB (`python/workout_db.py`) populated from workout history, saved workouts, run records, and the live active program. Gemini writes its own SQL to query interval structures, compare past runs, and give contextual coaching. Engine-level read-only enforcement via `set_authorizer()`.
 - **ProgramState**: manages interval execution with 1s tick loop, pause/skip/extend support, encouragement milestones (25/50/75%)
 - **GPX import**: `POST /api/gpx/upload` parses GPX routes into incline-based interval programs
 
 ### Program History
 
 Recently generated/loaded programs are saved to `program_history.json` (max 10 entries). Programs are deduplicated by name. History is accessible via REST API and shown as a horizontal scroll in the UI.
+
+### Run History
+
+Completed and in-progress sessions are persisted to `run_history.json` (max 200 entries). Records are created 30 seconds into a session (as `end_reason: "in_progress"`), updated every 30 seconds with current metrics (elapsed, distance, calories), and finalized when the session ends with the actual end reason (`user_stop`, `program_complete`, `disconnect`). This ensures run data survives server crashes. Records include `program_fingerprint` for matching runs to workouts.
 
 ### Saved Workouts
 
@@ -198,7 +203,7 @@ cd rust/hrm && cargo test
 python3 -m pytest python/tests/test_hrm_client.py -v
 
 # Python unit tests (mocked sleep, <1s)
-python3 -m pytest python/tests/test_program_engine.py python/tests/test_server_integration.py -v
+python3 -m pytest python/tests/test_program_engine.py python/tests/test_server_integration.py python/tests/test_workout_db.py -v
 
 # Python live integration tests (real asyncio.sleep, ~45s)
 python3 -m pytest python/tests/test_live_program.py -v
@@ -259,6 +264,7 @@ Note: `make test` automatically stops the `treadmill-io` service before running 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/chat` | POST | Send message to AI coach. Body: `{"message": "..."}`. Returns `{"text": "...", "actions": [...]}` |
+| `/api/tool` | POST | Generic tool execution (used by voice clients). Body: `{"name": "...", "args": {...}, "context": "..."}`. Forwards to `_exec_fn()`. |
 
 ### WebSocket
 | Endpoint | Description |
@@ -324,6 +330,8 @@ All C++ code in `cpp/` must follow these rules. The environment is resource-cons
 **HRM daemon** (`rust/hrm/`): BLE client layer only. Scans for heart rate monitors, connects, reads HR notifications, and serves data on a Unix socket. No application logic, no knowledge of programs/workouts/AI.
 
 **Python clients** (`python/treadmill_client.py`, `python/hrm_client.py`): Thin IPC wrappers to daemon sockets. No business logic.
+
+**Workout DB** (`python/workout_db.py`): In-memory SQLite read-only query interface for Gemini. Populated from JSON files + live active program. No HTTP, no business logic.
 
 **Program engine** (`python/program_engine.py`): Interval execution + Gemini API. No HTTP, no GPIO, no imports from server.
 

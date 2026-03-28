@@ -42,6 +42,30 @@ Safety is the design principle that drives every decision in this binary. A trea
 - **Client disconnect watchdog**: if all IPC clients disconnect during emulate, same behavior — exit to proxy.
 - **Auto proxy-on-console-change**: if someone presses a button on the physical console while emulating (detected as a change in the console's `hmph` or `inc` values), the binary instantly switches to proxy. Physical controls always win.
 
+## DMA Crash Recovery
+
+pigpio allocates ~23 GPU DMA memory handles via the VideoCore mailbox (`/dev/vcio`) for bit-banged serial I/O. These handles live in GPU firmware memory, not Linux userspace. When a process crashes (SIGKILL, segfault), Linux cleans up its memory and file descriptors, but the GPU firmware has no concept of process death. The handles are leaked.
+
+After enough crash-restart cycles, the GPU's handle table fills up and pigpio can't initialize at all (`initMboxBlock: init mbox zaps failed`). Previously, this required a Pi reboot. Now it's self-healing:
+
+```
+Startup:
+  1. DmaGuard reads /run/treadmill-io.dma-handles (crash journal)
+  2. If file exists: free exactly those leaked handles via mailbox ioctl
+  3. Probe handles 0-1024 to record baseline (other GPU users like DRM)
+  4. gpioInitialise() — pigpio allocates ~23 new handles
+  5. Probe again, compute diff = our handles
+  6. Write our handles to crash journal
+
+Clean shutdown (SIGTERM → destructor):
+  gpioTerminate() frees handles, delete journal
+
+Crash (SIGKILL):
+  Journal persists in /run/ (tmpfs), next startup recovers at step 1
+```
+
+`GpioSession` (`gpio/gpio_session.h`) wraps this as RAII. `DmaGuard` (`gpio/dma_guard.h`) handles the mailbox operations and state file. The probe step uses non-destructive lock/unlock to detect allocated handles without modifying them.
+
 ## Architecture
 
 ```
@@ -94,7 +118,7 @@ A fourth thread runs only during emulate mode:
 
 | File | Role |
 |------|------|
-| `treadmill_io.cpp` | `main()`, signal handling, GPIO init |
+| `treadmill_io.cpp` | `main()`, signal handling, `GpioSession` creation |
 | `treadmill_io.h` | `TreadmillController` — top-level wiring, thread lifecycle |
 | `serial_io.h` | `SerialReader` (inverted bit-bang read) + `SerialWriter` (DMA waveforms) |
 | `kv_protocol.h/cpp` | `[key:value]` parser + builder, speed hex encoding. Hot path — zero allocation |
@@ -106,6 +130,8 @@ A fourth thread runs only during emulate mode:
 | `config.h` | `gpio.json` loader, GPIO pin validation |
 | `gpio_port.h` | GPIO interface contract (constants, documentation) |
 | `gpio_pigpio.h` | Production `PigpioPort` — thin wrapper around libpigpio C API |
+| `gpio_session.h` | `GpioSession` — RAII pigpio lifecycle with DMA crash recovery |
+| `dma_guard.h/cpp` | `DmaGuard` — VideoCore GPU mailbox handle tracking + leak recovery |
 | `gpio_mock.h` | Test `MockGpioPort` — records calls, no hardware |
 
 ## IPC Protocol
@@ -149,7 +175,7 @@ Requires `libpigpio-dev`. Compiled with C++20, `-fno-exceptions -fno-rtti`. Hot 
 ## Testing
 
 ```bash
-make test       # 92 tests across 8 binaries
+make test       # 9 test binaries
 ```
 
 This automatically stops the `treadmill-io` systemd service (to free the socket), runs all tests, and restarts it — even if tests fail.
@@ -164,8 +190,9 @@ This automatically stops the `treadmill-io` systemd service (to free the socket)
 | `test_integration` | Full controller with mock GPIO, end-to-end IPC |
 | `test_ipc_server` | Socket accept, command dispatch, client disconnect |
 | `test_controller_live` | Controller startup/shutdown, thread lifecycle |
+| `test_dma_guard` | State file round-trip, recovery, corrupt file handling |
 
-All tests use `MockGpioPort` — no hardware required. The `gpio_mock.h` records all GPIO calls for assertion.
+All tests use `MockGpioPort` — no hardware required. `test_dma_guard` tests state file logic only (no `/dev/vcio`). Hardware integration tests for DMA leak/recovery run on the Pi via `make test-pi`.
 
 ## Pin Configuration
 

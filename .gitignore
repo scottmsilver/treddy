@@ -31,6 +31,7 @@ key.pem
 program_history.json
 saved_workouts.json
 run_history.json
+user_profile.json
 
 # C++ build artifacts
 *.o
@@ -71,4 +72,8 @@ static/assets/*.css
 worktree.env
 
 # Claude config (local)
-.claude/
+.claude/*
+!.claude/skills
+.claude/skills/*
+!.claude/skills/gstack
+.gstack/

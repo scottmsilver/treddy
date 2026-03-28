@@ -106,6 +106,11 @@ interface TreadmillApi {
     @POST("/api/tts")
     suspend fun requestTts(@Body request: TtsRequest): TtsResponse
 
+    // --- Generic Tool Execution ---
+
+    @POST("/api/tool")
+    suspend fun execTool(@Body request: ToolCallRequest): ToolCallResponse
+
     // --- Heart Rate Monitor ---
 
     @GET("/api/hrm")

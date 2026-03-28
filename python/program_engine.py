@@ -692,6 +692,20 @@ TOOL_DECLARATIONS = [
                     "required": ["id"],
                 },
             },
+            {
+                "name": "query_workout_data",
+                "description": "Query the workout database using SQL. Returns workout structures, interval details, and run history. Use SELECT queries only.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "sql": {
+                            "type": "STRING",
+                            "description": "A SELECT SQL query against the workout database tables",
+                        }
+                    },
+                    "required": ["sql"],
+                },
+            },
         ]
     }
 ]

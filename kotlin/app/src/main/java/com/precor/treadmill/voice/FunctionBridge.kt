@@ -24,7 +24,7 @@ class FunctionBridge(private val api: TreadmillApi) {
         val response: String,
     )
 
-    suspend fun execute(name: String, args: Map<String, JsonElement>): FunctionResult {
+    suspend fun execute(name: String, args: Map<String, JsonElement>, context: String? = null): FunctionResult {
         val result = try {
             when (name) {
                 "set_speed" -> {
@@ -86,7 +86,11 @@ class FunctionBridge(private val api: TreadmillApi) {
                     resp.text.ifEmpty { "Time added" }
                 }
 
-                else -> "Unknown function: $name"
+                else -> {
+                    // Generic fallback: forward any unknown tool to the server's _exec_fn()
+                    val resp = api.execTool(ToolCallRequest(name, args, context))
+                    if (resp.ok) resp.result ?: "Done" else "Error: ${resp.error ?: "unknown"}"
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error executing $name", e)

@@ -647,6 +647,150 @@ class TestLogEndpoint:
         assert data["lines"] == []
 
 
+class TestRunRecordPersistence:
+    """Run records should be created early, updated periodically, and finalized on end."""
+
+    def _reset_run_state(self, server):
+        """Reset the module-level run record state between tests."""
+        server._active_run_id = None
+
+    def _simulate_elapsed(self, server, seconds, speed_tenths=30):
+        """Simulate a session that has been running for `seconds` seconds."""
+        server.state["emu_speed"] = speed_tenths
+        server.state["emu_incline"] = 0
+        # Tick once to initialize, then backdate started_at to fake elapsed time
+        server.sess.tick(speed_tenths / 10, 0, 70)
+        server.sess.started_at = time.monotonic() - seconds
+        server.sess.tick(speed_tenths / 10, 0, 70)
+
+    def test_start_run_record_creates_entry(self, test_app):
+        """_start_run_record creates an in-progress record after 5s of activity."""
+        _, server, _ = test_app
+        self._reset_run_state(server)
+        server.sess.start()
+        self._simulate_elapsed(server, 10)
+
+        with patch.object(server, "_load_runs", return_value=[]), patch.object(server, "_save_runs") as mock_save:
+            server._start_run_record()
+
+        assert server._active_run_id is not None
+        assert mock_save.called
+        saved = mock_save.call_args[0][0]
+        assert len(saved) == 1
+        assert saved[0]["end_reason"] == "in_progress"
+        assert saved[0]["id"] == server._active_run_id
+
+    def test_update_run_record_updates_existing(self, test_app):
+        """_update_run_record updates the in-progress record with current metrics."""
+        _, server, _ = test_app
+        self._reset_run_state(server)
+        server.sess.start()
+        self._simulate_elapsed(server, 10)
+
+        # Create initial record
+        initial_runs = []
+        with (
+            patch.object(server, "_load_runs", return_value=initial_runs),
+            patch.object(server, "_save_runs") as mock_save,
+        ):
+            server._start_run_record()
+        initial_record = mock_save.call_args[0][0][0].copy()
+
+        # Simulate more ticks to change metrics
+        self._simulate_elapsed(server, 30)
+
+        # Update the record
+        with (
+            patch.object(server, "_load_runs", return_value=[initial_record]),
+            patch.object(server, "_save_runs") as mock_save,
+        ):
+            server._update_run_record()
+
+        assert mock_save.called
+        updated = mock_save.call_args[0][0][0]
+        assert updated["id"] == server._active_run_id
+        assert updated["elapsed"] > initial_record["elapsed"]
+        assert updated["end_reason"] == "in_progress"
+
+    def test_save_run_record_finalizes(self, test_app):
+        """_save_run_record finalizes with the real end reason."""
+        _, server, _ = test_app
+        self._reset_run_state(server)
+        server.sess.start()
+        self._simulate_elapsed(server, 10)
+
+        # Create initial in-progress record
+        initial_runs = []
+        with patch.object(server, "_load_runs", return_value=initial_runs), patch.object(server, "_save_runs"):
+            server._start_run_record()
+        run_id = server._active_run_id
+
+        # Build the in-progress record for load_runs to return
+        in_progress = server._build_run_record("in_progress")
+
+        # Finalize
+        with (
+            patch.object(server, "_load_runs", return_value=[in_progress]),
+            patch.object(server, "_save_runs") as mock_save,
+        ):
+            server._save_run_record("user_stop")
+
+        assert mock_save.called
+        final = mock_save.call_args[0][0][0]
+        assert final["id"] == run_id
+        assert final["end_reason"] == "user_stop"
+        assert server._active_run_id is None
+
+    def test_save_without_start_still_works(self, test_app):
+        """_save_run_record works even if _start_run_record was never called (legacy path)."""
+        _, server, _ = test_app
+        self._reset_run_state(server)
+        server.sess.start()
+        self._simulate_elapsed(server, 10)
+        assert server._active_run_id is None
+
+        with patch.object(server, "_load_runs", return_value=[]), patch.object(server, "_save_runs") as mock_save:
+            server._save_run_record("user_stop")
+
+        assert mock_save.called
+        saved = mock_save.call_args[0][0]
+        assert len(saved) == 1
+        assert saved[0]["end_reason"] == "user_stop"
+
+    def test_crash_leaves_in_progress_record(self, test_app):
+        """If the server crashes after _start_run_record, the record survives."""
+        _, server, _ = test_app
+        self._reset_run_state(server)
+        server.sess.start()
+        self._simulate_elapsed(server, 10)
+
+        captured_runs = []
+        with (
+            patch.object(server, "_load_runs", return_value=[]),
+            patch.object(server, "_save_runs", side_effect=lambda r: captured_runs.clear() or captured_runs.extend(r)),
+        ):
+            server._start_run_record()
+
+        # "Crash" — _save_run_record never called
+        assert len(captured_runs) == 1
+        assert captured_runs[0]["end_reason"] == "in_progress"
+        assert captured_runs[0]["elapsed"] > 0
+        assert captured_runs[0]["distance"] >= 0
+
+    def test_trivial_session_skipped(self, test_app):
+        """Sessions under 5 seconds don't create run records."""
+        _, server, _ = test_app
+        self._reset_run_state(server)
+        server.sess.start()
+        self._simulate_elapsed(server, 3)
+
+        with patch.object(server, "_load_runs", return_value=[]), patch.object(server, "_save_runs") as mock_save:
+            server._start_run_record()
+
+        assert server._active_run_id is None
+        assert not mock_save.called
+
+
 class TestHeartbeatThread:
     def test_start_heartbeat_calls_send(self):
         from treadmill_client import TreadmillClient

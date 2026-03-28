@@ -44,6 +44,7 @@ from program_engine import (
 )
 from pydantic import BaseModel, Field, field_validator
 from treadmill_client import MAX_INCLINE, MAX_SPEED_TENTHS, TreadmillClient
+from workout_db import WorkoutDB
 from workout_session import WorkoutSession
 
 logging.basicConfig(level=logging.INFO)
@@ -301,6 +302,7 @@ def _add_to_history(program, prompt=""):
     history.insert(0, entry)
     history = history[:MAX_HISTORY]
     _save_history(history)
+    workout_db.sync(active_program=sess.prog.program if sess else None)
     return entry
 
 
@@ -395,15 +397,16 @@ def _save_runs(runs):
     os.replace(tmp, RUNS_FILE)
 
 
-def _save_run_record(reason):
-    """Persist a run record when a session ends. Call before sess.end()."""
-    if not sess.active or sess.elapsed < 5:
-        return  # skip zero-length or trivial sessions
+_active_run_id = None  # ID of the in-progress run record, if any
+
+
+def _build_run_record(reason="in_progress"):
+    """Build a run record dict from current session state."""
     prog = sess.prog.program
-    record = {
-        "id": f"{time.time_ns()}",
+    return {
+        "id": _active_run_id or f"{time.time_ns()}",
         "started_at": sess.wall_started_at,
-        "ended_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "ended_at": time.strftime("%Y-%m-%dT%H:%M:%S") if reason != "in_progress" else None,
         "elapsed": round(sess.elapsed, 1),
         "distance": round(sess.distance, 3),
         "vert_feet": round(sess.vert_feet, 1),
@@ -414,11 +417,60 @@ def _save_run_record(reason):
         "program_completed": sess.prog.completed,
         "is_manual": sess.prog.is_manual,
     }
+
+
+def _start_run_record():
+    """Create an in-progress run record when a session starts."""
+    global _active_run_id
+    if not sess.active or sess.elapsed < 5:
+        return
+    _active_run_id = f"{time.time_ns()}"
+    record = _build_run_record("in_progress")
     runs = _load_runs()
     runs.insert(0, record)
     if len(runs) > MAX_RUNS:
         runs = runs[:MAX_RUNS]
     _save_runs(runs)
+
+
+def _update_run_record():
+    """Update the in-progress run record with current metrics. Called periodically."""
+    if not _active_run_id or not sess.active:
+        return
+    record = _build_run_record("in_progress")
+    runs = _load_runs()
+    for i, r in enumerate(runs):
+        if r.get("id") == _active_run_id:
+            runs[i] = record
+            _save_runs(runs)
+            return
+
+
+def _save_run_record(reason):
+    """Finalize the run record when a session ends. Call before sess.end()."""
+    global _active_run_id
+    if not sess.active or sess.elapsed < 5:
+        _active_run_id = None
+        return
+    record = _build_run_record(reason)
+    runs = _load_runs()
+    if _active_run_id:
+        # Update existing in-progress record
+        for i, r in enumerate(runs):
+            if r.get("id") == _active_run_id:
+                runs[i] = record
+                break
+        else:
+            # Not found (shouldn't happen), insert as new
+            runs.insert(0, record)
+    else:
+        # No in-progress record (legacy path), insert as new
+        runs.insert(0, record)
+    if len(runs) > MAX_RUNS:
+        runs = runs[:MAX_RUNS]
+    _save_runs(runs)
+    _active_run_id = None
+    workout_db.sync(active_program=sess.prog.program)
 
 
 def _last_run_by_fingerprint():
@@ -430,6 +482,16 @@ def _last_run_by_fingerprint():
         if fp and fp not in by_fp:
             by_fp[fp] = r  # runs are newest-first, so first seen wins
     return by_fp
+
+
+# --- Workout Query Database ---
+
+workout_db = WorkoutDB(
+    history_loader=_load_history,
+    workouts_loader=_load_workouts,
+    runs_loader=_load_runs,
+    fingerprint_fn=_program_fingerprint,
+)
 
 
 def _relative_time(date_str):
@@ -530,6 +592,7 @@ def _save_workout(program, source="generated", prompt=""):
     if len(workouts) > MAX_SAVED_WORKOUTS:
         workouts = workouts[-MAX_SAVED_WORKOUTS:]
     _save_workouts(workouts)
+    workout_db.sync(active_program=sess.prog.program if sess else None)
     return entry
 
 
@@ -578,12 +641,28 @@ def _handle_auto_proxy(reason="auto_proxy"):
     log.info(f"Auto-paused session: {reason}")
 
 
+_run_save_counter = 0
+_RUN_SAVE_INTERVAL = 30  # save every 30 seconds
+
+
 async def _session_tick_loop():
     """1/sec loop: compute session metrics and broadcast to all WS clients."""
+    global _run_save_counter
     while state["running"]:
         if sess.active:
             sess.tick(state["emu_speed"] / 10, state["emu_incline"] / 2.0, _user_weight_kg())
             await manager.broadcast(sess.to_dict())
+            # Periodic run record save + workout_db active program sync
+            _run_save_counter += 1
+            if _run_save_counter >= _RUN_SAVE_INTERVAL:
+                _run_save_counter = 0
+                if not _active_run_id and sess.elapsed >= 5:
+                    _start_run_record()
+                elif _active_run_id:
+                    _update_run_record()
+                # Keep workout_db's active program current (handles mid-run
+                # mutations like split_for_manual, extend, add_time)
+                workout_db.sync(active_program=sess.prog.program)
         await asyncio.sleep(1)
 
 
@@ -1304,6 +1383,7 @@ async def api_rename_workout(workout_id: str, req: RenameWorkoutRequest):
     workout["name"] = req.name
     workout["program"]["name"] = req.name
     _save_workouts(workouts)
+    workout_db.sync(active_program=sess.prog.program)
     return {"ok": True, "workout": workout}
 
 
@@ -1315,6 +1395,7 @@ async def api_delete_workout(workout_id: str):
     if len(workouts) == before:
         return {"ok": False, "error": "Not found"}
     _save_workouts(workouts)
+    workout_db.sync(active_program=sess.prog.program)
     return {"ok": True}
 
 
@@ -1329,7 +1410,31 @@ async def api_load_workout(workout_id: str):
     _save_workouts(workouts)
     sess.prog.load(workout["program"])
     _add_to_history(workout["program"], prompt=workout.get("prompt", ""))
+    workout_db.sync(active_program=sess.prog.program)
     return {"ok": True, "program": workout["program"]}
+
+
+# --- Workout query (for voice function bridge) ---
+
+
+class ToolCallRequest(BaseModel):
+    name: str
+    args: dict = {}
+    context: str | None = None  # optional: why the tool was called (user utterance, model reasoning)
+
+
+@app.post("/api/tool")
+async def api_exec_tool(req: ToolCallRequest):
+    """Generic tool execution endpoint. Forwards to _exec_fn(), the single source of truth."""
+    if req.context:
+        log.info("tool call: %s(%s) context: %s", req.name, req.args, req.context)
+    else:
+        log.info("tool call: %s(%s)", req.name, req.args)
+    try:
+        result = await _exec_fn(req.name, req.args)
+        return {"ok": True, "result": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # --- GPX upload ---
@@ -1609,12 +1714,26 @@ async def _exec_fn(name, args):
         if not program:
             return f"Workout id '{wid}' not found"
         sess.prog.load(program)
+        workout_db.sync(active_program=sess.prog.program)
         if start:
             await sess.start_program(_prog_on_change(), _prog_on_update())
             n = len(program.get("intervals", []))
             mins = sum(iv["duration"] for iv in program.get("intervals", [])) // 60
             return f"Loaded and started '{program.get('name')}': {n} intervals, {mins} min"
         return f"Loaded '{program.get('name')}' (not started yet)"
+
+    elif name == "query_workout_data":
+        sql = args.get("sql", "")
+        if not sql:
+            return "No SQL query provided"
+        try:
+            # DB is kept in sync via mutation hooks (no pre-query sync needed)
+            rows = workout_db.query(sql)
+            if not rows:
+                return "No results"
+            return json.dumps(rows, default=str)
+        except Exception as e:
+            return f"Query error: {e}"
 
     return f"Unknown function: {name}"
 
@@ -1641,6 +1760,8 @@ def _build_chat_system(smartass=False):
             "elapsed": sess.prog.total_elapsed,
             "remaining": sess.prog.total_duration - sess.prog.total_elapsed,
             "total_intervals": len(sess.prog.program.get("intervals", [])),
+            "current_workout_id": "__active__",
+            "current_workout_fingerprint": _program_fingerprint(sess.prog.program),
         }
 
     history = _load_history()
@@ -1662,8 +1783,28 @@ def _build_chat_system(smartass=False):
             "Let them choose, then call load_workout with the id internally.\n" + "\n".join(library_lines)
         )
 
+    schema_text = (
+        "\n\nYou have access to the workout database via the query_workout_data tool. "
+        "You can write read-only SQL (SELECT only) against these tables:\n"
+        "- workouts (id, fingerprint, name, source, prompt, total_duration, created_at, times_used, is_saved)\n"
+        "- intervals (workout_id, position, name, duration_s, speed_mph, incline_pct)\n"
+        "- runs (id, program_fingerprint, program_name, started_at, ended_at, elapsed, distance, "
+        "vert_feet, calories, end_reason, program_completed, is_manual)\n\n"
+        "Join runs to workouts via: runs.program_fingerprint = workouts.fingerprint\n"
+        "The currently loaded workout has id='__active__'.\n\n"
+        "Example queries:\n"
+        "- SELECT * FROM intervals WHERE workout_id = '__active__' ORDER BY position\n"
+        "- SELECT started_at, elapsed, distance, calories FROM runs "
+        "WHERE program_fingerprint = '<fingerprint>' ORDER BY started_at DESC LIMIT 3\n"
+        "- SELECT position, name, speed_mph, incline_pct, duration_s FROM intervals "
+        "WHERE workout_id = '__active__' AND speed_mph = "
+        "(SELECT MAX(speed_mph) FROM intervals WHERE workout_id = '__active__')\n\n"
+        "Use this to understand workout structure, compare with past performance, "
+        "and provide informed coaching. Query what you need, when you need it."
+    )
+
     base_prompt = CHAT_SYSTEM_PROMPT + (SMARTASS_ADDENDUM if smartass else "")
-    return f"{base_prompt}{library_text}\n\nCurrent state:\n{json.dumps(treadmill_state)}"
+    return f"{base_prompt}{library_text}{schema_text}\n\nCurrent state:\n{json.dumps(treadmill_state)}"
 
 
 async def _run_chat_core(smartass=False):

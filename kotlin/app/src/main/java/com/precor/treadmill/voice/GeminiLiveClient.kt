@@ -417,7 +417,8 @@ class GeminiLiveClient(
                 turnToolCalls.add(name)
                 Log.d(TAG, "toolCall: $name($args) id=$fcId")
 
-                val result = functionBridge.execute(name, args)
+                val context = turnTextParts.takeIf { it.isNotEmpty() }?.joinToString(" ")
+                val result = functionBridge.execute(name, args, context)
                 sendToolResponse(result.name, result.response, fcId)
             }
             // Fire fallback immediately if there was narration text alongside tool calls

@@ -2041,3 +2041,182 @@ def test_config_returns_gemini_31_live_model(test_app):
     data = response.json()
     assert "gemini_live_model" in data
     assert data["gemini_live_model"] == "gemini-3.1-flash-live-preview"
+
+
+class TestWorkoutQueryEndToEnd:
+    """End-to-end: load program → run session → save run record → query via /api/tool."""
+
+    PROGRAM = {
+        "name": "E2E Hill Workout",
+        "intervals": [
+            {"name": "Warmup", "duration": 120, "speed": 3.0, "incline": 0},
+            {"name": "Hill", "duration": 180, "speed": 5.0, "incline": 5.0},
+            {"name": "Cooldown", "duration": 120, "speed": 3.0, "incline": 0},
+        ],
+    }
+
+    def test_full_lifecycle(self, test_app):
+        """Load a workout, simulate a run, finalize, then query intervals and runs."""
+        import time as _time
+
+        client, server, _ = test_app
+        server._active_run_id = None
+
+        # 1. Load a program
+        server.sess.prog.load(self.PROGRAM)
+        assert server.sess.prog.program["name"] == "E2E Hill Workout"
+
+        # 2. Start session and simulate elapsed time
+        server.sess.start()
+        server.sess.tick(3.0, 0, 70)
+        server.sess.started_at = _time.monotonic() - 600  # fake 10 minutes
+        server.sess.tick(3.0, 0, 70)
+        assert server.sess.elapsed > 500
+
+        # 3. Save run record (simulates session end)
+        server._save_run_record("program_complete")
+
+        # 4. Sync workout_db so it has the run + workout
+        server.workout_db.sync(active_program=server.sess.prog.program)
+
+        # 5. Query intervals via /api/tool
+        resp = client.post(
+            "/api/tool",
+            json={
+                "name": "query_workout_data",
+                "args": {"sql": "SELECT * FROM intervals WHERE workout_id = '__active__' ORDER BY position"},
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        intervals = json.loads(data["result"])
+        assert len(intervals) == 3
+        assert intervals[0]["name"] == "Warmup"
+        assert intervals[1]["name"] == "Hill"
+        assert intervals[1]["speed_mph"] == 5.0
+        assert intervals[1]["incline_pct"] == 5.0
+        assert intervals[2]["name"] == "Cooldown"
+
+        # 6. Query runs — find the specific run we just created by program_name
+        resp = client.post(
+            "/api/tool",
+            json={
+                "name": "query_workout_data",
+                "args": {"sql": "SELECT program_name, end_reason FROM runs WHERE program_name = 'E2E Hill Workout'"},
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        runs = json.loads(data["result"])
+        assert len(runs) >= 1
+        assert runs[0]["program_name"] == "E2E Hill Workout"
+        assert runs[0]["end_reason"] == "program_complete"
+
+        # 7. Query with JOIN — runs matched to workouts via fingerprint
+        #    Use __active__ which we control, not workouts from disk
+        resp = client.post(
+            "/api/tool",
+            json={
+                "name": "query_workout_data",
+                "args": {
+                    "sql": (
+                        "SELECT w.name, r.end_reason, r.elapsed "
+                        "FROM workouts w JOIN runs r ON w.fingerprint = r.program_fingerprint "
+                        "WHERE w.id = '__active__'"
+                    )
+                },
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        joined = json.loads(data["result"])
+        assert len(joined) >= 1
+        assert joined[0]["name"] == "E2E Hill Workout"
+        assert joined[0]["elapsed"] > 500
+
+    def test_in_progress_run_queryable(self, test_app):
+        """An in-progress run record should be queryable before session ends."""
+        import time as _time
+
+        client, server, _ = test_app
+        server._active_run_id = None
+
+        # Load and start
+        server.sess.prog.load(self.PROGRAM)
+        server.sess.start()
+        server.sess.tick(3.0, 0, 70)
+        server.sess.started_at = _time.monotonic() - 60  # fake 1 minute
+        server.sess.tick(3.0, 0, 70)
+
+        # Create the in-progress record (simulates the 30s tick)
+        server._start_run_record()
+        run_id = server._active_run_id
+        assert run_id is not None
+
+        # Sync and query by the specific run ID
+        server.workout_db.sync(active_program=server.sess.prog.program)
+        resp = client.post(
+            "/api/tool",
+            json={
+                "name": "query_workout_data",
+                "args": {"sql": f"SELECT end_reason, elapsed FROM runs WHERE id = '{run_id}'"},
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        runs = json.loads(data["result"])
+        assert len(runs) == 1
+        assert runs[0]["end_reason"] == "in_progress"
+        assert runs[0]["elapsed"] > 50
+
+    def test_hardest_interval_query(self, test_app):
+        """The 'hardest interval' query pattern works end-to-end."""
+        client, server, _ = test_app
+        server._active_run_id = None
+
+        server.sess.prog.load(self.PROGRAM)
+        server.workout_db.sync(active_program=server.sess.prog.program)
+
+        # This is the query pattern Gemini uses
+        resp = client.post(
+            "/api/tool",
+            json={
+                "name": "query_workout_data",
+                "args": {
+                    "sql": (
+                        "SELECT position, name, speed_mph, incline_pct, duration_s "
+                        "FROM intervals WHERE workout_id = '__active__' "
+                        "ORDER BY speed_mph DESC, incline_pct DESC LIMIT 1"
+                    )
+                },
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        rows = json.loads(data["result"])
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Hill"
+        assert rows[0]["speed_mph"] == 5.0
+        assert rows[0]["incline_pct"] == 5.0
+
+    def test_sql_injection_blocked(self, test_app):
+        """Destructive SQL is blocked by the authorizer."""
+        client, server, _ = test_app
+
+        resp = client.post(
+            "/api/tool",
+            json={
+                "name": "query_workout_data",
+                "args": {"sql": "DROP TABLE runs"},
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert (
+            data["ok"] is False or "error" in data.get("result", "").lower() or "error" in data.get("error", "").lower()
+        )

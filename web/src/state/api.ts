@@ -178,6 +178,10 @@ export async function sendVoiceChat(audio: string, mimeType: string): Promise<Ch
   return post('/api/chat/voice', { audio, mime_type: mimeType, smartass: isSmartassMode() });
 }
 
+export async function execTool(name: string, args: Record<string, unknown>, context?: string): Promise<{ ok: boolean; result?: string; error?: string }> {
+  return post('/api/tool', { name, args, context });
+}
+
 // --- Voice intent extraction ---
 
 export async function extractIntent(text: string, alreadyExecuted: string[] = []): Promise<{ actions: Action[]; text: string }> {

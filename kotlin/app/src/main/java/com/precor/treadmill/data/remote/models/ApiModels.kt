@@ -62,6 +62,20 @@ data class TtsRequest(
 )
 
 @Serializable
+data class ToolCallRequest(
+    val name: String,
+    val args: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
+    val context: String? = null,
+)
+
+@Serializable
+data class ToolCallResponse(
+    val ok: Boolean,
+    val result: String? = null,
+    val error: String? = null,
+)
+
+@Serializable
 data class HrmSelectRequest(val address: String)
 
 @Serializable

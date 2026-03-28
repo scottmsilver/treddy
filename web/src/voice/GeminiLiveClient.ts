@@ -303,7 +303,8 @@ export class GeminiLiveClient {
       for (const fc of toolCall.functionCalls) {
         this.turnToolCalls.push(fc.name);
         console.log(`[Voice] toolCall: ${fc.name}(${JSON.stringify(fc.args ?? {})})`);
-        const call: FunctionCall = { name: fc.name, args: fc.args ?? {} };
+        const context = this.turnTextParts.length > 0 ? this.turnTextParts.join(' ') : undefined;
+        const call: FunctionCall = { name: fc.name, args: fc.args ?? {}, context };
         const result = await executeFunctionCall(call);
         this.sendToolResponse(result.name, result.response);
       }

@@ -6,6 +6,7 @@ import * as api from '../state/api';
 export interface FunctionCall {
   name: string;
   args: Record<string, unknown>;
+  context?: string;  // why the tool was called (model text, user utterance)
 }
 
 export interface FunctionResult {
@@ -77,8 +78,11 @@ export async function executeFunctionCall(call: FunctionCall): Promise<FunctionR
         result = resp.text || 'Time added';
         break;
       }
-      default:
-        result = `Unknown function: ${name}`;
+      default: {
+        // Generic fallback: forward any unknown tool to the server's _exec_fn()
+        const tr = await api.execTool(name, args, call.context);
+        result = tr.ok ? (tr.result ?? 'Done') : `Error: ${tr.error ?? 'unknown'}`;
+      }
     }
   } catch (err) {
     result = `Error executing ${name}: ${err instanceof Error ? err.message : String(err)}`;

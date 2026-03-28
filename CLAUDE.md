@@ -90,6 +90,8 @@ The serial bus uses RS-485 signaling which idles LOW (opposite of standard UART)
 
 All GPIO I/O is handled by a C++20 binary (`cpp/`) that links libpigpio directly (no daemon). It reads pin assignments from `gpio.json`, handles KV parsing, proxy forwarding, and emulation, and serves data to clients over a Unix domain socket (`/tmp/treadmill_io.sock`). Both the Python server and the FTMS daemon connect as socket clients. See `python/treadmill_client.py` for the Python IPC client library. Runs as a systemd service (`treadmill-io.service`). Internal layout: `protocol/` (KV/IPC parsing), `gpio/` (hardware abstraction), `engine/` (mode state + emulation), `ipc/` (socket server), plus entry point and config at root.
 
+**DMA crash recovery**: pigpio allocates ~23 GPU DMA memory handles via the VideoCore mailbox (`/dev/vcio`). These handles are managed by the GPU firmware and are NOT freed when a Linux process dies (SIGKILL, segfault). `GpioSession` (RAII, `gpio/gpio_session.h`) wraps the pigpio lifecycle and uses `DmaGuard` (`gpio/dma_guard.h`) to track allocated handles in a crash journal at `/run/treadmill-io.dma-handles`. On clean shutdown, the destructor calls `gpioTerminate()` and deletes the journal. On crash, the journal persists (tmpfs) and the next startup frees exactly those leaked handles before reinitializing. This prevents the `initMboxBlock: init mbox zaps failed` death spiral that previously required a Pi reboot to fix.
+
 ### Protocol
 
 Both directions use `[key:value]` text framing at 9600 baud, 8N1.
@@ -170,7 +172,7 @@ This logic lives in the C binary (not Python) so that mode transitions work even
 ## Testing
 
 ```bash
-# C++ unit tests (126 tests, runs from cpp/)
+# C++ unit tests (132 tests including DMA guard, runs from cpp/)
 make test
 
 # Deploy to Pi, build, restart binary, run hardware integration tests

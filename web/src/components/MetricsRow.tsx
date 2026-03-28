@@ -40,6 +40,10 @@ export default function MetricsRow(): React.ReactElement {
         <span className="metric-value" style={{ ...valStyle, color: 'var(--orange)' }}>{sess.vertDisplay}</span>
         <span className="metric-label" style={unitStyle}>vert ft</span>
       </div>
+      <div style={cellStyle}>
+        <span className="metric-value" style={valStyle}>{sess.caloriesDisplay}</span>
+        <span className="metric-label" style={unitStyle}>cal</span>
+      </div>
       <HeartRate />
     </motion.div>
   );

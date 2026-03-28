@@ -30,6 +30,7 @@ export interface SessionMessage {
   elapsed: number;
   distance: number;
   vert_feet: number;
+  calories: number;
   wall_started_at: string;
   end_reason: 'user_stop' | 'watchdog' | 'auto_proxy' | 'disconnect' | null;
 }
@@ -100,6 +101,7 @@ export interface SessionState {
   elapsed: number;
   distance: number;
   vertFeet: number;
+  calories: number;
   wallStartedAt: string;
   endReason: string | null;
 }
@@ -194,4 +196,7 @@ export interface AppConfig {
   gemini_model: string;
   gemini_live_model: string;
   gemini_voice: string;
+  tools?: Array<{ functionDeclarations: unknown[] }>;
+  system_prompt?: string;
+  smartass_addendum?: string;
 }

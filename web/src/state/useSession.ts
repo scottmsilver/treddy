@@ -90,6 +90,8 @@ export function useSession() {
       distDisplay: session.distance.toFixed(2),
       vertFeet: session.vertFeet,
       vertDisplay: Math.round(session.vertFeet).toLocaleString(),
+      calories: session.calories,
+      caloriesDisplay: Math.round(session.calories).toLocaleString(),
       pace: paceDisplay(speedMph),
       speedMph,
       endReason: session.endReason,

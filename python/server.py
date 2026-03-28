@@ -343,6 +343,37 @@ def _program_fingerprint(program):
     return "|".join(f"{iv.get('speed', 0)},{iv.get('incline', 0)},{iv.get('duration', 0)}" for iv in intervals)
 
 
+# --- User Profile ---
+
+USER_PROFILE_FILE = "user_profile.json"
+
+DEFAULT_USER = {
+    "id": "1",
+    "weight_lbs": 154,  # ~70 kg
+}
+
+
+def _load_user():
+    try:
+        with open(USER_PROFILE_FILE) as f:
+            user = json.load(f)
+            return {**DEFAULT_USER, **user}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return dict(DEFAULT_USER)
+
+
+def _save_user(user):
+    tmp = USER_PROFILE_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(user, f, indent=2)
+    os.replace(tmp, USER_PROFILE_FILE)
+
+
+def _user_weight_kg():
+    """Get user weight in kg for calorie calculations."""
+    return _load_user().get("weight_lbs", 154) * 0.453592
+
+
 # --- Run History (completed/stopped runs) ---
 
 RUNS_FILE = "run_history.json"
@@ -376,6 +407,7 @@ def _save_run_record(reason):
         "elapsed": round(sess.elapsed, 1),
         "distance": round(sess.distance, 3),
         "vert_feet": round(sess.vert_feet, 1),
+        "calories": round(sess.calories, 1),
         "end_reason": reason,
         "program_name": prog.get("name") if prog else None,
         "program_fingerprint": _program_fingerprint(prog) if prog else None,
@@ -446,7 +478,8 @@ def _last_run_text(run):
     dist = f"{run.get('distance', 0):.2f} mi" if run.get("distance", 0) >= 0.01 else ""
     dur = _fmt_dur(run.get("elapsed", 0))
     parts = [p for p in (when, dur, dist) if p]
-    return f"Last run: {' \u00b7 '.join(parts)}" if parts else ""
+    sep = " \u00b7 "
+    return f"Last run: {sep.join(parts)}" if parts else ""
 
 
 def _usage_text(workout, run):
@@ -549,7 +582,7 @@ async def _session_tick_loop():
     """1/sec loop: compute session metrics and broadcast to all WS clients."""
     while state["running"]:
         if sess.active:
-            sess.tick(state["emu_speed"] / 10, state["emu_incline"] / 2.0)
+            sess.tick(state["emu_speed"] / 10, state["emu_incline"] / 2.0, _user_weight_kg())
             await manager.broadcast(sess.to_dict())
         await asyncio.sleep(1)
 
@@ -894,15 +927,40 @@ def _create_ephemeral_token() -> str | None:
         return None
 
 
+# --- User Profile API ---
+
+
+@app.get("/api/user")
+async def api_get_user():
+    return _load_user()
+
+
+class UpdateUserRequest(BaseModel):
+    weight_lbs: int | None = Field(None, ge=50, le=500)
+
+
+@app.put("/api/user")
+async def api_update_user(req: UpdateUserRequest):
+    user = _load_user()
+    if req.weight_lbs is not None:
+        user["weight_lbs"] = req.weight_lbs
+    _save_user(user)
+    return user
+
+
 @app.get("/api/config")
 async def get_config():
     """Return client config with ephemeral token for Gemini Live."""
     token = await asyncio.to_thread(_create_ephemeral_token)
+    system_prompt = _build_chat_system()
     return {
         "gemini_api_key": token or "",
         "gemini_model": GEMINI_MODEL,
         "gemini_live_model": GEMINI_LIVE_MODEL,
         "gemini_voice": "Kore",
+        "tools": TOOL_DECLARATIONS,
+        "system_prompt": system_prompt,
+        "smartass_addendum": SMARTASS_ADDENDUM,
     }
 
 
@@ -1531,6 +1589,33 @@ async def _exec_fn(name, args):
             return "Failed to add intervals"
         return "No program loaded"
 
+    elif name == "load_workout":
+        wid = str(args.get("id", ""))
+        start = args.get("start", True)
+        # Check saved workouts first, then history
+        program = None
+        workouts = _load_workouts()
+        workout = next((w for w in workouts if w["id"] == wid), None)
+        if workout:
+            workout["times_used"] = workout.get("times_used", 0) + 1
+            workout["last_used"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            _save_workouts(workouts)
+            program = workout["program"]
+        else:
+            history = _load_history()
+            entry = next((h for h in history if h["id"] == wid), None)
+            if entry:
+                program = entry["program"]
+        if not program:
+            return f"Workout id '{wid}' not found"
+        sess.prog.load(program)
+        if start:
+            await sess.start_program(_prog_on_change(), _prog_on_update())
+            n = len(program.get("intervals", []))
+            mins = sum(iv["duration"] for iv in program.get("intervals", [])) // 60
+            return f"Loaded and started '{program.get('name')}': {n} intervals, {mins} min"
+        return f"Loaded '{program.get('name')}' (not started yet)"
+
     return f"Unknown function: {name}"
 
 
@@ -1559,13 +1644,26 @@ def _build_chat_system(smartass=False):
         }
 
     history = _load_history()
-    history_summary = ""
-    if history:
-        names = [h["program"].get("name", "?") for h in history[:5]]
-        history_summary = f"\n\nRecent programs: {', '.join(names)}"
+    workouts = _load_workouts()
+    library_lines = []
+    for w in workouts[:10]:
+        wname = w.get("name") or w["program"].get("name", "?")
+        mins = sum(iv.get("duration", 0) for iv in w["program"].get("intervals", [])) // 60
+        library_lines.append(f'- "{wname}" ({mins} min, saved) id={w["id"]}')
+    for h in history[:10]:
+        hname = h["program"].get("name", "?")
+        mins = sum(iv.get("duration", 0) for iv in h["program"].get("intervals", [])) // 60
+        library_lines.append(f'- "{hname}" ({mins} min, history) id={h["id"]}')
+    library_text = ""
+    if library_lines:
+        library_text = (
+            "\n\nAvailable workouts. When the user asks to load a workout, "
+            "present the list by name and duration only (never show IDs to the user). "
+            "Let them choose, then call load_workout with the id internally.\n" + "\n".join(library_lines)
+        )
 
     base_prompt = CHAT_SYSTEM_PROMPT + (SMARTASS_ADDENDUM if smartass else "")
-    return f"{base_prompt}{history_summary}\n\nCurrent state:\n{json.dumps(treadmill_state)}"
+    return f"{base_prompt}{library_text}\n\nCurrent state:\n{json.dumps(treadmill_state)}"
 
 
 async def _run_chat_core(smartass=False):

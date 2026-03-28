@@ -30,9 +30,17 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps): Re
     try { return localStorage.getItem('mountain_view') === 'true'; } catch { return false; }
   });
   const [hrmScanning, setHrmScanning] = useState(false);
+  const [weightLbs, setWeightLbs] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const debugTaps = useRef<number[]>([]);
   const [, setLocation] = useLocation();
+
+  // Fetch user profile when panel opens
+  useEffect(() => {
+    if (open) {
+      api.getUser().then(u => setWeightLbs(u.weight_lbs)).catch(() => {});
+    }
+  }, [open]);
 
   // Reset debug unlock when panel closes
   useEffect(() => {
@@ -102,6 +110,37 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps): Re
         >
           Settings
         </h2>
+
+        {/* Weight */}
+        <div style={{ ...rowStyle, cursor: 'default' }}>
+          <span style={{ fontSize: 15, color: 'var(--text)' }}>Weight</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={50}
+              max={500}
+              value={weightLbs ?? ''}
+              onChange={e => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setWeightLbs(v);
+              }}
+              onBlur={() => {
+                if (weightLbs != null && weightLbs >= 50 && weightLbs <= 500) {
+                  api.updateUser({ weight_lbs: weightLbs }).catch(() => {});
+                }
+              }}
+              style={{
+                width: 60, height: 32, borderRadius: 'var(--r-sm)',
+                border: 'none', background: 'var(--fill2)',
+                color: 'var(--text)', fontSize: 15, fontWeight: 600,
+                textAlign: 'right', padding: '0 8px',
+                fontFamily: 'inherit',
+              }}
+            />
+            <span style={{ fontSize: 13, color: 'var(--text3)' }}>lbs</span>
+          </div>
+        </div>
 
         {/* Import GPX */}
         <label style={rowStyle}>

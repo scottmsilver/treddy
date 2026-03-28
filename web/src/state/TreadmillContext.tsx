@@ -44,6 +44,7 @@ const initialSession: SessionState = {
   elapsed: 0,
   distance: 0,
   vertFeet: 0,
+  calories: 0,
   wallStartedAt: '',
   endReason: null,
 };
@@ -138,6 +139,7 @@ function reducer(state: AppState, action: Action): AppState {
         elapsed: m.elapsed || 0,
         distance: m.distance || 0,
         vertFeet: m.vert_feet || 0,
+        calories: m.calories || 0,
         wallStartedAt: m.wall_started_at || '',
         endReason: m.end_reason,
       };

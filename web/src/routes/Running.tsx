@@ -121,7 +121,11 @@ export default function Running(): React.ReactElement {
                       lineHeight: 1.3,
                       color: 'var(--green)',
                       textAlign: 'center',
-                      padding: '16px 8px',
+                      padding: '0 8px',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
                     {renderGlowText(encouragement)}

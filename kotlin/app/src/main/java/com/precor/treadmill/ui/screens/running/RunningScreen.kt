@@ -131,6 +131,9 @@ fun RunningScreen(
     // Edge padding applied to Column bottom; timer trim matches this value
     val edgePadPx = with(LocalDensity.current) { EdgePad.roundToPx() }
     val (glyphAbove, glyphBelow) = timerGlyphBounds(96.sp)
+    val timerTrimmedHeight = with(LocalDensity.current) {
+        (glyphAbove + glyphBelow + 2 * edgePadPx).toDp()
+    }
 
     // 3-row layout: top (timer+metrics), middle (HUD), bottom (buttons)
     Column(
@@ -193,7 +196,8 @@ fun RunningScreen(
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
+                                    .height(timerTrimmedHeight)
+                                    .wrapContentHeight(Alignment.CenterVertically),
                             )
                         } else {
                             Text(
@@ -337,6 +341,9 @@ private fun RunningScreenLandscape(
         val edgePad = 16.dp
         val edgePadPx = with(LocalDensity.current) { edgePad.roundToPx() }
         val (lsGlyphAbove, lsGlyphBelow) = timerGlyphBounds(timerFontSize)
+        val lsTimerTrimmedHeight = with(LocalDensity.current) {
+            (lsGlyphAbove + lsGlyphBelow + 2 * edgePadPx).toDp()
+        }
 
         // 3-row layout: top (timer+metrics), middle (HUD+controls), bottom (buttons)
         Column(
@@ -382,7 +389,10 @@ private fun RunningScreenLandscape(
                                     fontFamily = TimerFontFamily,
                                     letterSpacing = (-0.03).em,
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(lsTimerTrimmedHeight)
+                                        .wrapContentHeight(Alignment.CenterVertically),
                                 )
                             } else {
                                 Text(

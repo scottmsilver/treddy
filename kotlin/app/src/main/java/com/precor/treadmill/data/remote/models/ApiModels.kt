@@ -190,6 +190,9 @@ data class AppConfig(
     @SerialName("gemini_model") val geminiModel: String,
     @SerialName("gemini_live_model") val geminiLiveModel: String,
     @SerialName("gemini_voice") val geminiVoice: String,
+    @SerialName("tools") val tools: kotlinx.serialization.json.JsonArray? = null,
+    @SerialName("system_prompt") val systemPrompt: String? = null,
+    @SerialName("smartass_addendum") val smartassAddendum: String? = null,
 )
 
 @Serializable
@@ -197,6 +200,17 @@ data class LogResponse(val lines: List<String>)
 
 @Serializable
 data class VoicePromptResponse(val prompt: String)
+
+@Serializable
+data class UserProfile(
+    val id: String = "1",
+    @SerialName("weight_lbs") val weightLbs: Int = 154,
+)
+
+@Serializable
+data class UpdateUserRequest(
+    @SerialName("weight_lbs") val weightLbs: Int,
+)
 
 @Serializable
 data class TtsResponse(

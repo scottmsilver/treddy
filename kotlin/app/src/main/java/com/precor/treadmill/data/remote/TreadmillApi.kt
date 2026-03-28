@@ -120,6 +120,14 @@ interface TreadmillApi {
     @POST("/api/hrm/scan")
     suspend fun scanHrmDevices(): GenericOkResponse
 
+    // --- User Profile ---
+
+    @GET("/api/user")
+    suspend fun getUser(): UserProfile
+
+    @PUT("/api/user")
+    suspend fun updateUser(@Body request: UpdateUserRequest): UserProfile
+
     // --- Log & Config ---
 
     @GET("/api/log")

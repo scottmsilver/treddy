@@ -76,6 +76,13 @@ fun MetricsRow(
                 color = Color(0xFFA69882), // orange
                 scale = scale,
             )
+            Spacer(Modifier.width((20 * scale).dp))
+            MetricItem(
+                value = sess.caloriesDisplay,
+                label = "cal",
+                color = Color(0xFFE8E4DF), // text
+                scale = scale,
+            )
         }
     }
 }

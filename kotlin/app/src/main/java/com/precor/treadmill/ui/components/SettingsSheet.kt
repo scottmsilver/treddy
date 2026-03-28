@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.precor.treadmill.data.preferences.ServerPreferences
 import com.precor.treadmill.data.remote.TreadmillApi
+import com.precor.treadmill.data.remote.models.UpdateUserRequest
 import com.precor.treadmill.ui.theme.LocalPrecorColors
 import com.precor.treadmill.ui.util.haptic
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
@@ -47,11 +48,16 @@ fun SettingsSheet(
     val status by viewModel.status.collectAsState()
 
     var smartass by remember { mutableStateOf(false) }
+    var weightText by remember { mutableStateOf("") }
     var debugUnlocked by remember { mutableStateOf(false) }
     var debugTaps by remember { mutableStateOf(listOf<Long>()) }
 
     LaunchedEffect(Unit) {
         smartass = serverPreferences.smartassMode.first()
+        runCatching {
+            val user = api.getUser()
+            weightText = user.weightLbs.toString()
+        }
     }
 
     // Reset debug when sheet closes
@@ -161,6 +167,63 @@ fun SettingsSheet(
                         uncheckedThumbColor = colors.text3,
                     ),
                 )
+            }
+
+            // Weight
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Weight",
+                    color = colors.text,
+                    fontSize = 15.sp,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = weightText,
+                        onValueChange = { v ->
+                            weightText = v.filter { it.isDigit() }.take(3)
+                        },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                        ),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = colors.text,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        ),
+                        modifier = Modifier
+                            .width(60.dp)
+                            .height(32.dp)
+                            .background(colors.fill2, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onDone = {
+                                val lbs = weightText.toIntOrNull()
+                                if (lbs != null && lbs in 50..500) {
+                                    scope.launch {
+                                        runCatching { api.updateUser(UpdateUserRequest(lbs)) }
+                                    }
+                                }
+                            },
+                        ),
+                    )
+                    Text(
+                        text = "lbs",
+                        color = colors.text3,
+                        fontSize = 13.sp,
+                    )
+                }
             }
 
             HorizontalDivider(color = colors.separator, thickness = 0.5.dp)

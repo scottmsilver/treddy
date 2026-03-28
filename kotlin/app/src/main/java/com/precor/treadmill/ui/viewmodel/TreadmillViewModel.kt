@@ -38,6 +38,7 @@ data class SessionState(
     val elapsed: Double = 0.0,
     val distance: Double = 0.0,
     val vertFeet: Double = 0.0,
+    val calories: Double = 0.0,
     val wallStartedAt: String = "",
     val endReason: String? = null,
 )
@@ -70,6 +71,8 @@ data class DerivedSession(
     val distDisplay: String,
     val vertFeet: Double,
     val vertDisplay: String,
+    val calories: Double,
+    val caloriesDisplay: String,
     val pace: String,
     val speedMph: Double,
     val endReason: String?,
@@ -237,14 +240,16 @@ class TreadmillViewModel(
             distDisplay = "%.2f".format(sess.distance),
             vertFeet = sess.vertFeet,
             vertDisplay = sess.vertFeet.roundToInt().let { if (it >= 1000) "%,d".format(it) else it.toString() },
+            calories = sess.calories,
+            caloriesDisplay = sess.calories.roundToInt().let { if (it >= 1000) "%,d".format(it) else it.toString() },
             pace = paceDisplay(speedMph),
             speedMph = speedMph,
             endReason = sess.endReason,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DerivedSession(
         active = false, elapsed = 0.0, elapsedDisplay = "0:00", distance = 0.0,
-        distDisplay = "0.00", vertFeet = 0.0, vertDisplay = "0", pace = "--:--",
-        speedMph = 0.0, endReason = null,
+        distDisplay = "0.00", vertFeet = 0.0, vertDisplay = "0", calories = 0.0,
+        caloriesDisplay = "0", pace = "--:--", speedMph = 0.0, endReason = null,
     ))
 
     val derivedProgram: StateFlow<DerivedProgram> = _program.map { pgm ->
@@ -348,6 +353,7 @@ class TreadmillViewModel(
                 elapsed = msg.elapsed,
                 distance = msg.distance,
                 vertFeet = msg.vertFeet,
+                calories = msg.calories,
                 wallStartedAt = msg.wallStartedAt,
                 endReason = msg.endReason,
             )

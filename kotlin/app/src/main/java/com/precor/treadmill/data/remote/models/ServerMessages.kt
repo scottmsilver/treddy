@@ -63,6 +63,7 @@ data class SessionMessage(
     val elapsed: Double,
     val distance: Double,
     @SerialName("vert_feet") val vertFeet: Double,
+    val calories: Double = 0.0,
     @SerialName("wall_started_at") val wallStartedAt: String,
     @SerialName("end_reason") val endReason: String? = null,
 ) : ServerMessage

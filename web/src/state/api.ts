@@ -202,6 +202,16 @@ export async function getLog(lines = 200): Promise<{ lines: string[] }> {
   return get(`/api/log?lines=${lines}`);
 }
 
+// --- User Profile ---
+
+export async function getUser(): Promise<{ id: string; weight_lbs: number }> {
+  return get('/api/user');
+}
+
+export async function updateUser(body: { weight_lbs: number }): Promise<{ id: string; weight_lbs: number }> {
+  return put('/api/user', body);
+}
+
 // --- Config ---
 
 export async function getConfig(): Promise<AppConfig> {

@@ -33,6 +33,7 @@ class WorkoutSession:
         self.elapsed = 0.0
         self.distance = 0.0
         self.vert_feet = 0.0
+        self.calories = 0.0
         self.last_tick = 0.0
         self.end_reason = None
 
@@ -49,6 +50,7 @@ class WorkoutSession:
         self.elapsed = 0.0
         self.distance = 0.0
         self.vert_feet = 0.0
+        self.calories = 0.0
         self.last_tick = time.monotonic()
         self.end_reason = None
         log.info("Session started")
@@ -101,12 +103,13 @@ class WorkoutSession:
         self.elapsed = 0.0
         self.distance = 0.0
         self.vert_feet = 0.0
+        self.calories = 0.0
         self.last_tick = 0.0
         self.end_reason = None
         log.info("Session reset")
 
-    def tick(self, speed_mph, incline):
-        """Compute elapsed/distance/vert from monotonic clock and current speed/incline."""
+    def tick(self, speed_mph, incline, weight_kg=70.0):
+        """Compute elapsed/distance/vert/calories from monotonic clock and current speed/incline."""
         if not self.active or self.paused_at > 0:
             return
         now = time.monotonic()
@@ -118,6 +121,19 @@ class WorkoutSession:
             self.distance += miles_this_tick
             if incline > 0:
                 self.vert_feet += miles_this_tick * (incline / 100) * 5280
+            # ACSM metabolic equation (VO2 in mL/kg/min)
+            # Walking (<4.5 mph): VO2 = 3.5 + 0.1*S + 1.8*S*G
+            # Running (>=4.5 mph): VO2 = 3.5 + 0.2*S + 0.9*S*G
+            # where S = speed in m/min, G = fractional grade
+            speed_m_min = speed_mph * 26.8224  # mph to m/min
+            grade = incline / 100.0
+            if speed_mph < 4.5:
+                vo2 = 3.5 + 0.1 * speed_m_min + 1.8 * speed_m_min * grade
+            else:
+                vo2 = 3.5 + 0.2 * speed_m_min + 0.9 * speed_m_min * grade
+            # kcal/min = VO2 * body_mass_kg / 1000 * 5.0
+            kcal_per_min = vo2 * weight_kg / 1000.0 * 5.0
+            self.calories += kcal_per_min * (dt / 60.0)
 
     def to_dict(self):
         """Build session state dict for WebSocket broadcast."""
@@ -127,6 +143,7 @@ class WorkoutSession:
             "elapsed": self.elapsed,
             "distance": self.distance,
             "vert_feet": self.vert_feet,
+            "calories": round(self.calories, 1),
             "wall_started_at": self.wall_started_at,
             "end_reason": self.end_reason,
         }

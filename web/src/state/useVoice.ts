@@ -215,14 +215,17 @@ export function useVoice(): UseVoiceReturn {
 
     let smartass = false;
     try { smartass = localStorage.getItem('smartass_mode') === 'true'; } catch {}
-    const client = new GeminiLiveClient(
-      config.gemini_api_key,
-      config.gemini_live_model || 'gemini-2.5-flash-native-audio-latest',
-      config.gemini_voice || 'Kore',
+    const client = new GeminiLiveClient({
+      apiKey: config.gemini_api_key,
+      model: config.gemini_live_model || 'gemini-2.5-flash-native-audio-latest',
+      voice: config.gemini_voice || 'Kore',
       callbacks,
-      stateContextRef.current,
+      stateContext: stateContextRef.current,
       smartass,
-    );
+      serverTools: config.tools,
+      serverPrompt: config.system_prompt,
+      serverSmartass: config.smartass_addendum,
+    });
     clientRef.current = client;
     client.connect();
   }, [ensurePlayer, startMic, stopMic]);

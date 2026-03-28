@@ -40,6 +40,12 @@ class GeminiLiveClient(
     private var stateContext: String = "",
     private val smartass: Boolean = false,
     private val okHttpClient: OkHttpClient? = null,
+    /** Server-provided tool declarations as raw JSON array (preferred over hardcoded) */
+    private val serverTools: kotlinx.serialization.json.JsonArray? = null,
+    /** Server-provided system prompt (preferred over hardcoded) */
+    private val serverPrompt: String? = null,
+    /** Server-provided smartass addendum */
+    private val serverSmartass: String? = null,
 ) {
     companion object {
         private const val TAG = "GeminiLive"
@@ -195,35 +201,41 @@ class GeminiLiveClient(
     }
 
     private fun sendSetup() {
-        val basePrompt = if (smartass) {
-            VOICE_SYSTEM_PROMPT + VOICE_SMARTASS_ADDENDUM
-        } else {
-            VOICE_SYSTEM_PROMPT
-        }
+        val prompt = serverPrompt ?: VOICE_SYSTEM_PROMPT
+        val smartassText = serverSmartass ?: VOICE_SMARTASS_ADDENDUM
+        val basePrompt = if (smartass) prompt + smartassText else prompt
         val systemText = if (stateContext.isNotEmpty()) {
             "$basePrompt\n\nCurrent treadmill state:\n$stateContext"
         } else {
             basePrompt
         }
 
-        val toolDecls = buildJsonArray {
-            for (decl in TOOL_DECLARATIONS) {
-                addJsonObject {
-                    put("name", decl.name)
-                    put("description", decl.description)
-                    putJsonObject("parameters") {
-                        put("type", decl.parameters.type)
-                        putJsonObject("properties") {
-                            for ((key, param) in decl.parameters.properties) {
-                                putJsonObject(key) {
-                                    put("type", param.type)
-                                    param.description?.let { put("description", it) }
-                                    param.items?.let { put("items", it) }
+        // Use server-provided tools (includes load_workout etc.) or fall back to hardcoded
+        val toolDecls = if (serverTools != null && serverTools.isNotEmpty()) {
+            // Server sends [{functionDeclarations: [...]}] — extract the inner array
+            val first = serverTools[0] as? kotlinx.serialization.json.JsonObject
+            first?.get("functionDeclarations") as? kotlinx.serialization.json.JsonArray
+                ?: serverTools  // fallback: treat as flat array
+        } else {
+            buildJsonArray {
+                for (decl in TOOL_DECLARATIONS) {
+                    addJsonObject {
+                        put("name", decl.name)
+                        put("description", decl.description)
+                        putJsonObject("parameters") {
+                            put("type", decl.parameters.type)
+                            putJsonObject("properties") {
+                                for ((key, param) in decl.parameters.properties) {
+                                    putJsonObject(key) {
+                                        put("type", param.type)
+                                        param.description?.let { put("description", it) }
+                                        param.items?.let { put("items", it) }
+                                    }
                                 }
                             }
-                        }
-                        decl.parameters.required?.let { req ->
-                            putJsonArray("required") { req.forEach { add(it) } }
+                            decl.parameters.required?.let { req ->
+                                putJsonArray("required") { req.forEach { add(it) } }
+                            }
                         }
                     }
                 }

@@ -674,6 +674,24 @@ TOOL_DECLARATIONS = [
                     "required": ["intervals"],
                 },
             },
+            {
+                "name": "load_workout",
+                "description": "Load and start a saved or recent workout by its id. Present the available workouts to the user first and let them choose before calling this.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "id": {
+                            "type": "STRING",
+                            "description": "The workout id from the available workouts list in your context",
+                        },
+                        "start": {
+                            "type": "BOOLEAN",
+                            "description": "Whether to immediately start the workout after loading (default: true)",
+                        },
+                    },
+                    "required": ["id"],
+                },
+            },
         ]
     }
 ]

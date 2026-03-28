@@ -7,7 +7,7 @@
  * - Receives audio responses and tool calls
  * - Handles barge-in (interruption)
  */
-import { TOOL_DECLARATIONS, VOICE_SYSTEM_PROMPT, VOICE_SMARTASS_ADDENDUM } from './voiceTools';
+import { TOOL_DECLARATIONS as FALLBACK_TOOLS, VOICE_SYSTEM_PROMPT as FALLBACK_PROMPT, VOICE_SMARTASS_ADDENDUM as FALLBACK_SMARTASS } from './voiceTools';
 import type { FunctionCall } from './functionBridge';
 import { executeFunctionCall } from './functionBridge';
 
@@ -27,7 +27,7 @@ interface SetupMessage {
   setup: {
     model: string;
     system_instruction: { parts: { text: string }[] };
-    tools: { function_declarations: typeof TOOL_DECLARATIONS }[];
+    tools: { function_declarations: unknown[] }[];
     generation_config: {
       speech_config: {
         voice_config: { prebuilt_voice_config: { voice_name: string } };
@@ -39,6 +39,21 @@ interface SetupMessage {
 
 const GEMINI_WS_BASE = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained';
 
+export interface ClientConfig {
+  apiKey: string;
+  model: string;
+  voice: string;
+  callbacks: GeminiLiveCallbacks;
+  stateContext?: string;
+  smartass?: boolean;
+  /** Server-provided tool declarations (preferred over hardcoded fallback) */
+  serverTools?: Array<{ functionDeclarations: unknown[] }>;
+  /** Server-provided system prompt (preferred over hardcoded fallback) */
+  serverPrompt?: string;
+  /** Server-provided smartass addendum */
+  serverSmartass?: string;
+}
+
 export class GeminiLiveClient {
   private ws: WebSocket | null = null;
   private callbacks: GeminiLiveCallbacks;
@@ -47,6 +62,9 @@ export class GeminiLiveClient {
   private voice: string;
   private stateContext: string;
   private smartass: boolean;
+  private serverTools?: Array<{ functionDeclarations: unknown[] }>;
+  private serverPrompt?: string;
+  private serverSmartass?: string;
   private _state: ClientState = 'disconnected';
   private setupDone = false;
   private receivingAudio = false;
@@ -54,20 +72,16 @@ export class GeminiLiveClient {
   private turnTextParts: string[] = [];
   private turnToolCalls: string[] = [];
 
-  constructor(
-    apiKey: string,
-    model: string,
-    voice: string,
-    callbacks: GeminiLiveCallbacks,
-    stateContext = '',
-    smartass = false,
-  ) {
-    this.apiKey = apiKey;
-    this.model = model;
-    this.voice = voice;
-    this.callbacks = callbacks;
-    this.stateContext = stateContext;
-    this.smartass = smartass;
+  constructor(config: ClientConfig) {
+    this.apiKey = config.apiKey;
+    this.model = config.model;
+    this.voice = config.voice;
+    this.callbacks = config.callbacks;
+    this.stateContext = config.stateContext ?? '';
+    this.smartass = config.smartass ?? false;
+    this.serverTools = config.serverTools;
+    this.serverPrompt = config.serverPrompt;
+    this.serverSmartass = config.serverSmartass;
   }
 
   get state(): ClientState {
@@ -161,18 +175,23 @@ export class GeminiLiveClient {
   }
 
   private sendSetup(): void {
-    const basePrompt = this.smartass
-      ? VOICE_SYSTEM_PROMPT + VOICE_SMARTASS_ADDENDUM
-      : VOICE_SYSTEM_PROMPT;
+    const prompt = this.serverPrompt ?? FALLBACK_PROMPT;
+    const smartassAddendum = this.serverSmartass ?? FALLBACK_SMARTASS;
+    const basePrompt = this.smartass ? prompt + smartassAddendum : prompt;
     const systemText = this.stateContext
       ? `${basePrompt}\n\nCurrent treadmill state:\n${this.stateContext}`
       : basePrompt;
+
+    // Use server-provided tools (includes load_workout etc.) or fall back to hardcoded
+    const toolDecls = this.serverTools
+      ? this.serverTools[0]?.functionDeclarations ?? FALLBACK_TOOLS
+      : FALLBACK_TOOLS;
 
     const setup: SetupMessage = {
       setup: {
         model: `models/${this.model}`,
         system_instruction: { parts: [{ text: systemText }] },
-        tools: [{ function_declarations: TOOL_DECLARATIONS }],
+        tools: [{ function_declarations: toolDecls }],
         generation_config: {
           speech_config: {
             voice_config: { prebuilt_voice_config: { voice_name: this.voice } },

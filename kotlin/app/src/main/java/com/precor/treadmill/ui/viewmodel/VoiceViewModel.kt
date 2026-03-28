@@ -142,6 +142,9 @@ class VoiceViewModel(
                 stateContext = currentStateContext,
                 smartass = false,
                 okHttpClient = okHttpClient,
+                serverTools = cfg.tools,
+                serverPrompt = cfg.systemPrompt,
+                serverSmartass = cfg.smartassAddendum,
             )
             geminiClient = client
             client.speechEndTimestampProvider = { audioCapture?.silenceStartMs ?: 0L }

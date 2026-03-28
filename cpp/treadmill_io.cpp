@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <ctime>
 
-#include "gpio/gpio_pigpio.h"
+#include "gpio/gpio_session.h"
 #include "treadmill_io.h"
 #include "config.h"
 
@@ -42,11 +42,12 @@ int main() {
     std::fprintf(stderr, "  Motor read:   GPIO %d\n", cfg.motor_read);
     std::fprintf(stderr, "  Baud:         %d\n", BAUD);
 
-    PigpioPort port;
-    if (port.initialise() < 0) {
-        std::fprintf(stderr, "Failed to initialize pigpio (is pigpiod running? kill it first)\n");
+    auto session = GpioSession::create();
+    if (!session) {
+        std::fprintf(stderr, "Failed to initialize GPIO session\n");
         return 1;
     }
+    auto& port = session->port();
 
     // Motor write pin: output, idle LOW (inverted RS-485)
     port.set_mode(cfg.motor_write, PORT_OUTPUT);
@@ -59,7 +60,6 @@ int main() {
     TreadmillController<PigpioPort> controller(port, cfg);
 
     if (!controller.start()) {
-        port.terminate();
         return 1;
     }
 
@@ -76,7 +76,7 @@ int main() {
 
     port.write(cfg.motor_write, 0);
     port.set_mode(cfg.motor_write, PORT_INPUT);
-    port.terminate();
+    // GpioSession destructor handles gpioTerminate() + DMA state file cleanup
 
     std::fprintf(stderr, "treadmill_io stopped.\n");
     return 0;

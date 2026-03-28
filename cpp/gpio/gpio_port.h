@@ -5,10 +5,11 @@
  * This isn't enforced by a C++ concept (C++20), but serves as documentation.
  * PigpioPort and MockGpioPort both satisfy this interface.
  *
+ * Lifecycle (initialise/terminate) is managed by GpioSession in production.
+ * MockGpioPort still provides initialise/terminate for test compatibility.
+ *
  * Required interface:
  *
- *   int  initialise();                    // Init GPIO system. Returns 0 on success.
- *   void terminate();                     // Shutdown GPIO system.
  *   void set_mode(int pin, int mode);     // PI_OUTPUT or PI_INPUT
  *   void write(int pin, int level);       // 0 or 1
  *   int  serial_read_open(int pin, int baud, int bits);

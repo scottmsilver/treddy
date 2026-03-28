@@ -13,18 +13,20 @@ TEST_DIR = $(BUILD)/tests
 SRCS = treadmill_io.cpp \
        protocol/kv_protocol.cpp protocol/ipc_protocol.cpp \
        engine/mode_state.cpp \
-       ipc/ipc_server.cpp
+       ipc/ipc_server.cpp \
+       gpio/dma_guard.cpp
 OBJS = $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SRCS))
 
 # Shared library sources for tests (no gpio_pigpio.h, no main())
 TEST_LIB_SRCS = protocol/kv_protocol.cpp protocol/ipc_protocol.cpp \
-                engine/mode_state.cpp ipc/ipc_server.cpp
+                engine/mode_state.cpp ipc/ipc_server.cpp \
+                gpio/dma_guard.cpp
 TEST_LIB_OBJS = $(patsubst %.cpp,$(OBJ_TEST_DIR)/%.test.o,$(TEST_LIB_SRCS))
 
 # Individual test binaries (each has its own main via doctest)
 TEST_NAMES = test_kv_protocol test_ipc_protocol test_ring_buffer \
              test_mode_state test_emulation test_integration \
-             test_ipc_server test_controller_live
+             test_ipc_server test_controller_live test_dma_guard
 TEST_BINS = $(addprefix $(TEST_DIR)/,$(TEST_NAMES))
 
 TARGET = $(BUILD)/treadmill_io
@@ -66,6 +68,9 @@ $(TEST_DIR)/test_ipc_server: $(TEST_DIR)/test_ipc_server.o $(TEST_LIB_OBJS) | $(
 	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
 
 $(TEST_DIR)/test_controller_live: $(TEST_DIR)/test_controller_live.o $(TEST_LIB_OBJS) | $(TEST_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
+
+$(TEST_DIR)/test_dma_guard: $(TEST_DIR)/test_dma_guard.o $(OBJ_TEST_DIR)/gpio/dma_guard.test.o | $(TEST_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ -pthread -lrt
 
 # Directory creation

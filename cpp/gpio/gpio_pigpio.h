@@ -3,6 +3,9 @@
  *
  * Zero overhead — every method is a direct call to the pigpio C API.
  * Only included in the production binary (links libpigpio).
+ *
+ * Lifecycle (gpioInitialise/gpioTerminate) is managed by GpioSession,
+ * not by PigpioPort. This prevents bypassing the DMA handle guard.
  */
 
 #pragma once
@@ -11,9 +14,6 @@
 #include "gpio_port.h"
 
 struct PigpioPort {
-    int initialise() { return gpioInitialise() < 0 ? -1 : 0; }
-    void terminate() { gpioTerminate(); }
-
     void set_mode(int pin, int mode) {
         gpioSetMode(pin, mode == PORT_OUTPUT ? PI_OUTPUT : PI_INPUT);
     }

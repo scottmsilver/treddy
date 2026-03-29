@@ -2,41 +2,35 @@
 
 > A 2005 treadmill that listens when you talk to it.
 
-A Raspberry Pi intercepts the serial bus on a Precor 9.31 treadmill, replacing the dumb console with an AI coach, voice control, phone/tablet UI, and Bluetooth fitness app support. Everything the original console could do, plus everything it couldn't.
+A Raspberry Pi sits between the console and motor controller of a Precor 9.31 treadmill, intercepting the serial bus. It runs an AI coach (Gemini), voice control, a tablet UI, and a Bluetooth daemon that makes Zwift think it's a modern smart treadmill.
 
 ---
 
-## 🎙️ Voice Control + AI Coach
+## Voice + AI Coach
 
-<img src="docs/screenshots/android-running.png" width="700" alt="Running screen on Android tablet — timer, elevation profile, speed/incline controls">
+<img src="docs/screenshots/android-running.png" width="700" alt="Running screen on Android tablet">
 
-- Talk to your treadmill: "set speed to 5 mph" or "start a hill workout"
-- Gemini Live: real-time voice to function calls to hardware control
-- AI generates structured interval programs from plain English descriptions
-- Queries your workout history via SQL to give contextual coaching
-- 11 Gemini tools: speed, incline, start/stop/pause/skip, extend intervals, load saved workouts, query data
+- "Set speed to 5" or "give me a 20-minute hill workout" — Gemini controls the belt directly
+- Voice works mid-run via Gemini Live (real-time, no wake word)
+- Says "this is the hardest interval" or "you're faster than last time" because it can query your run history
 
-## 📱 Apps
+## Apps
 
-<img src="docs/screenshots/android-lobby.png" width="700" alt="Lobby screen on Android tablet — saved workouts, program history">
+<img src="docs/screenshots/android-lobby.png" width="700" alt="Lobby screen on Android tablet">
 
-- **Android**: Kotlin + Jetpack Compose, designed for a tablet mounted on the treadmill console
-- **Web**: React 19 + TypeScript + Vite, same features, runs on any browser
-- Saved workouts, program history, session metrics, elevation profiles
-- Touch targets 44px+, landscape nav rail, warm dark palette
+- **Android** (Kotlin + Compose): runs on a tablet mounted on the treadmill console
+- **Web** (React + TypeScript): same features, any browser
+- Workout library, run history, live elevation profile, calorie tracking
 
-## 💙 Bluetooth FTMS
+## Bluetooth
 
-- Rust daemon advertises as a standard Bluetooth FTMS (Fitness Machine Service) device
-- Zwift, Peloton, QZ Fitness, Apple Watch see it as a smart treadmill
-- Speed, incline, distance, elapsed time broadcast at 1 Hz
-- Control Point: fitness apps can set speed/incline back through BLE
+- Rust daemon makes the treadmill show up in Zwift, Peloton, QZ Fitness, and Apple Watch as a standard FTMS device
+- Fitness apps can read speed/incline and write speed/incline commands back
 
-## ❤️ Heart Rate
+## Heart Rate
 
-- Rust BLE client connects to any standard heart rate monitor (HR Service 0x180D)
-- HR data flows to the UI, AI coach context, and ACSM-based calorie calculations
-- Auto-reconnects, device persistence, multi-device scan
+- Connects to any Bluetooth heart rate strap
+- HR shows in the UI and feeds into calorie calculations
 
 ---
 
@@ -64,14 +58,13 @@ A Raspberry Pi intercepts the serial bus on a Precor 9.31 treadmill, replacing t
                   RS-485 serial bus
 ```
 
-- **C++ binary** — safety-critical GPIO serial I/O. 3-hour timeout, auto proxy/emulate, physical buttons always win. Zero-allocation hot paths.
-- **Python server** — FastAPI, all business logic. Gemini AI, workout sessions, program engine, workout query DB.
-- **FTMS daemon** — Rust, Bluetooth FTMS advertising for fitness apps.
-- **HRM daemon** — Rust, BLE heart rate monitor client.
-- **Web UI** — React 19 + TypeScript, display layer only. Every decision is server-side.
-- **Android** — Kotlin + Jetpack Compose. Same server API, same features.
+- **C++ binary** — reads/writes the serial bus, enforces safety (3-hour timeout, physical buttons always override software)
+- **Python server** — FastAPI. All the logic: Gemini AI, workouts, sessions, run history
+- **FTMS daemon** — Rust. Bluetooth for fitness apps
+- **HRM daemon** — Rust. Connects to heart rate straps
+- **Web + Android** — display layers. All decisions happen server-side.
 
-Full architecture details: [CLAUDE.md](CLAUDE.md)
+Details: [CLAUDE.md](CLAUDE.md)
 
 ---
 
@@ -103,7 +96,7 @@ make deploy    # stages, rsyncs, builds on Pi, restarts all 4 services
 TREADMILL_MOCK=1 ./scripts/dev.sh    # Caddy + server + Vite HMR
 ```
 
-For developers: see [CLAUDE.md](CLAUDE.md) for API reference, testing, architecture details, and code review standards.
+API reference, tests, and dev docs: [CLAUDE.md](CLAUDE.md)
 
 ## License
 

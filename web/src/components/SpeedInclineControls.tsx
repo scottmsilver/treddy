@@ -36,11 +36,13 @@ function DoubleChevronDown({ sw = 2.5 }: { sw?: number }) {
 
 // Clean pill button — matches Home/Voice style
 const btn: React.CSSProperties = {
-  width: 'var(--touch-fingertip)', height: 'var(--touch-finger-pad)', borderRadius: 10, boxSizing: 'border-box' as const,
+  width: 'clamp(36px, var(--touch-fingertip), 48px)',
+  height: 'clamp(40px, var(--touch-finger-pad), 60px)',
+  borderRadius: 10, boxSizing: 'border-box' as const,
   border: 'none', background: 'var(--fill)',
   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
   WebkitTapHighlightColor: 'transparent',
-  fontFamily: 'inherit',
+  fontFamily: 'inherit', flexShrink: 0,
 };
 
 type PulseDir = 'up' | 'down' | null;
@@ -152,7 +154,7 @@ export default function SpeedInclineControls(): React.ReactElement {
           }}>
             {(status.emuSpeed / 10).toFixed(1)}
           </div>
-          <div className="ctrl-label" style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>mph</div>
+          <div className="ctrl-label" style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1, whiteSpace: 'nowrap' }}>mph</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <button key="su10" className={`ctrl-btn ${pulseBtn(speedPulse, 'up', 'su10')}`} style={{ ...btn, color: 'var(--green)' }} {...ph('speed', 10, 'su10')}>
@@ -185,7 +187,7 @@ export default function SpeedInclineControls(): React.ReactElement {
           }}>
             {status.emuIncline.toFixed(1)}
           </div>
-          <div className="ctrl-label" style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>% incline</div>
+          <div className="ctrl-label" style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1, whiteSpace: 'nowrap' }}>% incline</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <button key="iu5" className={`ctrl-btn ${pulseBtn(inclinePulse, 'up', 'iu5')}`} style={{ ...btn, color: 'var(--orange)' }} {...ph('incline', 1, 'iu5')}>

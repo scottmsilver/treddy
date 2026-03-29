@@ -51,8 +51,9 @@ hrm/target/
 # Analysis/experimental scripts (not part of main tools)
 analysis/
 
-# Screenshots (dev artifacts)
+# Screenshots (dev artifacts, except docs/screenshots which is tracked for README)
 screenshots/
+!docs/screenshots/
 
 # Three.js (vendored, large)
 static/three.module.js

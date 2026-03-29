@@ -1,4 +1,4 @@
-# Precor 9.3x — AI Treadmill
+# Treddy
 
 > A 2005 treadmill that listens when you talk to it.
 
@@ -37,23 +37,19 @@ A Raspberry Pi sits between the console and motor controller of a Precor 9.31 tr
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│   Web UI (React + Vite)  │  Android (Kotlin + Compose)  │
-├──────────────────────────┴──────────────────────────────┤
-│  REST / WebSocket / Gemini Live (voice)                 │
-├─────────────────────────────────────────────────────────┤
-│                  server.py (FastAPI)                     │
-│   Sessions, programs, AI chat, workout query DB          │
-│   workout_session.py │ program_engine.py │ workout_db.py │
-├──────────────────────┼───────────────────┼──────────────┤
-│  treadmill_client.py │  hrm_client.py   │              │
-│  (Unix socket IPC)   │  (Unix socket)   │              │
-├──────────────────────┴───────────────────┴──────────────┤
-│  treadmill_io (C++20)  │  ftms-daemon   │  hrm-daemon  │
-│  GPIO serial, safety   │  (Rust, BLE)   │  (Rust, BLE) │
-│  proxy/emulate modes   │  FTMS service  │  HR client   │
-└─────────────────────────┴──────────────────┴────────────┘
-                          │
+┌───────────────────────────┬───────────────────────────┐
+│  Web UI (React + Vite)    │  Android (Kotlin+Compose) │
+├───────────────────────────┴───────────────────────────┤
+│  REST / WebSocket / Gemini Live (voice)               │
+├───────────────────────────────────────────────────────┤
+│  server.py (FastAPI)                                  │
+│  Sessions, programs, AI chat, workout query DB        │
+├──────────────────┬──────────────┬─────────────────────┤
+│  treadmill_io    │  ftms-daemon │  hrm-daemon         │
+│  C++20, GPIO     │  Rust, BLE   │  Rust, BLE          │
+│  serial, safety  │  FTMS        │  heart rate         │
+└──────────────────┴──────────────┴─────────────────────┘
+                         │
                     Precor 9.31
                   RS-485 serial bus
 ```

@@ -70,7 +70,7 @@ Details: [CLAUDE.md](CLAUDE.md)
 
 ## The Hardware Story
 
-> This project started with a $200 Craigslist treadmill and a logic analyzer. The serial protocol turned out to be plain ASCII text — we just had the polarity wrong and spent days decoding "binary" that was actually `[key:value]` pairs with every bit flipped.
+> The serial protocol turned out to be plain ASCII text. We just had the polarity wrong and spent days decoding "binary" that was actually `[key:value]` pairs with every bit flipped.
 
 [Full reverse engineering writeup →](HARDWARE.md)
 

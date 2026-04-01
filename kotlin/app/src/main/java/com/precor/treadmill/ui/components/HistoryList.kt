@@ -153,8 +153,8 @@ private fun HistoryCard(
     onSave: (String) -> Unit = {},
 ) {
     val colors = LocalPrecorColors.current
-    val name = entry.program.name.ifBlank { "Workout" }
-    val intervals = entry.program.intervals.size
+    val name = entry.program?.name?.ifBlank { "Workout" } ?: "Workout"
+    val intervals = entry.program?.intervals?.size ?: 0
     val duration = fmtDur(entry.totalDuration.toInt())
     val canResume = !entry.completed && entry.lastElapsed > 0
     val resumeLabel = if (canResume) "Resume from ${fmtDur(entry.lastElapsed)}" else null

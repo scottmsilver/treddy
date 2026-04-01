@@ -29,8 +29,10 @@ val appModule = module {
 
     single {
         Json {
-            ignoreUnknownKeys = true
-            isLenient = true
+            ignoreUnknownKeys = true   // don't crash on new server fields
+            isLenient = true           // tolerate unquoted strings, trailing commas
+            coerceInputValues = true   // null → default value for non-nullable fields
+            explicitNulls = false      // omit nulls in output, tolerate missing fields
         }
     }
 

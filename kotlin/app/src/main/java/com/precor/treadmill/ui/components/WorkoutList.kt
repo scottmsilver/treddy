@@ -105,8 +105,8 @@ private fun WorkoutCard(
 ) {
     val colors = LocalPrecorColors.current
     val name = workout.name.ifBlank { "Workout" }
-    val intervals = workout.program.intervals.size
-    val totalSecs = workout.program.intervals.sumOf { it.duration }.toInt()
+    val intervals = workout.program?.intervals?.size ?: 0
+    val totalSecs = workout.program?.intervals?.sumOf { it.duration }?.toInt() ?: 0
     val duration = fmtDur(totalSecs)
 
     Row(

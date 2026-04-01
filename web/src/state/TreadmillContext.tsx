@@ -117,8 +117,8 @@ function reducer(state: AppState, action: Action): AppState {
       const speedDirty = now - state._dirtySpeed < DIRTY_GRACE_MS;
       const inclineDirty = now - state._dirtyIncline < DIRTY_GRACE_MS;
       const next: TreadmillStatus = {
-        proxy: m.proxy,
-        emulate: m.emulate,
+        proxy: m.proxy ?? state.status.proxy,
+        emulate: m.emulate ?? state.status.emulate,
         emuSpeed: speedDirty ? state.status.emuSpeed : (m.emu_speed ?? state.status.emuSpeed),
         emuIncline: inclineDirty ? state.status.emuIncline : (m.emu_incline ?? state.status.emuIncline),
         speed: m.speed ?? state.status.speed,

@@ -275,6 +275,16 @@ Note: `make test` automatically stops the `treadmill-io` service before running 
 
 When reviewing or writing code in this project, enforce these principles:
 
+### Postel's Law (Robustness Principle)
+**Be conservative in what you send, be liberal in what you accept.**
+
+Clients (Android, web) must tolerate unexpected data from the server: unknown fields, null where a value was expected, missing optional fields, extra fields added later. The server evolves faster than clients update, so clients that crash on unfamiliar input are bugs.
+
+In practice:
+- **Kotlin**: kotlinx.serialization uses `ignoreUnknownKeys`, `coerceInputValues` (null → default), `isLenient`, `explicitNulls = false`. All model fields that could ever be null from the server must be nullable with a default. See `AppModule.kt` Json config.
+- **TypeScript**: Don't assert response shapes. Use optional chaining and defaults. If a field might not exist, handle it.
+- **Python (server)**: Validate at system boundaries (user input, API requests). Trust internal data structures. Send clean, well-typed JSON.
+
 ### Docs Stay Current
 - **CLAUDE.md must reflect reality.** If you add a feature, endpoint, mode, or dependency, update this file. Stale docs are a bug.
 - Inline comments only where the "why" isn't obvious. Don't comment the "what."

@@ -117,29 +117,29 @@ data class GpxUploadResponse(
 
 @Serializable
 data class ChatAction(
-    val name: String,
-    val args: Map<String, JsonElement>,
-    val result: String,
+    val name: String = "",
+    val args: Map<String, JsonElement> = emptyMap(),
+    val result: String = "",
 )
 
 @Serializable
 data class ChatResponse(
-    val text: String,
-    val actions: List<ChatAction>,
+    val text: String = "",
+    val actions: List<ChatAction> = emptyList(),
     val transcription: String? = null,
 )
 
 @Serializable
 data class ExtractIntentResponse(
-    val actions: List<ChatAction>,
-    val text: String,
+    val actions: List<ChatAction> = emptyList(),
+    val text: String = "",
 )
 
 @Serializable
 data class RunRecord(
-    val id: String,
-    @SerialName("started_at") val startedAt: String,
-    @SerialName("ended_at") val endedAt: String,
+    val id: String = "",
+    @SerialName("started_at") val startedAt: String? = null,
+    @SerialName("ended_at") val endedAt: String? = null,
     val elapsed: Double = 0.0,
     val distance: Double = 0.0,
     @SerialName("vert_feet") val vertFeet: Double = 0.0,
@@ -151,11 +151,11 @@ data class RunRecord(
 
 @Serializable
 data class HistoryEntry(
-    val id: String,
-    val prompt: String,
-    val program: Program,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("total_duration") val totalDuration: Double,
+    val id: String = "",
+    val prompt: String = "",
+    val program: Program? = null,
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("total_duration") val totalDuration: Double = 0.0,
     val completed: Boolean = false,
     @SerialName("last_interval") val lastInterval: Int = 0,
     @SerialName("last_elapsed") val lastElapsed: Int = 0,
@@ -166,11 +166,11 @@ data class HistoryEntry(
 
 @Serializable
 data class SavedWorkout(
-    val id: String,
-    val name: String,
-    val program: Program,
-    @SerialName("created_at") val createdAt: String,
-    val source: String,
+    val id: String = "",
+    val name: String = "",
+    val program: Program? = null,
+    @SerialName("created_at") val createdAt: String = "",
+    val source: String = "",
     val prompt: String = "",
     @SerialName("times_used") val timesUsed: Int = 0,
     @SerialName("last_used") val lastUsed: String? = null,
@@ -200,10 +200,10 @@ data class RenameWorkoutRequest(val name: String)
 
 @Serializable
 data class AppConfig(
-    @SerialName("gemini_api_key") val geminiApiKey: String,
-    @SerialName("gemini_model") val geminiModel: String,
-    @SerialName("gemini_live_model") val geminiLiveModel: String,
-    @SerialName("gemini_voice") val geminiVoice: String,
+    @SerialName("gemini_api_key") val geminiApiKey: String = "",
+    @SerialName("gemini_model") val geminiModel: String = "",
+    @SerialName("gemini_live_model") val geminiLiveModel: String = "",
+    @SerialName("gemini_voice") val geminiVoice: String = "",
     @SerialName("tools") val tools: kotlinx.serialization.json.JsonArray? = null,
     @SerialName("system_prompt") val systemPrompt: String? = null,
     @SerialName("smartass_addendum") val smartassAddendum: String? = null,

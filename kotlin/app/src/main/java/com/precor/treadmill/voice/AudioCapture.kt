@@ -29,7 +29,7 @@ class AudioCapture(
         private const val SAMPLE_RATE = 16000
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
-        private const val BUFFER_SIZE_SAMPLES = 4096
+        private const val BUFFER_SIZE_SAMPLES = 2048  // 128ms @ 16kHz (was 4096/256ms)
         private const val SILENCE_RMS_THRESHOLD = 800   // PCM16 amplitude; speech is typically 2000+
         private const val SILENCE_CHUNKS_REQUIRED = 2    // consecutive silent chunks before "went silent"
     }

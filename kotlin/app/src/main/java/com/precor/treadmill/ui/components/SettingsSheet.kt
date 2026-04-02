@@ -49,6 +49,7 @@ fun SettingsSheet(
 
     var smartass by remember { mutableStateOf(false) }
     var weightText by remember { mutableStateOf("") }
+    var vestText by remember { mutableStateOf("") }
     var debugUnlocked by remember { mutableStateOf(false) }
     var debugTaps by remember { mutableStateOf(listOf<Long>()) }
 
@@ -57,6 +58,7 @@ fun SettingsSheet(
         runCatching {
             val user = api.getUser()
             weightText = user.weightLbs.toString()
+            vestText = if (user.vestLbs > 0) user.vestLbs.toString() else ""
         }
     }
 
@@ -212,11 +214,73 @@ fun SettingsSheet(
                                 val lbs = weightText.toIntOrNull()
                                 if (lbs != null && lbs in 50..500) {
                                     scope.launch {
-                                        runCatching { api.updateUser(UpdateUserRequest(lbs)) }
+                                        runCatching { api.updateUser(UpdateUserRequest(weightLbs = lbs)) }
                                     }
                                 }
                             },
                         ),
+                    )
+                    Text(
+                        text = "lbs",
+                        color = colors.text3,
+                        fontSize = 13.sp,
+                    )
+                }
+            }
+
+            // Vest weight
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Weight Vest",
+                    color = colors.text,
+                    fontSize = 15.sp,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = vestText,
+                        onValueChange = { v ->
+                            vestText = v.filter { it.isDigit() }.take(3)
+                        },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                        ),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = colors.text,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        ),
+                        modifier = Modifier
+                            .width(60.dp)
+                            .background(colors.fill2, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onDone = {
+                                val lbs = vestText.toIntOrNull() ?: 0
+                                if (lbs in 0..100) {
+                                    scope.launch {
+                                        runCatching { api.updateUser(UpdateUserRequest(vestLbs = lbs)) }
+                                    }
+                                }
+                            },
+                        ),
+                        decorationBox = { inner ->
+                            if (vestText.isEmpty()) {
+                                Text("0", color = colors.text3, fontSize = 15.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                                    modifier = Modifier.fillMaxWidth())
+                            }
+                            inner()
+                        },
                     )
                     Text(
                         text = "lbs",

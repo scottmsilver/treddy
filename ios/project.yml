@@ -1,0 +1,44 @@
+name: Treddy
+options:
+  bundleIdPrefix: com.treddy
+  deploymentTarget:
+    iOS: '17.0'
+targets:
+  Treddy:
+    type: application
+    platform: iOS
+    sources:
+    - Treddy
+    settings:
+      base:
+        SWIFT_VERSION: '6.0'
+        PRODUCT_BUNDLE_IDENTIFIER: com.treddy.app
+        INFOPLIST_GENERATION_MODE: GeneratedFile
+        GENERATE_INFOPLIST_FILE: true
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: '1'
+        DEVELOPMENT_TEAM: M8B368H9T5
+        CODE_SIGN_STYLE: Automatic
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Voice control for your treadmill
+  TreddyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+    - TreddyTests
+    dependencies:
+    - target: Treddy
+    settings:
+      base:
+        SWIFT_VERSION: '6.0'
+        GENERATE_INFOPLIST_FILE: true
+  TreddyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+    - TreddyUITests
+    dependencies:
+    - target: Treddy
+    settings:
+      base:
+        SWIFT_VERSION: '6.0'
+        GENERATE_INFOPLIST_FILE: true

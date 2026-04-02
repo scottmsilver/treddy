@@ -101,11 +101,11 @@ export default function NavRail({ voiceState, onVoiceToggle, onSettingsToggle }:
   const [location, setLocation] = useLocation();
   const isLandscape = useIsLandscape();
 
-  const voiceActive = voiceState === 'listening' || voiceState === 'speaking';
+  const voiceActive = voiceState === 'connecting' || voiceState === 'listening' || voiceState === 'speaking';
   const isHome = location === '/' || location === '';
   const isRun = location.startsWith('/run');
   const voiceColor = voiceActive
-    ? (voiceState === 'listening' ? 'var(--red)' : 'var(--purple)')
+    ? (voiceState === 'connecting' ? 'var(--yellow)' : voiceState === 'listening' ? 'var(--green)' : 'var(--purple)')
     : undefined;
 
   const grow = !isLandscape;
@@ -134,7 +134,7 @@ export default function NavRail({ voiceState, onVoiceToggle, onSettingsToggle }:
         grow={grow}
         hideLabel={hideLabel}
         icon={<MicIcon size={22} />}
-        label={voiceActive ? (voiceState === 'listening' ? 'Listening' : 'Speaking') : 'Voice'}
+        label={voiceActive ? (voiceState === 'connecting' ? 'Connecting...' : voiceState === 'listening' ? 'Listening' : 'Speaking') : 'Voice'}
         active={voiceActive}
         color={voiceColor}
         onClick={() => { haptic(voiceState === 'idle' ? 20 : 10); onVoiceToggle(); }}

@@ -5,7 +5,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -2220,3 +2219,54 @@ class TestWorkoutQueryEndToEnd:
         assert (
             data["ok"] is False or "error" in data.get("result", "").lower() or "error" in data.get("error", "").lower()
         )
+
+
+class TestUserProfile:
+    """PUT /api/user persists both weight and vest."""
+
+    def test_update_weight(self, test_app):
+        client, server, _ = test_app
+        with (
+            patch.object(server, "_load_user", return_value={"id": "1", "weight_lbs": 154, "vest_lbs": 0}),
+            patch.object(server, "_save_user") as mock_save,
+        ):
+            resp = client.put("/api/user", json={"weight_lbs": 180})
+            assert resp.status_code == 200
+            mock_save.assert_called_once()
+            saved = mock_save.call_args[0][0]
+            assert saved["weight_lbs"] == 180
+            assert saved["vest_lbs"] == 0  # unchanged
+
+    def test_update_vest(self, test_app):
+        """Regression: vest_lbs was silently dropped before the fix."""
+        client, server, _ = test_app
+        with (
+            patch.object(server, "_load_user", return_value={"id": "1", "weight_lbs": 154, "vest_lbs": 0}),
+            patch.object(server, "_save_user") as mock_save,
+        ):
+            resp = client.put("/api/user", json={"vest_lbs": 20})
+            assert resp.status_code == 200
+            mock_save.assert_called_once()
+            saved = mock_save.call_args[0][0]
+            assert saved["vest_lbs"] == 20
+            assert saved["weight_lbs"] == 154  # unchanged
+
+    def test_update_both(self, test_app):
+        client, server, _ = test_app
+        with (
+            patch.object(server, "_load_user", return_value={"id": "1", "weight_lbs": 154, "vest_lbs": 0}),
+            patch.object(server, "_save_user") as mock_save,
+        ):
+            resp = client.put("/api/user", json={"weight_lbs": 200, "vest_lbs": 30})
+            assert resp.status_code == 200
+            saved = mock_save.call_args[0][0]
+            assert saved["weight_lbs"] == 200
+            assert saved["vest_lbs"] == 30
+
+    def test_vest_included_in_calorie_calc(self, test_app):
+        """_user_weight_kg() adds body + vest for calorie calculations."""
+        _, server, _ = test_app
+        with patch.object(server, "_load_user", return_value={"id": "1", "weight_lbs": 154, "vest_lbs": 20}):
+            kg = server._user_weight_kg()
+            expected = (154 + 20) * 0.453592
+            assert abs(kg - expected) < 0.01

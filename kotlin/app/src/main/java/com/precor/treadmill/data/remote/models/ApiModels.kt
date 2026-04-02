@@ -219,11 +219,13 @@ data class VoicePromptResponse(val prompt: String)
 data class UserProfile(
     val id: String = "1",
     @SerialName("weight_lbs") val weightLbs: Int = 154,
+    @SerialName("vest_lbs") val vestLbs: Int = 0,
 )
 
 @Serializable
 data class UpdateUserRequest(
-    @SerialName("weight_lbs") val weightLbs: Int,
+    @SerialName("weight_lbs") val weightLbs: Int? = null,
+    @SerialName("vest_lbs") val vestLbs: Int? = null,
 )
 
 @Serializable

@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun NavRail(
     currentRoute: String,
-    voiceState: String, // "idle", "listening", "speaking"
+    voiceState: String, // "idle", "connecting", "listening", "speaking"
     onNavigate: (String) -> Unit,
     onVoiceToggle: () -> Unit,
     onSettingsToggle: () -> Unit,
@@ -162,10 +162,11 @@ private fun VoiceTabItem(
     onClick: () -> Unit,
     showLabel: Boolean = true,
 ) {
-    val active = voiceState == "listening" || voiceState == "speaking"
-    val isListening = voiceState == "listening"
+    val active = voiceState == "connecting" || voiceState == "listening" || voiceState == "speaking"
+    val shouldPulse = voiceState == "connecting" || voiceState == "listening"
     val glowColor = when (voiceState) {
-        "listening" -> Color(0xFFC45C52)
+        "connecting" -> Color(0xFFB8A87A)
+        "listening" -> Color(0xFF6BC89B)
         "speaking" -> Color(0xFF8B7FA0)
         else -> Color.Transparent
     }
@@ -173,16 +174,17 @@ private fun VoiceTabItem(
     val infiniteTransition = rememberInfiniteTransition(label = "tabMicGlow")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.6f,
-        targetValue = if (isListening) 0.15f else 0.4f,
+        targetValue = if (voiceState == "listening") 0.15f else 0.4f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (isListening) 1000 else 1600, easing = EaseInOut),
+            animation = tween(if (voiceState == "listening") 1000 else 1600, easing = EaseInOut),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "tabPulseAlpha",
     )
 
     val color = when (voiceState) {
-        "listening" -> Color(0xFFC45C52)
+        "connecting" -> Color(0xFFB8A87A)
+        "listening" -> Color(0xFF6BC89B)
         "speaking" -> Color(0xFF8B7FA0)
         else -> Color(0x59E8E4DF)
     }
@@ -200,6 +202,7 @@ private fun VoiceTabItem(
         Icon(
             imageVector = Icons.Default.Mic,
             contentDescription = when (voiceState) {
+                "connecting" -> "Connecting"
                 "listening" -> "Listening"
                 "speaking" -> "Speaking"
                 else -> "Voice"
@@ -209,8 +212,9 @@ private fun VoiceTabItem(
                 .size(24.dp)
                 .drawBehind {
                     if (active) {
+                        val alpha = if (shouldPulse) pulseAlpha else 0.5f
                         drawCircle(
-                            color = glowColor.copy(alpha = pulseAlpha),
+                            color = glowColor.copy(alpha = alpha),
                             radius = size.minDimension * 0.9f,
                         )
                     }
@@ -220,6 +224,7 @@ private fun VoiceTabItem(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = when (voiceState) {
+                    "connecting" -> "Connecting..."
                     "listening" -> "Listening"
                     "speaking" -> "Speaking"
                     else -> "Voice"

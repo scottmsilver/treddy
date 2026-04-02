@@ -43,7 +43,7 @@ from program_engine import (
     validate_interval,
 )
 from pydantic import BaseModel, Field, field_validator
-from treadmill_client import MAX_INCLINE, MAX_SPEED_TENTHS, TreadmillClient
+from treadmill_client import MAX_SPEED_TENTHS, TreadmillClient
 from workout_db import WorkoutDB
 from workout_session import WorkoutSession
 
@@ -352,6 +352,7 @@ USER_PROFILE_FILE = "user_profile.json"
 DEFAULT_USER = {
     "id": "1",
     "weight_lbs": 154,  # ~70 kg
+    "vest_lbs": 0,  # weight vest, added to body weight for calorie calc
 }
 
 
@@ -372,8 +373,10 @@ def _save_user(user):
 
 
 def _user_weight_kg():
-    """Get user weight in kg for calorie calculations."""
-    return _load_user().get("weight_lbs", 154) * 0.453592
+    """Get total weight in kg for calorie calculations (body + vest)."""
+    user = _load_user()
+    total_lbs = user.get("weight_lbs", 154) + user.get("vest_lbs", 0)
+    return total_lbs * 0.453592
 
 
 # --- Run History (completed/stopped runs) ---
@@ -1016,6 +1019,7 @@ async def api_get_user():
 
 class UpdateUserRequest(BaseModel):
     weight_lbs: int | None = Field(None, ge=50, le=500)
+    vest_lbs: int | None = Field(None, ge=0, le=100)
 
 
 @app.put("/api/user")
@@ -1023,6 +1027,8 @@ async def api_update_user(req: UpdateUserRequest):
     user = _load_user()
     if req.weight_lbs is not None:
         user["weight_lbs"] = req.weight_lbs
+    if req.vest_lbs is not None:
+        user["vest_lbs"] = req.vest_lbs
     _save_user(user)
     return user
 

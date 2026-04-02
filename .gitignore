@@ -71,6 +71,7 @@ static/assets/*.css
 
 # Worktree environment (per-worktree ports)
 worktree.env
+.worktrees/
 
 # Claude config (local)
 .claude/*

@@ -26,14 +26,10 @@ final class AudioCapture: @unchecked Sendable {
         engine = eng
 
         let inputNode = eng.inputNode
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatInt16,
-            sampleRate: Self.sampleRate,
-            channels: 1,
-            interleaved: true
-        )!
-
-        inputNode.installTap(onBus: 0, bufferSize: Self.bufferSize, format: format) { [weak self] buffer, _ in
+        // Use nil format to get the node's native format. Requesting a specific
+        // format (like 16kHz PCM16) crashes on simulators and some devices where
+        // the hardware doesn't support that format natively. We convert in processBuffer.
+        inputNode.installTap(onBus: 0, bufferSize: Self.bufferSize, format: nil) { [weak self] buffer, _ in
             self?.processBuffer(buffer)
         }
 
@@ -76,17 +72,52 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     private func processBuffer(_ buffer: AVAudioPCMBuffer) {
-        guard let int16Data = buffer.int16ChannelData else { return }
-        let count = Int(buffer.frameLength)
-        let samples = int16Data[0]
+        // Convert native format (typically 48kHz Float32) to 16kHz PCM16 for Gemini
+        let nativeSampleRate = buffer.format.sampleRate
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0 else { return }
 
-        // RMS for speech detection
-        var sumSquares: Float = 0
-        for i in 0..<count {
-            let s = Float(samples[i])
-            sumSquares += s * s
+        // Get float samples (works for both Float32 and Int16 native formats)
+        var floatSamples: [Float]
+        if let floatData = buffer.floatChannelData {
+            floatSamples = Array(UnsafeBufferPointer(start: floatData[0], count: frameCount))
+        } else if let int16Data = buffer.int16ChannelData {
+            floatSamples = (0..<frameCount).map { Float(int16Data[0][$0]) / 32768.0 }
+        } else {
+            return
         }
-        let rms = sqrtf(sumSquares / Float(count))
+
+        // Downsample to 16kHz if needed
+        let ratio = nativeSampleRate / Self.sampleRate
+        let outputCount: Int
+        let resampled: [Int16]
+
+        if ratio > 1.01 {
+            outputCount = Int(Double(frameCount) / ratio)
+            resampled = (0..<outputCount).map { i in
+                let pos = Double(i) * ratio
+                let idx = Int(pos)
+                let frac = Float(pos - Double(idx))
+                let s: Float
+                if idx + 1 < frameCount {
+                    s = floatSamples[idx] * (1 - frac) + floatSamples[idx + 1] * frac
+                } else {
+                    s = floatSamples[idx]
+                }
+                return Int16(clamping: Int(s * 32767))
+            }
+        } else {
+            outputCount = frameCount
+            resampled = floatSamples.map { Int16(clamping: Int($0 * 32767)) }
+        }
+
+        // RMS for speech detection (on resampled PCM16)
+        var sumSquares: Float = 0
+        for s in resampled {
+            let f = Float(s)
+            sumSquares += f * f
+        }
+        let rms = sqrtf(sumSquares / Float(outputCount))
         let now = Int64(Date().timeIntervalSince1970 * 1000)
 
         if rms >= Self.silenceRmsThreshold {
@@ -102,8 +133,7 @@ final class AudioCapture: @unchecked Sendable {
         }
 
         // Base64 encode raw PCM16 bytes
-        let byteCount = count * 2
-        let data = Data(bytes: samples, count: byteCount)
+        let data = resampled.withUnsafeBytes { Data($0) }
         let base64 = data.base64EncodedString()
         onAudioChunk?(base64)
     }

@@ -133,6 +133,39 @@ interface TreadmillApi {
     @PUT("/api/user")
     suspend fun updateUser(@Body request: UpdateUserRequest): UserProfile
 
+    // --- Profiles ---
+
+    @GET("/api/profiles")
+    suspend fun getProfiles(): List<Profile>
+
+    @POST("/api/profiles")
+    suspend fun createProfile(@Body request: CreateProfileRequest): Profile
+
+    @POST("/api/profile/select")
+    suspend fun selectProfile(@Body request: SelectProfileRequest): GenericOkResponse
+
+    @GET("/api/profile/active")
+    suspend fun getActiveProfile(): ActiveProfileResponse
+
+    @POST("/api/profile/guest")
+    suspend fun startGuest(): GenericOkResponse
+
+    @PUT("/api/profiles/{id}")
+    suspend fun updateProfile(@Path("id") id: String, @Body request: UpdateProfileRequest): Profile
+
+    @DELETE("/api/profiles/{id}")
+    suspend fun deleteProfile(@Path("id") id: String): GenericOkResponse
+
+    @POST("/api/profile/guest/convert")
+    suspend fun convertGuest(@Body request: ConvertGuestRequest): Profile
+
+    @Multipart
+    @POST("/api/profiles/{id}/avatar")
+    suspend fun uploadAvatar(@Path("id") id: String, @Part file: MultipartBody.Part): GenericOkResponse
+
+    @DELETE("/api/profiles/{id}/avatar")
+    suspend fun deleteAvatar(@Path("id") id: String): GenericOkResponse
+
     // --- Log & Config ---
 
     @GET("/api/log")

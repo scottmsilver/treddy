@@ -235,3 +235,38 @@ data class TtsResponse(
     @SerialName("sample_rate") val sampleRate: Int? = null,
     val error: String? = null,
 )
+
+// --- Profile models ---
+
+@Serializable
+data class SelectProfileRequest(val id: String)
+
+@Serializable
+data class UpdateProfileRequest(
+    val name: String? = null,
+    val color: String? = null,
+    @SerialName("weight_lbs") val weightLbs: Int? = null,
+    @SerialName("vest_lbs") val vestLbs: Int? = null,
+)
+
+@Serializable
+data class CreateProfileRequest(
+    val name: String,
+    val color: String? = null,
+    val initials: String? = null,
+    @SerialName("weight_lbs") val weightLbs: Double? = null,
+)
+
+@Serializable
+data class ConvertGuestRequest(
+    val name: String,
+    val color: String? = null,
+    val initials: String? = null,
+    @SerialName("weight_lbs") val weightLbs: Double? = null,
+)
+
+@Serializable
+data class ActiveProfileResponse(
+    val profile: Profile? = null,
+    @SerialName("guest_mode") val guestMode: Boolean = false,
+)

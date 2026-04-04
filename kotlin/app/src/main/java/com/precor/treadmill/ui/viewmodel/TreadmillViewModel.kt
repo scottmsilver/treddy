@@ -6,6 +6,9 @@ import com.precor.treadmill.data.preferences.ServerPreferences
 import com.precor.treadmill.data.remote.TreadmillApi
 import com.precor.treadmill.data.remote.TreadmillWebSocket
 import com.precor.treadmill.data.remote.models.*
+import com.precor.treadmill.data.remote.models.Profile
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import com.precor.treadmill.ui.util.LeadingGuard
 import com.precor.treadmill.ui.util.TrailingDebounce
 import com.precor.treadmill.ui.util.fmtDur
@@ -158,6 +161,20 @@ class TreadmillViewModel(
     private val _hrmDevices = MutableStateFlow<List<HrmDevice>>(emptyList())
     val hrmDevices: StateFlow<List<HrmDevice>> = _hrmDevices.asStateFlow()
 
+    // --- Profile state ---
+    private val _activeProfile = MutableStateFlow<Profile?>(null)
+    val activeProfile: StateFlow<Profile?> = _activeProfile.asStateFlow()
+
+    private val _guestMode = MutableStateFlow(false)
+    val guestMode: StateFlow<Boolean> = _guestMode.asStateFlow()
+
+    private val _profiles = MutableStateFlow<List<Profile>>(emptyList())
+    val profiles: StateFlow<List<Profile>> = _profiles.asStateFlow()
+
+    /** Emits Unit each time the profile changes (for VoiceViewModel to invalidate config). */
+    private val _profileChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    val profileChanged: SharedFlow<Unit> = _profileChanged.asSharedFlow()
+
     // --- Toast ---
     private val _toast = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val toast: SharedFlow<String> = _toast.asSharedFlow()
@@ -300,6 +317,7 @@ class TreadmillViewModel(
             is KVMessage -> handleKVUpdate(msg)
             is HRMessage -> handleHRUpdate(msg)
             is ScanResultMessage -> handleScanResult(msg)
+            is ProfileChangedMessage -> handleProfileChanged(msg)
             is UnknownMessage -> {} // ignored
         }
     }
@@ -416,6 +434,12 @@ class TreadmillViewModel(
 
     private fun handleScanResult(msg: ScanResultMessage) {
         _hrmDevices.value = msg.devices
+    }
+
+    private fun handleProfileChanged(msg: ProfileChangedMessage) {
+        _activeProfile.value = msg.profile
+        _guestMode.value = msg.guestMode
+        _profileChanged.tryEmit(Unit)
     }
 
     // --- Actions ---
@@ -591,6 +615,198 @@ class TreadmillViewModel(
         viewModelScope.launch {
             runCatching { api.scanHrmDevices() }
                 .onFailure { Log.e(TAG, "Failed to scan HRM devices", it) }
+        }
+    }
+
+    // --- Profile actions ---
+
+    fun fetchProfiles() {
+        viewModelScope.launch {
+            runCatching { api.getProfiles() }
+                .onSuccess { _profiles.value = it }
+                .onFailure { Log.e(TAG, "Failed to fetch profiles", it) }
+        }
+    }
+
+    fun fetchActiveProfile() {
+        viewModelScope.launch {
+            runCatching { api.getActiveProfile() }
+                .onSuccess {
+                    _activeProfile.value = it.profile
+                    _guestMode.value = it.guestMode
+                }
+                .onFailure { Log.e(TAG, "Failed to fetch active profile", it) }
+        }
+    }
+
+    fun selectProfile(id: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { api.selectProfile(SelectProfileRequest(id)) }
+                .onSuccess {
+                    if (it.ok) {
+                        fetchActiveProfile()
+                        onSuccess()
+                    } else {
+                        onError(it.error ?: "Failed to select profile")
+                    }
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to select profile", it)
+                    onError(it.message ?: "Network error")
+                }
+        }
+    }
+
+    fun startGuest(onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { api.startGuest() }
+                .onSuccess {
+                    if (it.ok) {
+                        _guestMode.value = true
+                        _activeProfile.value = null
+                        onSuccess()
+                    } else {
+                        onError(it.error ?: "Failed to start guest mode")
+                    }
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to start guest mode", it)
+                    onError(it.message ?: "Network error")
+                }
+        }
+    }
+
+    fun createProfile(
+        name: String,
+        color: String? = null,
+        initials: String? = null,
+        weightLbs: Double? = null,
+        onSuccess: (Profile) -> Unit = {},
+        onError: (String) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            runCatching { api.createProfile(CreateProfileRequest(name, color, initials, weightLbs)) }
+                .onSuccess {
+                    fetchProfiles()
+                    onSuccess(it)
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to create profile", it)
+                    onError(it.message ?: "Network error")
+                }
+        }
+    }
+
+    fun renameProfile(id: String, name: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { api.updateProfile(id, UpdateProfileRequest(name = name)) }
+                .onSuccess {
+                    fetchActiveProfile()
+                    onSuccess()
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to rename profile", it)
+                    onError(it.message ?: "Network error")
+                }
+        }
+    }
+
+    fun deleteProfile(id: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { api.deleteProfile(id) }
+                .onSuccess {
+                    if (it.ok) {
+                        fetchProfiles()
+                        fetchActiveProfile()
+                        onSuccess()
+                    } else {
+                        onError(it.error ?: "Cannot delete profile")
+                    }
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to delete profile", it)
+                    onError(it.message ?: "Network error")
+                }
+        }
+    }
+
+    fun uploadAvatar(id: String, imageBytes: ByteArray, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching {
+                val requestBody = imageBytes.toRequestBody("image/jpeg".toMediaType())
+                val part = okhttp3.MultipartBody.Part.createFormData("file", "avatar.jpg", requestBody)
+                api.uploadAvatar(id, part)
+            }
+                .onSuccess {
+                    if (it.ok) {
+                        fetchActiveProfile()
+                        fetchProfiles()
+                        onSuccess()
+                    } else {
+                        onError(it.error ?: "Upload failed")
+                    }
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to upload avatar", it)
+                    onError(it.message ?: "Network error")
+                }
+        }
+    }
+
+    fun deleteAvatar(id: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { api.deleteAvatar(id) }
+                .onSuccess {
+                    if (it.ok) {
+                        fetchActiveProfile()
+                        fetchProfiles()
+                        onSuccess()
+                    } else {
+                        onError(it.error ?: "Failed to remove avatar")
+                    }
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to delete avatar", it)
+                    onError(it.message ?: "Network error")
+                }
+        }
+    }
+
+    fun updateProfileColor(id: String, color: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { api.updateProfile(id, UpdateProfileRequest(color = color)) }
+                .onSuccess {
+                    fetchActiveProfile()
+                    fetchProfiles()
+                    onSuccess()
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to update profile color", it)
+                    onError(it.message ?: "Network error")
+                }
+        }
+    }
+
+    fun convertGuest(
+        name: String,
+        color: String? = null,
+        initials: String? = null,
+        weightLbs: Double? = null,
+        onSuccess: (Profile) -> Unit = {},
+        onError: (String) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            runCatching { api.convertGuest(ConvertGuestRequest(name, color, initials, weightLbs)) }
+                .onSuccess {
+                    _activeProfile.value = it
+                    _guestMode.value = false
+                    fetchProfiles()
+                    onSuccess(it)
+                }
+                .onFailure {
+                    Log.e(TAG, "Failed to convert guest", it)
+                    onError(it.message ?: "Network error")
+                }
         }
     }
 

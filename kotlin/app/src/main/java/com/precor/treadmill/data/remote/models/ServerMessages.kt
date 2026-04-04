@@ -22,6 +22,7 @@ object ServerMessageSerializer : JsonContentPolymorphicSerializer<ServerMessage>
             "connection" -> ConnectionMessage.serializer()
             "hr" -> HRMessage.serializer()
             "scan_result" -> ScanResultMessage.serializer()
+            "profile_changed" -> ProfileChangedMessage.serializer()
             else -> {
                 Log.w("ServerMsg", "Unknown message type: ${element.jsonObject["type"]}")
                 UnknownMessage.serializer()
@@ -123,6 +124,13 @@ data class HrmDevice(
 data class ScanResultMessage(
     val type: String = "scan_result",
     val devices: List<HrmDevice>,
+) : ServerMessage
+
+@Serializable
+data class ProfileChangedMessage(
+    val type: String = "profile_changed",
+    val profile: Profile? = null,
+    @SerialName("guest_mode") val guestMode: Boolean = false,
 ) : ServerMessage
 
 @Serializable

@@ -1,11 +1,16 @@
 package com.precor.treadmill.ui.components
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,23 +18,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.precor.treadmill.data.preferences.ServerPreferences
 import com.precor.treadmill.data.remote.TreadmillApi
+import com.precor.treadmill.data.remote.models.Profile
 import com.precor.treadmill.data.remote.models.UpdateUserRequest
 import com.precor.treadmill.ui.theme.LocalPrecorColors
 import com.precor.treadmill.ui.util.haptic
 import com.precor.treadmill.ui.viewmodel.TreadmillViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.koin.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
+import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -289,6 +302,11 @@ fun SettingsSheet(
                     )
                 }
             }
+
+            HorizontalDivider(color = colors.separator, thickness = 0.5.dp)
+
+            // Profile section
+            ProfileSection(viewModel = viewModel, onToast = onToast)
 
             HorizontalDivider(color = colors.separator, thickness = 0.5.dp)
 

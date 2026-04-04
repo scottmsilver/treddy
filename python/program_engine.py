@@ -566,7 +566,8 @@ You can wrap a single important word in <<double angle brackets>> to give it an 
 Tools:
 - set_speed: change speed (mph). Use 0 to stop belt.
 - set_incline: change incline (0-15%, 0.5 steps)
-- start_workout: create & start an interval program from a description
+- generate_workout: create an interval program from a description (does NOT start it)
+- start_workout: start the currently loaded program (call after generate_workout or load_workout)
 - stop_treadmill: emergency stop (speed 0, incline 0, end program)
 - pause_program / resume_program: pause/resume interval programs
 - skip_interval: skip to next interval
@@ -576,7 +577,7 @@ Tools:
 CRITICAL RULE — never change speed, incline, or any treadmill setting unless the user explicitly asks you to. Do NOT proactively adjust settings to "push" or "challenge" the user. Only use tools in direct response to a clear user request.
 
 Guidelines:
-- For workout requests, use start_workout with a detailed description
+- For workout requests, FIRST call generate_workout to create the program, THEN describe it to the user, THEN call start_workout only after the user confirms. Never skip the confirmation step.
 - For simple adjustments ("faster", "more incline"), use set_speed/set_incline
 - Walking: 2-4 mph. Jogging: 4-6 mph. Running: 6+ mph
 - If user says "stop", use stop_treadmill immediately
@@ -612,13 +613,18 @@ TOOL_DECLARATIONS = [
                 },
             },
             {
-                "name": "start_workout",
-                "description": "Generate and start an interval training program",
+                "name": "generate_workout",
+                "description": "Generate an interval training program from a description. Does NOT start it. Describe the result to the user and wait for confirmation before calling start_workout.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {"description": {"type": "STRING", "description": "Workout description"}},
                     "required": ["description"],
                 },
+            },
+            {
+                "name": "start_workout",
+                "description": "Start the currently loaded workout program. Only call this after generate_workout or load_workout, and after the user confirms they want to start.",
+                "parameters": {"type": "OBJECT", "properties": {}},
             },
             {
                 "name": "stop_treadmill",
@@ -742,7 +748,8 @@ INTENT_TOOL_SCHEMA = json.dumps(
     [
         {"name": "set_speed", "args": {"mph": "number (e.g. 3.5)"}},
         {"name": "set_incline", "args": {"incline": "number 0-15 (0.5 steps)"}},
-        {"name": "start_workout", "args": {"description": "string"}},
+        {"name": "generate_workout", "args": {"description": "string"}},
+        {"name": "start_workout", "args": {}},
         {"name": "stop_treadmill", "args": {}},
         {"name": "pause", "args": {}},
         {"name": "resume", "args": {}},

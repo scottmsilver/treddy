@@ -1638,18 +1638,35 @@ async def _exec_fn(name, args):
         await _apply_incline(inc)
         return f"Incline set to {inc}%"
 
-    elif name == "start_workout":
+    elif name == "generate_workout":
         desc = args.get("description", "")
         try:
             program = await generate_program(desc)
             sess.prog.load(program)
-            _add_to_history(program, desc)
-            await sess.start_program(_prog_on_change(), _prog_on_update())
+            # Loaded but NOT started, NOT saved to history yet.
+            # Gemini should describe it and ask user to confirm before calling start_workout.
             n = len(program["intervals"])
             mins = sum(iv["duration"] for iv in program["intervals"]) // 60
-            return f"Started '{program['name']}': {n} intervals, {mins} min"
+            intervals_summary = ", ".join(
+                f"{iv['name']} ({iv['duration']//60}min, {iv['speed']}mph, {iv['incline']}%)"
+                for iv in program["intervals"][:6]
+            )
+            if n > 6:
+                intervals_summary += f", ... ({n - 6} more)"
+            return f"Generated '{program['name']}': {n} intervals, {mins} min. Intervals: {intervals_summary}. Tell the user what you created and ask if they want to start."
         except Exception as e:
             return f"Failed: {e}"
+
+    elif name == "start_workout":
+        # Start the currently loaded program (from generate_workout or load_workout)
+        if not sess.prog.program:
+            return "No program loaded. Use generate_workout first."
+        program = sess.prog.program
+        _add_to_history(program, args.get("description", ""))
+        await sess.start_program(_prog_on_change(), _prog_on_update())
+        n = len(program.get("intervals", []))
+        mins = sum(iv["duration"] for iv in program.get("intervals", [])) // 60
+        return f"Started '{program.get('name')}': {n} intervals, {mins} min"
 
     elif name == "stop_treadmill":
         await _apply_stop()

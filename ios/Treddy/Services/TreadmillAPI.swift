@@ -156,6 +156,10 @@ actor TreadmillAPI {
         try await postRaw("/api/programs/history/\(id)/load")
     }
 
+    func saveWorkoutFromHistory(historyId: String) async throws {
+        try await postRaw("/api/workouts", body: ["history_id": historyId])
+    }
+
     func resumeHistory(id: String) async throws -> ProgramState {
         return try await post("/api/programs/history/\(id)/resume")
     }

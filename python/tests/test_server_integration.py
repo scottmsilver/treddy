@@ -1099,6 +1099,111 @@ class TestHistoryResume:
         assert "completed" in data["error"].lower()
 
 
+class TestHistorySavedWorkoutId:
+    """Tests for saved_workout_id on history entries."""
+
+    def test_unsaved_history_has_null_workout_id(self, test_app):
+        """History entries that aren't saved should have saved_workout_id=None."""
+        client, server, _ = test_app
+        program = {
+            "name": "Not Saved",
+            "intervals": [{"name": "A", "duration": 60, "speed": 3.0, "incline": 0}],
+        }
+        server._add_to_history(program)
+
+        resp = client.get("/api/programs/history")
+        assert resp.status_code == 200
+        entries = resp.json()
+        entry = next(e for e in entries if e["program"]["name"] == "Not Saved")
+        assert entry["saved"] is False
+        assert entry["saved_workout_id"] is None
+
+    def test_saved_history_has_workout_id(self, test_app):
+        """Saving a workout should make its history entry return the workout ID."""
+        client, server, _ = test_app
+        program = {
+            "name": "Will Be Saved",
+            "intervals": [{"name": "A", "duration": 60, "speed": 3.0, "incline": 0}],
+        }
+        server._add_to_history(program)
+
+        # Get history entry ID
+        resp = client.get("/api/programs/history")
+        entry = next(e for e in resp.json() if e["program"]["name"] == "Will Be Saved")
+        history_id = entry["id"]
+
+        # Save it
+        resp = client.post("/api/workouts", json={"history_id": history_id})
+        assert resp.status_code == 200
+
+        # Get the saved workout ID
+        resp = client.get("/api/workouts")
+        workouts = resp.json()
+        saved = next(w for w in workouts if w["name"] == "Will Be Saved")
+        saved_id = saved["id"]
+
+        # History entry should now have the saved_workout_id
+        resp = client.get("/api/programs/history")
+        entry = next(e for e in resp.json() if e["program"]["name"] == "Will Be Saved")
+        assert entry["saved"] is True
+        assert entry["saved_workout_id"] == saved_id
+
+    def test_deleting_workout_clears_saved_workout_id(self, test_app):
+        """After deleting a saved workout, history should show saved=False and no ID."""
+        client, server, _ = test_app
+        program = {
+            "name": "Save Then Delete",
+            "intervals": [{"name": "A", "duration": 60, "speed": 4.0, "incline": 1}],
+        }
+        server._add_to_history(program)
+
+        # Save it
+        resp = client.get("/api/programs/history")
+        history_id = next(e for e in resp.json() if e["program"]["name"] == "Save Then Delete")["id"]
+        client.post("/api/workouts", json={"history_id": history_id})
+
+        # Get workout ID and delete it
+        resp = client.get("/api/workouts")
+        saved_id = next(w for w in resp.json() if w["name"] == "Save Then Delete")["id"]
+        resp = client.delete(f"/api/workouts/{saved_id}")
+        assert resp.status_code == 200
+
+        # History should no longer be saved
+        resp = client.get("/api/programs/history")
+        entry = next(e for e in resp.json() if e["program"]["name"] == "Save Then Delete")
+        assert entry["saved"] is False
+        assert entry["saved_workout_id"] is None
+
+    def test_different_fingerprints_get_independent_ids(self, test_app):
+        """Two programs with different intervals get independent saved_workout_ids."""
+        client, server, _ = test_app
+        prog_a = {
+            "name": "Workout A",
+            "intervals": [{"name": "A", "duration": 60, "speed": 3.0, "incline": 0}],
+        }
+        prog_b = {
+            "name": "Workout B",
+            "intervals": [{"name": "B", "duration": 120, "speed": 5.0, "incline": 2}],
+        }
+        server._add_to_history(prog_a)
+        server._add_to_history(prog_b)
+
+        # Save only prog_a
+        resp = client.get("/api/programs/history")
+        entry_a = next(e for e in resp.json() if e["program"]["name"] == "Workout A")
+        client.post("/api/workouts", json={"history_id": entry_a["id"]})
+
+        # Check: only A is saved, B is not
+        resp = client.get("/api/programs/history")
+        entries = resp.json()
+        saved_entry = next(e for e in entries if e["program"]["name"] == "Workout A")
+        unsaved_entry = next(e for e in entries if e["program"]["name"] == "Workout B")
+        assert saved_entry["saved"] is True
+        assert saved_entry["saved_workout_id"] is not None
+        assert unsaved_entry["saved"] is False
+        assert unsaved_entry["saved_workout_id"] is None
+
+
 class TestAutoProxy:
     """Tests for auto-proxy detection (hardware stop button pressed)."""
 

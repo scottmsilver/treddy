@@ -70,15 +70,10 @@ struct NavRail: View {
                 if let profile = store.activeProfile {
                     AvatarCircle(profile: profile, size: 28)
                 } else if store.guestMode {
-                    Circle()
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    Image(systemName: "ghost")
+                        .font(.system(size: 22))
                         .foregroundStyle(AppColors.text3)
                         .frame(width: 28, height: 28)
-                        .overlay {
-                            Text("G")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(AppColors.text3)
-                        }
                 } else {
                     Circle()
                         .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
@@ -185,7 +180,7 @@ struct NavRail: View {
                 if let profile = store.activeProfile {
                     AvatarCircle(profile: profile, size: 24)
                 } else if store.guestMode {
-                    Image(systemName: "person.wave.2")
+                    Image(systemName: "ghost")
                         .font(.system(size: 20))
                         .foregroundStyle(AppColors.text3)
                 } else {

@@ -33,6 +33,7 @@ protocol TreadmillAPIClient: Sendable {
     func startGuest() async throws
     func getActiveProfile() async throws -> ActiveProfileResponse
     func deleteWorkout(id: String) async throws
+    func saveWorkoutFromHistory(historyId: String) async throws
 }
 
 extension TreadmillAPI: TreadmillAPIClient {
@@ -116,6 +117,10 @@ final class TreadmillStore {
         ws.onProfileChanged = { [weak self] msg in self?.handleProfileChanged(msg) }
         ws.onConnect = { [weak self] in
             self?.isConnected = true
+            // Configure remote logger for voice debugging
+            if let url = self?.serverURL {
+                RemoteLogger.shared.configure(baseURL: url)
+            }
             // Lazily create voice coordinator on first connect
             if self?.voice == nil, let s = self {
                 s.voice = VoiceCoordinator(store: s)
@@ -293,6 +298,7 @@ final class TreadmillStore {
     }
 
     func resetSession() async {
+        try? await api.stopProgram() // save run record via _apply_stop()
         try? await api.reset()
         await loadAll()
     }
@@ -317,6 +323,27 @@ final class TreadmillStore {
         }
     }
 
+    func toggleSaveHistory(_ entry: HistoryEntry) async {
+        if entry.saved, let workoutId = entry.savedWorkoutId {
+            // Unsave by exact ID from server
+            await deleteWorkout(workoutId)
+            if let idx = history.firstIndex(where: { $0.id == entry.id }) {
+                history[idx].saved = false
+                history[idx].savedWorkoutId = nil
+            }
+        } else if !entry.saved {
+            // Save
+            do {
+                try await api.saveWorkoutFromHistory(historyId: entry.id)
+                // Reload to get the new saved_workout_id
+                history = (try? await api.getHistory()) ?? history
+                workouts = (try? await api.getWorkouts()) ?? workouts
+            } catch {
+                logger.error("Failed to save workout: \(error)")
+            }
+        }
+    }
+
     func loadHistoryEntry(_ id: String) async {
         do {
             try await api.loadHistory(id: id)
@@ -325,6 +352,16 @@ final class TreadmillStore {
             await loadAll()
         } catch {
             logger.error("Failed to load history: \(error)")
+        }
+    }
+
+    func resumeHistoryEntry(_ id: String) async {
+        do {
+            program = try await api.resumeHistory(id: id)
+            currentRoute = .running
+            await loadAll()
+        } catch {
+            logger.error("Failed to resume history: \(error)")
         }
     }
 

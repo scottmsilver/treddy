@@ -144,7 +144,6 @@ final class GeminiLiveClient: @unchecked Sendable {
         }
 
         sendJSON(["setup": setup])
-        logger.info("Setup message sent")
     }
 
     // MARK: - Receive
@@ -207,11 +206,10 @@ final class GeminiLiveClient: @unchecked Sendable {
                 let context = turnTextParts.isEmpty ? nil : turnTextParts.joined(separator: " ")
                 let argsData = (try? JSONSerialization.data(withJSONObject: args)) ?? Data()
                 Task {
-                    let result = await functionBridge.execute(name: name, argsJSON: argsData, context: context)
+                    let result = await self.functionBridge.execute(name: name, argsJSON: argsData, context: context)
                     self.sendToolResponse(name: result.name, response: result.response, id: fcId)
                 }
             }
-            // Fire fallback immediately if there's narration alongside tool calls
             if !turnTextParts.isEmpty {
                 let text = turnTextParts.joined(separator: " ")
                 callbacks?.onTextFallback(text, executedTools: turnToolCalls)
@@ -259,7 +257,6 @@ final class GeminiLiveClient: @unchecked Sendable {
                     receivingAudio = true
                     callbacks?.onSpeakingStart()
                 }
-                // Emit audio to player via callback on main
                 NotificationCenter.default.post(
                     name: .geminiAudioChunk,
                     object: nil,

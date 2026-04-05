@@ -167,10 +167,12 @@ struct HistoryEntry: Codable, Identifiable {
     var lastInterval: Int = 0
     var lastElapsed: Int = 0
     var saved: Bool = false
+    var savedWorkoutId: String? = nil
     var lastRunText: String = ""
 
     enum CodingKeys: String, CodingKey {
         case id, prompt, program, completed, saved
+        case savedWorkoutId = "saved_workout_id"
         case createdAt = "created_at"
         case totalDuration = "total_duration"
         case lastInterval = "last_interval"
@@ -189,6 +191,7 @@ struct HistoryEntry: Codable, Identifiable {
         lastInterval = c.val(Int.self, .lastInterval, 0)
         lastElapsed = c.val(Int.self, .lastElapsed, 0)
         saved = c.val(Bool.self, .saved, false)
+        savedWorkoutId = try? c.decodeIfPresent(String.self, forKey: .savedWorkoutId)
         lastRunText = c.val(String.self, .lastRunText, "")
     }
 

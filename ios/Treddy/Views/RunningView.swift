@@ -33,7 +33,7 @@ struct RunningView: View {
             if program.completed || (!program.running && !program.paused && session.elapsed > 5) {
                 completionView
             } else if !program.running && !program.paused && !session.active {
-                idleView
+                Color.clear.onAppear { store.navigate(to: .lobby) }
             } else {
                 activeLandscapeLayout
             }
@@ -122,7 +122,7 @@ struct RunningView: View {
             if program.completed || (!program.running && !program.paused && session.elapsed > 5) {
                 completionView
             } else if !program.running && !program.paused && !session.active {
-                idleView
+                Color.clear.onAppear { store.navigate(to: .lobby) }
             } else {
                 activePortraitLayout
             }
@@ -258,59 +258,6 @@ struct RunningView: View {
         }
     }
 
-    // MARK: - Idle view
-
-    private var idleView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            if let prog = program.program {
-                Text(prog.name)
-                    .font(.title2.weight(.bold))
-                Text("\(prog.intervals.count) intervals")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                ElevationProfile(
-                    intervals: prog.intervals,
-                    currentInterval: 0,
-                    intervalElapsed: 0,
-                    totalDuration: prog.intervals.reduce(0) { $0 + Int($1.duration) }
-                )
-                .frame(height: 160)
-                .padding(.horizontal, 24)
-
-                Button("Start") {
-                    Task { await store.startProgram() }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(AppColors.green)
-                .controlSize(.large)
-            } else {
-                Text("Ready when you are")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 8)
-
-                HStack(spacing: 12) {
-                    Button("Quick") {
-                        Task { await store.quickStart() }
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(AppColors.green)
-                    .controlSize(.large)
-
-                    Button("Manual") {
-                        Task { await store.quickStart(speed: 0.5, incline: 0) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppColors.green)
-                    .controlSize(.large)
-                }
-            }
-            Spacer()
-        }
-    }
-
     // MARK: - Shared elements
 
     private var elevationCard: some View {
@@ -438,13 +385,16 @@ struct RunningView: View {
                 .buttonStyle(StopBarStyle(color: AppColors.green))
 
                 Button("Reset") {
-                    Task { await store.resetSession() }
+                    Task {
+                        await store.resetSession()
+                        store.navigate(to: .lobby)
+                    }
                 }
                 .buttonStyle(StopBarStyle(color: Color(.systemGray3)))
             }
         } else {
             Button("Stop") {
-                Task { await store.stop() }
+                Task { await store.pause() }
             }
             .buttonStyle(StopBarStyle(color: AppColors.red))
         }

@@ -104,20 +104,41 @@ struct LobbyView: View {
                 if !store.history.isEmpty {
                     sectionHeader("YOUR PROGRAMS")
                     ForEach(store.history) { entry in
+                        let canResume = !entry.completed && entry.lastElapsed > 0
                         WorkoutCard(
-                            name: entry.program?.name ?? "Workout",
+                            name: (entry.program?.name ?? "Workout") + (entry.completed ? " \u{2713}" : ""),
                             detail: Fmt.duration(Int(entry.totalDuration)) + " · \(entry.program?.intervals.count ?? 0) intervals",
                             subtext: entry.lastRunText
                         ) {
                             Task { await store.loadHistoryEntry(entry.id) }
                         }
                         .overlay(alignment: .trailing) {
-                            if entry.saved {
-                                Image(systemName: "heart.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(.pink)
-                                    .padding(.trailing, 16)
+                            HStack(spacing: 4) {
+                                if canResume {
+                                    Button {
+                                        Task { await store.resumeHistoryEntry(entry.id) }
+                                    } label: {
+                                        Text("Resume from \(Fmt.time(Double(entry.lastElapsed)))")
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(AppColors.green)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(AppColors.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                Button {
+                                    Task { await store.toggleSaveHistory(entry) }
+                                } label: {
+                                    Image(systemName: entry.saved ? "heart.fill" : "heart")
+                                        .font(.title3)
+                                        .foregroundStyle(entry.saved ? .pink : .secondary)
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
                             }
+                            .padding(.trailing, 8)
                         }
                     }
                 }
@@ -152,25 +173,26 @@ struct WorkoutCard: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if !subtext.isEmpty {
-                    Text(subtext)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            Text(name)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !subtext.isEmpty {
+                Text(subtext)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .padding(.trailing, 36) // room for heart overlay
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture { action() }
+        .accessibilityAddTraits(.isButton)
     }
 }
 

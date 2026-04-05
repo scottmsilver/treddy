@@ -1132,6 +1132,16 @@ async def get_config():
     }
 
 
+@app.post("/api/device-log")
+async def device_log(request: Request):
+    """Receive debug logs from iOS/Android clients."""
+    body = await request.json()
+    msg = body.get("message", "")
+    cat = body.get("category", "device")
+    log.info("[%s] %s", cat, msg)
+    return {"ok": True}
+
+
 @app.get("/api/log")
 async def get_log(lines: int = 100):
     """Return last N lines of /tmp/treadmill_io.log."""
@@ -1369,11 +1379,12 @@ async def api_get_program():
 @app.get("/api/programs/history")
 async def api_get_history():
     history = db.get_program_history(_active_profile_id())
-    saved_fps = {_program_fingerprint(w["program"]) for w in db.get_saved_workouts(_active_profile_id())}
+    saved_by_fp = {_program_fingerprint(w["program"]): w["id"] for w in db.get_saved_workouts(_active_profile_id())}
     run_by_fp = _last_run_by_fingerprint()
     for entry in history:
         fp = _program_fingerprint(entry["program"])
-        entry["saved"] = fp in saved_fps
+        entry["saved"] = fp in saved_by_fp
+        entry["saved_workout_id"] = saved_by_fp.get(fp)
         run = run_by_fp.get(fp)
         entry["last_run"] = run
         entry["last_run_text"] = _last_run_text(run)

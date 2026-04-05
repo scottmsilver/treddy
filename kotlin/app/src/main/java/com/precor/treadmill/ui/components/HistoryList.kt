@@ -73,16 +73,22 @@ fun HistoryList(
         }
     }
 
-    val handleSave: (String) -> Unit = { id ->
+    val handleToggleSave: (HistoryEntry) -> Unit = { entry ->
         scope.launch {
             runCatching {
-                val res = api.saveWorkout(SaveWorkoutRequest(historyId = id))
-                if (res.ok) {
-                    history = api.getHistory()
-                    onWorkoutSaved()
+                if (entry.saved && entry.savedWorkoutId != null) {
+                    // Unsave by deleting the saved workout
+                    api.deleteWorkout(entry.savedWorkoutId)
                 } else {
-                    Toast.makeText(context, "Failed to save workout", Toast.LENGTH_SHORT).show()
+                    // Save
+                    val res = api.saveWorkout(SaveWorkoutRequest(historyId = entry.id))
+                    if (!res.ok) {
+                        Toast.makeText(context, "Failed to save workout", Toast.LENGTH_SHORT).show()
+                        return@launch
+                    }
                 }
+                history = api.getHistory()
+                onWorkoutSaved()
             }.onFailure {
                 Toast.makeText(context, "Failed to save workout", Toast.LENGTH_SHORT).show()
             }
@@ -101,7 +107,7 @@ fun HistoryList(
                         variant = "lobby",
                         onLoad = handleLoad,
                         onResume = handleResume,
-                        onSave = handleSave,
+                        onToggleSave = handleToggleSave,
                     )
                 }
             }
@@ -136,7 +142,7 @@ fun HistoryList(
                             variant = "compact",
                             onLoad = handleLoad,
                             onResume = handleResume,
-                            onSave = handleSave,
+                            onToggleSave = handleToggleSave,
                         )
                     }
                 }
@@ -151,7 +157,7 @@ private fun HistoryCard(
     variant: String,
     onLoad: (String) -> Unit,
     onResume: (String) -> Unit = {},
-    onSave: (String) -> Unit = {},
+    onToggleSave: (HistoryEntry) -> Unit = {},
 ) {
     val colors = LocalPrecorColors.current
     val name = entry.program?.name?.ifBlank { "Workout" } ?: "Workout"
@@ -199,13 +205,12 @@ private fun HistoryCard(
                 }
             }
             IconButton(
-                onClick = { if (!entry.saved) onSave(entry.id) },
-                enabled = !entry.saved,
+                onClick = { onToggleSave(entry) },
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
                     imageVector = if (entry.saved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = if (entry.saved) "Saved" else "Save workout",
+                    contentDescription = if (entry.saved) "Unsave workout" else "Save workout",
                     tint = if (entry.saved) colors.pink else colors.text3,
                     modifier = Modifier.size(20.dp),
                 )

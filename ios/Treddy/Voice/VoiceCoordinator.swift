@@ -105,9 +105,15 @@ final class VoiceCoordinator: GeminiLiveCallbacks {
                 return
             }
 
-            // Pre-warm audio
-            capture.warmUp()
-            player.setup()
+            // Pre-warm audio off the main thread (AudioUnit creation can be slow)
+            await Task.detached {
+                self.capture.warmUp()
+                if let sharedEngine = self.capture.engine {
+                    self.player.setup(sharedEngine: sharedEngine)
+                } else {
+                    self.player.setup()
+                }
+            }.value
 
             // Listen for audio chunks from Gemini
             if audioObserver == nil {
@@ -142,19 +148,19 @@ final class VoiceCoordinator: GeminiLiveCallbacks {
             newClient.callbacks = self
             client = newClient
             newClient.connect()
-
-            logger.info("Background Gemini connection started")
         }
     }
 
     // MARK: - Mic
 
+    private var audioChunkCount = 0
+
     private func startMicCapture() {
+        audioChunkCount = 0
         capture.onAudioChunk = { [weak self] base64 in
             self?.client?.sendAudio(base64)
         }
-        let started = capture.start()
-        if !started {
+        if !capture.start() {
             logger.error("Failed to start mic")
             state = .idle
         }

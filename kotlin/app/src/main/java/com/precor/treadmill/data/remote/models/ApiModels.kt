@@ -161,6 +161,7 @@ data class HistoryEntry(
     @Serializable(with = LenientIntSerializer::class) @SerialName("last_interval") val lastInterval: Int = 0,
     @Serializable(with = LenientDoubleSerializer::class) @SerialName("last_elapsed") val lastElapsed: Double = 0.0,
     @Serializable(with = LenientBoolSerializer::class) val saved: Boolean = false,
+    @SerialName("saved_workout_id") val savedWorkoutId: String? = null,
     @SerialName("last_run") val lastRun: RunRecord? = null,
     @SerialName("last_run_text") val lastRunText: String = "",
 )

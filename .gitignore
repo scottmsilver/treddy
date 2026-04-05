@@ -45,8 +45,9 @@ src/tests/test_*_cov
 build/
 
 # Rust build artifacts
-ftms/target/
-hrm/target/
+rust/ftms/target/
+rust/hrm/target/
+**/target/
 
 # Analysis/experimental scripts (not part of main tools)
 analysis/
@@ -79,3 +80,8 @@ worktree.env
 .claude/skills/*
 !.claude/skills/gstack
 .gstack/
+.superpowers/
+
+# iOS build artifacts
+ios/Treddy.xcodeproj/xcuserdata/
+ios/DerivedData/

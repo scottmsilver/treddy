@@ -16,6 +16,7 @@ protocol TreadmillAPIClient: Sendable {
     func stopProgram() async throws
     func pauseProgram() async throws
     func skipInterval() async throws
+    func prevInterval() async throws
     func reset() async throws
     func loadWorkout(id: String) async throws
     func loadHistory(id: String) async throws
@@ -26,6 +27,12 @@ protocol TreadmillAPIClient: Sendable {
     func forgetHrmDevice() async throws
     func updateUser(weightLbs: Int?, vestLbs: Int?) async throws -> UserProfile
     func getConfig() async throws -> AppConfig
+    func getProfiles() async throws -> [Profile]
+    func createProfile(name: String, color: String?) async throws -> Profile
+    func selectProfile(id: String) async throws
+    func startGuest() async throws
+    func getActiveProfile() async throws -> ActiveProfileResponse
+    func deleteWorkout(id: String) async throws
 }
 
 extension TreadmillAPI: TreadmillAPIClient {
@@ -52,7 +59,15 @@ final class TreadmillStore {
     var history: [HistoryEntry] = []
     var userProfile = UserProfile()
     var hrmDevices: [HrmDevice] = []
-    var currentRoute: AppRoute = .lobby
+    var profiles: [Profile] = []
+    var activeProfile: Profile? = nil
+    var guestMode = false
+    var setupComplete: Bool = UserDefaults.standard.bool(forKey: "setup_complete") {
+        didSet {
+            UserDefaults.standard.set(setupComplete, forKey: "setup_complete")
+        }
+    }
+    var currentRoute: AppRoute = UserDefaults.standard.bool(forKey: "setup_complete") ? .profilePicker : .setup
     var isSettingsPresented = false
     var debugUnlocked = false
     var smartassEnabled = UserDefaults.standard.bool(forKey: "smartass_enabled") {
@@ -63,6 +78,7 @@ final class TreadmillStore {
     private(set) var voice: VoiceCoordinator?
     var voiceState: VoiceState { voice?.state ?? .idle }
     var isConnected = false
+    var toastMessage: String?
     var serverURL: String {
         didSet {
             UserDefaults.standard.set(serverURL, forKey: "server_url")
@@ -97,6 +113,7 @@ final class TreadmillStore {
         ws.onConnection = { [weak self] connected in self?.isConnected = connected }
         ws.onHR = { [weak self] hr in self?.handleHeartRate(hr) }
         ws.onScanResult = { [weak self] scan in self?.hrmDevices = scan.devices }
+        ws.onProfileChanged = { [weak self] msg in self?.handleProfileChanged(msg) }
         ws.onConnect = { [weak self] in
             self?.isConnected = true
             // Lazily create voice coordinator on first connect
@@ -121,6 +138,7 @@ final class TreadmillStore {
     }
 
     func loadAll() async {
+        await syncActiveProfile()
         await refreshUserProfile()
         do {
             async let w = api.getWorkouts()
@@ -129,10 +147,18 @@ final class TreadmillStore {
             workouts = try await w
             history = try await h
             program = try await p
-            syncRouteWithProgramState()
+            // Only auto-navigate TO running (not away from it) on data load
+            if program.running {
+                currentRoute = .running
+            }
         } catch {
             logger.error("Failed to load program data: \(error)")
         }
+    }
+
+    func reconnectIfNeeded() {
+        guard !isConnected else { return }
+        reconnect()
     }
 
     func reconnect() {
@@ -155,12 +181,27 @@ final class TreadmillStore {
         currentRoute = route
     }
 
+    func completeSetup() {
+        setupComplete = true
+        currentRoute = .profilePicker
+    }
+
     func unlockDebug() {
         debugUnlocked = true
     }
 
     func toggleVoice(prompt: String? = nil) {
         voice?.toggle(prompt: prompt)
+    }
+
+    func showToast(_ message: String) {
+        toastMessage = message
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            if toastMessage == message {
+                toastMessage = nil
+            }
+        }
     }
 
     func refreshUserProfile() async {
@@ -210,6 +251,7 @@ final class TreadmillStore {
     func quickStart(speed: Double = 3.0, incline: Double = 0) async {
         do {
             try await api.quickStart(speed: speed, incline: incline)
+            program = try await api.getProgram()
             currentRoute = .running
         } catch {
             logger.error("Failed to quick start: \(error)")
@@ -219,6 +261,7 @@ final class TreadmillStore {
     func startProgram() async {
         do {
             try await api.startProgram()
+            program = try await api.getProgram()
             currentRoute = .running
         } catch {
             logger.error("Failed to start program: \(error)")
@@ -237,6 +280,18 @@ final class TreadmillStore {
         try? await api.skipInterval()
     }
 
+    func prev() async {
+        try? await api.prevInterval()
+    }
+
+    func adjustDuration(_ seconds: Int) async {
+        do {
+            program = try await api.adjustDuration(deltaSeconds: seconds)
+        } catch {
+            logger.error("Failed to adjust duration: \(error)")
+        }
+    }
+
     func resetSession() async {
         try? await api.reset()
         await loadAll()
@@ -245,6 +300,7 @@ final class TreadmillStore {
     func loadWorkout(_ id: String) async {
         do {
             try await api.loadWorkout(id: id)
+            try await api.startProgram()
             currentRoute = .running
             await loadAll()
         } catch {
@@ -252,9 +308,19 @@ final class TreadmillStore {
         }
     }
 
+    func deleteWorkout(_ id: String) async {
+        do {
+            try await api.deleteWorkout(id: id)
+            workouts.removeAll { $0.id == id }
+        } catch {
+            logger.error("Failed to delete workout: \(error)")
+        }
+    }
+
     func loadHistoryEntry(_ id: String) async {
         do {
             try await api.loadHistory(id: id)
+            try await api.startProgram()
             currentRoute = .running
             await loadAll()
         } catch {
@@ -288,6 +354,73 @@ final class TreadmillStore {
         }
     }
 
+    // MARK: - Profiles
+
+    func fetchProfiles() async {
+        do {
+            profiles = try await api.getProfiles()
+        } catch {
+            logger.error("Failed to fetch profiles: \(error)")
+        }
+    }
+
+    func selectProfile(_ id: String) async {
+        // Stop any active session first — server rejects profile switch during sessions
+        if session.active || program.running {
+            try? await api.stopProgram()
+            try? await api.reset()
+        }
+        do {
+            try await api.selectProfile(id: id)
+            await loadAll()
+        } catch {
+            logger.error("Failed to select profile: \(error)")
+            showToast("Could not switch profile")
+        }
+    }
+
+    func startGuestMode() async {
+        if session.active || program.running {
+            try? await api.stopProgram()
+            try? await api.reset()
+        }
+        do {
+            try await api.startGuest()
+            await loadAll()
+        } catch {
+            logger.error("Failed to start guest mode: \(error)")
+            showToast("Could not switch to guest")
+        }
+    }
+
+    func createProfile(name: String, color: String?) async -> Profile? {
+        do {
+            let profile = try await api.createProfile(name: name, color: color)
+            profiles.append(profile)
+            return profile
+        } catch {
+            logger.error("Failed to create profile: \(error)")
+            return nil
+        }
+    }
+
+    func syncActiveProfile() async {
+        do {
+            let resp = try await api.getActiveProfile()
+            activeProfile = resp.profile
+            guestMode = resp.guestMode
+        } catch {
+            logger.error("Failed to sync active profile: \(error)")
+        }
+    }
+
+    private func handleProfileChanged(_ msg: ProfileChangedMessage) {
+        activeProfile = msg.profile
+        guestMode = msg.guestMode
+        // Reload profile-scoped data (workouts, history)
+        Task { await loadAll() }
+    }
+
     private func enqueueSpeedSend(_ mph: Double) {
         speedTask?.cancel()
         speedTask = Task { [api, debounceDelay] in
@@ -305,7 +438,7 @@ final class TreadmillStore {
     }
 
     private func handleStatus(_ incoming: TreadmillStatus) {
-        isConnected = true
+        if !isConnected { isConnected = true }
         let now = Date()
         let keepSpeed = dirtySpeedAt.map { now.timeIntervalSince($0) < reconcileWindow } ?? false
         let keepIncline = dirtyInclineAt.map { now.timeIntervalSince($0) < reconcileWindow } ?? false
@@ -323,21 +456,18 @@ final class TreadmillStore {
     }
 
     private func handleProgram(_ incoming: ProgramState) {
+        let wasRunning = program.running
         program = incoming
-        syncRouteWithProgramState()
+        // Only auto-navigate to running on START (transition from not-running to running)
+        // Don't force-navigate if user has deliberately navigated elsewhere
+        if program.running && !wasRunning {
+            currentRoute = .running
+        }
     }
 
     private func handleHeartRate(_ hr: HeartRateMessage) {
         status.heartRate = hr.bpm
         status.hrmConnected = hr.connected
         status.hrmDevice = hr.device
-    }
-
-    private func syncRouteWithProgramState() {
-        if program.running {
-            currentRoute = .running
-        } else if currentRoute == .running && !session.active {
-            currentRoute = .lobby
-        }
     }
 }

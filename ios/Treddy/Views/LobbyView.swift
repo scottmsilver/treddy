@@ -3,82 +3,149 @@ import SwiftUI
 struct LobbyView: View {
     @Environment(TreadmillStore.self) var store
 
+    private var greetingName: String {
+        if let profile = store.activeProfile {
+            return profile.firstName
+        }
+        return store.guestMode ? "Guest" : ""
+    }
+
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let timeOfDay: String
+        switch hour {
+        case 5..<12: timeOfDay = "Good morning"
+        case 12..<17: timeOfDay = "Good afternoon"
+        default: timeOfDay = "Good evening"
+        }
+        let name = greetingName
+        return name.isEmpty ? timeOfDay : "\(timeOfDay), \(name)"
+    }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Quick start buttons
+        ScrollView {
+            VStack(spacing: 16) {
+                VStack(spacing: 4) {
+                    Text(greeting)
+                        .font(.system(size: 28, weight: .bold))
+                    Text("Ready for a run?")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 24)
+
+                if store.session.active || store.program.running {
+                    Button("Return to Workout") {
+                        store.navigate(to: .running)
+                    }
+                    .buttonStyle(LobbyButton(filled: true))
+
+                    if store.program.running, let prog = store.program.program {
+                        let idx = store.program.currentInterval
+                        let intervalName = prog.intervals.indices.contains(idx)
+                            ? prog.intervals[idx].name : ""
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(intervalName)
+                                    .font(.body.weight(.semibold))
+                                Text("\(Fmt.speed(store.status.speedMph)) mph · \(Fmt.pace(store.status.speedMph)) min/mi")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(Fmt.time(store.session.elapsed))
+                                .font(.title2.weight(.bold).monospacedDigit())
+                        }
+                        .padding()
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .onTapGesture { store.navigate(to: .running) }
+                    }
+                } else {
                     HStack(spacing: 12) {
                         Button("Quick") {
                             Task { await store.quickStart() }
                         }
-                        .buttonStyle(PillButton())
+                        .buttonStyle(LobbyButton(filled: false))
 
                         Button("Manual") {
-                            Task { await store.quickStart(speed: 0, incline: 0) }
+                            Task { await store.quickStart(speed: 0.5, incline: 0) }
                         }
-                        .buttonStyle(PillButton(filled: true))
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    // Saved workouts
-                    if !store.workouts.isEmpty {
-                        Text("MY WORKOUTS")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        ForEach(store.workouts) { workout in
-                            WorkoutRow(
-                                name: workout.name,
-                                detail: formatDuration(workout.totalDuration) + " · \(workout.program?.intervals.count ?? 0) intervals",
-                                subtext: workout.lastRunText
-                            ) {
-                                Task { await store.loadWorkout(workout.id) }
-                            }
-                        }
+                        .buttonStyle(LobbyButton(filled: true))
                     }
 
-                    // History
-                    if !store.history.isEmpty {
-                        Text("YOUR PROGRAMS")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        ForEach(store.history) { entry in
-                            WorkoutRow(
-                                name: entry.program?.name ?? "Workout",
-                                detail: formatDuration(Int(entry.totalDuration)) + " · \(entry.program?.intervals.count ?? 0) intervals",
-                                subtext: entry.lastRunText
-                            ) {
-                                Task { await store.loadHistoryEntry(entry.id) }
-                            }
+                    if store.program.program != nil && !store.program.running {
+                        Button("Start Program") {
+                            Task { await store.startProgram() }
                         }
-                    }
-
-                    if store.workouts.isEmpty && store.history.isEmpty {
-                        Text("No workouts yet")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.top, 40)
+                        .buttonStyle(LobbyButton(filled: true))
                     }
                 }
-                .padding()
+
+                if !store.workouts.isEmpty {
+                    sectionHeader("MY WORKOUTS")
+                    ForEach(store.workouts) { workout in
+                        WorkoutCard(
+                            name: workout.name,
+                            detail: Fmt.duration(workout.totalDuration) + " · \(workout.program?.intervals.count ?? 0) intervals",
+                            subtext: workout.lastRunText
+                        ) {
+                            Task { await store.loadWorkout(workout.id) }
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                Task { await store.deleteWorkout(workout.id) }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+
+                if !store.history.isEmpty {
+                    sectionHeader("YOUR PROGRAMS")
+                    ForEach(store.history) { entry in
+                        WorkoutCard(
+                            name: entry.program?.name ?? "Workout",
+                            detail: Fmt.duration(Int(entry.totalDuration)) + " · \(entry.program?.intervals.count ?? 0) intervals",
+                            subtext: entry.lastRunText
+                        ) {
+                            Task { await store.loadHistoryEntry(entry.id) }
+                        }
+                        .overlay(alignment: .trailing) {
+                            if entry.saved {
+                                Image(systemName: "heart.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.pink)
+                                    .padding(.trailing, 16)
+                            }
+                        }
+                    }
+                }
+
+                if store.workouts.isEmpty && store.history.isEmpty {
+                    Text("No workouts yet")
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 40)
+                }
             }
-            .navigationTitle("Treddy")
-            .refreshable {
-                await store.loadData()
-            }
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
         }
+        .refreshable { await store.loadData() }
     }
 
-    func formatDuration(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return s > 0 ? "\(m):\(String(format: "%02d", s))" : "\(m):00"
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 8)
     }
+
 }
 
-struct WorkoutRow: View {
+struct WorkoutCard: View {
     let name: String
     let detail: String
     let subtext: String
@@ -101,24 +168,34 @@ struct WorkoutRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
-            .background(.quaternary.opacity(0.3))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
     }
 }
 
-struct PillButton: ButtonStyle {
+struct LobbyButton: ButtonStyle {
     var filled: Bool = false
 
+    @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
-            .background(filled ? Color.green.opacity(0.8) : Color(.systemGray5))
-            .foregroundStyle(filled ? .black : .primary)
-            .clipShape(Capsule())
-            .opacity(configuration.isPressed ? 0.7 : 1)
+        if filled {
+            configuration.label
+                .font(.body.weight(.bold))
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(AppColors.green)
+                .foregroundStyle(.black)
+                .clipShape(Capsule())
+                .opacity(configuration.isPressed ? 0.7 : 1)
+        } else {
+            configuration.label
+                .font(.body.weight(.bold))
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(.ultraThinMaterial, in: Capsule())
+                .foregroundStyle(AppColors.text)
+                .opacity(configuration.isPressed ? 0.7 : 1)
+        }
     }
 }

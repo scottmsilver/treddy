@@ -2,179 +2,465 @@ import SwiftUI
 
 struct RunningView: View {
     @Environment(TreadmillStore.self) var store
+    @State private var isLandscape = false
+    @State private var showHUD = false
+    @State private var hudTimer: Task<Void, Never>?
+    @State private var showDurationButtons = false
+
+    private var program: ProgramState { store.program }
+    private var session: SessionState { store.session }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Timer
-            Text(formatTime(store.session.elapsed))
-                .font(.system(size: 64, weight: .bold, design: .monospaced))
-                .monospacedDigit()
-                .padding(.top, 20)
-
-            // Metrics row
-            HStack(spacing: 20) {
-                MetricLabel(value: formatPace(store.status.speedMph), label: "min/mi")
-                MetricLabel(value: String(format: "%.2f", store.session.distance), label: "miles")
-                MetricLabel(value: String(format: "%.0f", store.session.vertFeet), label: "vert ft")
-                MetricLabel(value: String(format: "%.0f", store.session.calories), label: "cal")
-            }
-            .padding(.vertical, 12)
-
-            // Encouragement
-            if let msg = store.program.encouragement, !msg.isEmpty {
-                Text(msg)
-                    .font(.callout)
-                    .foregroundStyle(.green)
-                    .padding(.horizontal)
-                    .transition(.opacity)
-            }
-
-            Spacer()
-
-            // Speed / Incline controls
-            HStack(spacing: 12) {
-                SpeedControl(store: store)
-                InclineControl(store: store)
-            }
-            .padding(.horizontal)
-
-            // Stop / Pause buttons
-            HStack(spacing: 12) {
-                if store.program.running {
-                    Button(store.program.paused ? "Resume" : "Pause") {
-                        Task { await store.pause() }
-                    }
-                    .buttonStyle(ActionButton(color: .orange))
+        GeometryReader { geo in
+            let landscape = geo.size.width > geo.size.height
+            Group {
+                if landscape {
+                    landscapeLayout
+                } else {
+                    portraitLayout
                 }
-
-                Button("Stop") {
-                    Task { await store.stop() }
-                }
-                .buttonStyle(ActionButton(color: .red))
             }
-            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onAppear { isLandscape = landscape }
+            .onChange(of: landscape) { _, newValue in isLandscape = newValue }
+        }
+    }
+
+    // MARK: - Landscape
+
+    private var landscapeLayout: some View {
+        Group {
+            if program.completed || (!program.running && !program.paused && session.elapsed > 5) {
+                completionView
+            } else if !program.running && !program.paused && !session.active {
+                idleView
+            } else {
+                activeLandscapeLayout
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
     }
 
-    func formatTime(_ seconds: Double) -> String {
-        let m = Int(seconds) / 60
-        let s = Int(seconds) % 60
-        return String(format: "%d:%02d", m, s)
-    }
+    private var activeLandscapeLayout: some View {
+        GeometryReader { geo in
+            let h = geo.size.height
+            let w = geo.size.width
+            let timerSize = min(max(h * 0.14, 48), 100)
+            let controlsWidth = min(max(w * 0.33, 280), 440)
 
-    func formatPace(_ mph: Double) -> String {
-        guard mph > 0 else { return "--:--" }
-        let minPerMile = 60.0 / mph
-        let m = Int(minPerMile)
-        let s = Int((minPerMile - Double(m)) * 60)
-        return String(format: "%d:%02d", m, s)
-    }
-}
+            VStack(spacing: 0) {
+                // Fixed-height container for timer/encouragement — never resizes
+                ZStack {
+                    // Invisible timer to hold the size constant
+                    Text("00:00")
+                        .font(.system(size: timerSize, weight: .bold))
+                        .monospacedDigit()
+                        .hidden()
 
-struct MetricLabel: View {
-    let value: String
-    let label: String
+                    if let msg = program.encouragement, !msg.isEmpty {
+                        Text(msg.replacingOccurrences(of: "<<", with: "").replacingOccurrences(of: ">>", with: ""))
+                            .font(.system(size: min(max(h * 0.05, 18), 36), weight: .semibold))
+                            .foregroundStyle(AppColors.green)
+                            .transition(.opacity)
+                    } else {
+                        Text(Fmt.time(session.elapsed))
+                            .font(.system(size: timerSize, weight: .bold))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.3), value: program.encouragement != nil)
+                .padding(.top, 8)
+                .onTapGesture {
+                    if program.program?.manual == true && program.running {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showDurationButtons.toggle()
+                        }
+                    }
+                }
 
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.body.weight(.semibold).monospacedDigit())
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                // Duration adjustment (manual programs only, shown on timer tap)
+                if showDurationButtons && program.program?.manual == true && program.running {
+                    durationAdjustButtons
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                }
+
+                MetricsRow(
+                    speedMph: store.status.speedMph,
+                    distance: session.distance,
+                    vertFeet: session.vertFeet,
+                    calories: session.calories,
+                    heartRate: store.status.heartRate,
+                    hrmConnected: store.status.hrmConnected,
+                    scale: min(max(h / 380, 1.0), 1.8)
+                )
+                .padding(.vertical, 6)
+
+                GeometryReader { midGeo in
+                    HStack(spacing: 8) {
+                        elevationCard
+                            .frame(height: midGeo.size.height)
+                        SpeedInclineControls(vertical: true)
+                            .frame(width: controlsWidth, height: midGeo.size.height)
+                    }
+                }
+                .padding(.horizontal, 12)
+
+                stopBar
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
-}
 
-struct SpeedControl: View {
-    let store: TreadmillStore
+    // MARK: - Portrait
 
-    var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Button { Task { await store.adjustSpeed(delta: -1) } } label: {
-                    Image(systemName: "chevron.down")
+    private var portraitLayout: some View {
+        Group {
+            if program.completed || (!program.running && !program.paused && session.elapsed > 5) {
+                completionView
+            } else if !program.running && !program.paused && !session.active {
+                idleView
+            } else {
+                activePortraitLayout
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var activePortraitLayout: some View {
+        GeometryReader { geo in
+            let h = geo.size.height
+            let timerSize = min(max(h * 0.10, 48), 80)
+
+            VStack(spacing: 0) {
+                // Fixed-height container for timer/encouragement
+                ZStack {
+                    Text("00:00")
+                        .font(.system(size: timerSize, weight: .bold))
+                        .monospacedDigit()
+                        .hidden()
+
+                    if let msg = program.encouragement, !msg.isEmpty {
+                        Text(msg.replacingOccurrences(of: "<<", with: "").replacingOccurrences(of: ">>", with: ""))
+                            .font(.system(size: min(max(h * 0.04, 16), 28), weight: .semibold))
+                            .foregroundStyle(AppColors.green)
+                            .transition(.opacity)
+                    } else {
+                        Text(Fmt.time(session.elapsed))
+                            .font(.system(size: timerSize, weight: .bold))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .transition(.opacity)
+                    }
                 }
-                .buttonStyle(ChevronButton())
+                .animation(.easeInOut(duration: 0.3), value: program.encouragement != nil)
+                .padding(.top, 8)
+                .onTapGesture {
+                    if program.program?.manual == true && program.running {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showDurationButtons.toggle()
+                        }
+                    }
+                }
 
+                // Duration adjustment (manual programs only, shown on timer tap)
+                if showDurationButtons && program.program?.manual == true && program.running {
+                    durationAdjustButtons
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                }
+
+                MetricsRow(
+                    speedMph: store.status.speedMph,
+                    distance: session.distance,
+                    vertFeet: session.vertFeet,
+                    calories: session.calories,
+                    heartRate: store.status.heartRate,
+                    hrmConnected: store.status.hrmConnected,
+                    scale: min(max(h / 500, 1.0), 1.6)
+                )
+                .padding(.vertical, 8)
+
+                elevationCard
+                    .padding(.horizontal, 12)
+
+                SpeedInclineControls(vertical: false)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+
+                Spacer(minLength: 0)
+
+                stopBar
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    // MARK: - Completion view
+
+    private var completionView: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.green)
+            Text("Workout Complete")
+                .font(.title2.weight(.bold))
+
+            HStack(spacing: 24) {
                 VStack {
-                    Text(String(format: "%.1f", store.status.speedMph))
-                        .font(.title.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.green)
-                    Text("mph")
+                    Text(Fmt.time(session.elapsed))
+                        .font(.system(size: 20, weight: .bold))
+                        .monospacedDigit()
+                    Text("time")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .frame(minWidth: 60)
-
-                Button { Task { await store.adjustSpeed(delta: 1) } } label: {
-                    Image(systemName: "chevron.up")
-                }
-                .buttonStyle(ChevronButton())
-            }
-        }
-        .padding()
-        .background(.quaternary.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-}
-
-struct InclineControl: View {
-    let store: TreadmillStore
-
-    var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Button { Task { await store.adjustIncline(delta: -0.5) } } label: {
-                    Image(systemName: "chevron.down")
-                }
-                .buttonStyle(ChevronButton())
-
                 VStack {
-                    Text(String(format: "%.1f", store.status.inclinePct))
-                        .font(.title.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.orange)
-                    Text("% incline")
+                    Text(String(format: "%.2f", session.distance))
+                        .font(.system(size: 20, weight: .bold))
+                        .monospacedDigit()
+                    Text("miles")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .frame(minWidth: 60)
-
-                Button { Task { await store.adjustIncline(delta: 0.5) } } label: {
-                    Image(systemName: "chevron.up")
+                VStack {
+                    Text(String(format: "%.0f", session.vertFeet))
+                        .font(.system(size: 20, weight: .bold))
+                        .monospacedDigit()
+                    Text("vert ft")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(ChevronButton())
+                VStack {
+                    Text(String(format: "%.0f", session.calories))
+                        .font(.system(size: 20, weight: .bold))
+                        .monospacedDigit()
+                    Text("cal")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Button("New Workout") {
+                Task {
+                    await store.resetSession()
+                    store.navigate(to: .lobby)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            Spacer()
+        }
+    }
+
+    // MARK: - Idle view
+
+    private var idleView: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            if let prog = program.program {
+                Text(prog.name)
+                    .font(.title2.weight(.bold))
+                Text("\(prog.intervals.count) intervals")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                ElevationProfile(
+                    intervals: prog.intervals,
+                    currentInterval: 0,
+                    intervalElapsed: 0,
+                    totalDuration: prog.intervals.reduce(0) { $0 + Int($1.duration) }
+                )
+                .frame(height: 160)
+                .padding(.horizontal, 24)
+
+                Button("Start") {
+                    Task { await store.startProgram() }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppColors.green)
+                .controlSize(.large)
+            } else {
+                Text("Ready when you are")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 8)
+
+                HStack(spacing: 12) {
+                    Button("Quick") {
+                        Task { await store.quickStart() }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AppColors.green)
+                    .controlSize(.large)
+
+                    Button("Manual") {
+                        Task { await store.quickStart(speed: 0.5, incline: 0) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppColors.green)
+                    .controlSize(.large)
+                }
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Shared elements
+
+    private var elevationCard: some View {
+        ZStack {
+            if let prog = program.program, !prog.intervals.isEmpty {
+                ElevationProfile(
+                    intervals: prog.intervals,
+                    currentInterval: program.currentInterval,
+                    intervalElapsed: program.intervalElapsed,
+                    totalDuration: program.totalDuration
+                )
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+            }
+
+            // HUD overlay
+            if showHUD && program.running {
+                hudOverlay
+                    .transition(.opacity)
             }
         }
-        .padding()
-        .background(.quaternary.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .overlay {
+            GeometryReader { geo in
+                Color.clear
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        SpatialTapGesture(count: 2)
+                            .onEnded { value in
+                                guard program.running else { return }
+                                let mid = geo.size.width / 2
+                                if value.location.x > mid {
+                                    Task { await store.skip() }
+                                } else {
+                                    Task { await store.prev() }
+                                }
+                            }
+                    )
+                    .onTapGesture(count: 1) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showHUD.toggle()
+                        }
+                        if showHUD {
+                            scheduleHUDHide()
+                        }
+                    }
+            }
+        }
+        .onDisappear {
+            hudTimer?.cancel()
+            hudTimer = nil
+        }
     }
+
+    private var hudOverlay: some View {
+        HStack(spacing: 32) {
+            // Previous interval
+            Button {
+                // Skip backward not supported by API
+            } label: {
+                Image(systemName: "backward.fill")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+            }
+            .disabled(program.currentInterval == 0)
+            .opacity(program.currentInterval == 0 ? 0.3 : 1)
+
+            // Play/Pause
+            Button {
+                Task { await store.pause() }
+                scheduleHUDHide()
+            } label: {
+                Image(systemName: program.paused ? "play.fill" : "pause.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.white)
+            }
+
+            // Next interval / Skip
+            Button {
+                Task { await store.skip() }
+                scheduleHUDHide()
+            } label: {
+                Image(systemName: "forward.fill")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+            }
+        }
+        .padding(20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func scheduleHUDHide() {
+        hudTimer?.cancel()
+        hudTimer = Task {
+            try? await Task.sleep(for: .seconds(4))
+            if !Task.isCancelled && !program.paused {
+                withAnimation { showHUD = false }
+            }
+        }
+    }
+
+    private var durationAdjustButtons: some View {
+        HStack(spacing: 8) {
+            Button("-10") { Task { await store.adjustDuration(-600) } }
+                .buttonStyle(.bordered).tint(.secondary)
+            Button("-5") { Task { await store.adjustDuration(-300) } }
+                .buttonStyle(.bordered).tint(.secondary)
+            Button("+5") { Task { await store.adjustDuration(300) } }
+                .buttonStyle(.bordered).tint(.secondary)
+            Button("+10") { Task { await store.adjustDuration(600) } }
+                .buttonStyle(.bordered).tint(.secondary)
+        }
+        .font(.caption.weight(.semibold))
+    }
+
+    @ViewBuilder
+    private var stopBar: some View {
+        if program.paused {
+            HStack(spacing: 12) {
+                Button("Resume") {
+                    Task { await store.pause() }
+                }
+                .buttonStyle(StopBarStyle(color: AppColors.green))
+
+                Button("Reset") {
+                    Task { await store.resetSession() }
+                }
+                .buttonStyle(StopBarStyle(color: Color(.systemGray3)))
+            }
+        } else {
+            Button("Stop") {
+                Task { await store.stop() }
+            }
+            .buttonStyle(StopBarStyle(color: AppColors.red))
+        }
+    }
+
 }
 
-struct ChevronButton: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.title3)
-            .frame(width: 44, height: 44)
-            .background(.quaternary)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .opacity(configuration.isPressed ? 0.5 : 1)
-    }
-}
-
-struct ActionButton: ButtonStyle {
+struct StopBarStyle: ButtonStyle {
     let color: Color
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.body.weight(.semibold))
+            .font(.title3.weight(.semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(color.opacity(configuration.isPressed ? 0.6 : 0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.vertical, 28)
+            .background(color.opacity(configuration.isPressed ? 0.6 : 0.85), in: RoundedRectangle(cornerRadius: 12))
     }
 }

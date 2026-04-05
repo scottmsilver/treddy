@@ -60,10 +60,6 @@ struct SettingsView: View {
                         placeholder: "0",
                         isEditable: false
                     )
-
-                    Text("Vest sync is not supported yet.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 Section("Connection") {
@@ -135,7 +131,7 @@ struct SettingsView: View {
 
     private func syncBodyFields() {
         weightText = "\(store.userProfile.weightLbs)"
-        vestText = store.userProfile.vestLbs > 0 ? "\(store.userProfile.vestLbs)" : ""
+        vestText = store.activeProfile.map { $0.vestLbs > 0 ? String(format: "%.0f", $0.vestLbs) : "" } ?? ""
     }
 
     private func registerDebugTap() {

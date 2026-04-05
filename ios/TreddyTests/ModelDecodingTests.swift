@@ -219,6 +219,101 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertEqual(user.vestLbs, 0) // default
     }
 
+    // MARK: - Profile (Postel's Law: weight as int or double, has_avatar as bool or int)
+
+    func testProfileDecodesFullPayload() throws {
+        let json = """
+        {"id":"abc-123","name":"Scott Silver","color":"#b8c9d4","initials":"SS",
+         "weight_lbs":180.0,"vest_lbs":10.0,"has_avatar":true}
+        """.data(using: .utf8)!
+        let p = try JSONDecoder().decode(Profile.self, from: json)
+        XCTAssertEqual(p.id, "abc-123")
+        XCTAssertEqual(p.name, "Scott Silver")
+        XCTAssertEqual(p.color, "#b8c9d4")
+        XCTAssertEqual(p.initials, "SS")
+        XCTAssertEqual(p.weightLbs, 180.0, accuracy: 0.01)
+        XCTAssertEqual(p.vestLbs, 10.0, accuracy: 0.01)
+        XCTAssertTrue(p.hasAvatar)
+        XCTAssertEqual(p.firstName, "Scott")
+    }
+
+    func testProfileDecodesWeightAsInt() throws {
+        let json = """
+        {"id":"1","name":"Test","weight_lbs":154,"vest_lbs":0,"has_avatar":0}
+        """.data(using: .utf8)!
+        let p = try JSONDecoder().decode(Profile.self, from: json)
+        XCTAssertEqual(p.weightLbs, 154.0, accuracy: 0.01)
+        XCTAssertEqual(p.vestLbs, 0.0, accuracy: 0.01)
+        XCTAssertFalse(p.hasAvatar)
+    }
+
+    func testProfileDecodesHasAvatarAsInt() throws {
+        let json = """
+        {"id":"1","name":"Test","has_avatar":1}
+        """.data(using: .utf8)!
+        let p = try JSONDecoder().decode(Profile.self, from: json)
+        XCTAssertTrue(p.hasAvatar)
+    }
+
+    func testProfileDecodesEmpty() throws {
+        let json = "{}".data(using: .utf8)!
+        let p = try JSONDecoder().decode(Profile.self, from: json)
+        XCTAssertEqual(p.id, "")
+        XCTAssertEqual(p.initials, "?")
+        XCTAssertEqual(p.weightLbs, 154.0, accuracy: 0.01)
+        XCTAssertFalse(p.hasAvatar)
+    }
+
+    func testProfileIgnoresUnknownFields() throws {
+        let json = """
+        {"id":"1","name":"Test","created_at":"2026-01-01","updated_at":"2026-04-04","unknown_field":42}
+        """.data(using: .utf8)!
+        let p = try JSONDecoder().decode(Profile.self, from: json)
+        XCTAssertEqual(p.name, "Test")
+    }
+
+    // MARK: - ProfileChangedMessage
+
+    func testProfileChangedDecodesWithProfile() throws {
+        let json = """
+        {"type":"profile_changed","profile":{"id":"abc","name":"Scott","color":"#d4c4a8","initials":"S",
+         "weight_lbs":180,"vest_lbs":0,"has_avatar":false},"guest_mode":false}
+        """.data(using: .utf8)!
+        let msg = try JSONDecoder().decode(ProfileChangedMessage.self, from: json)
+        XCTAssertEqual(msg.profile?.name, "Scott")
+        XCTAssertFalse(msg.guestMode)
+    }
+
+    func testProfileChangedDecodesGuestMode() throws {
+        let json = """
+        {"type":"profile_changed","profile":null,"guest_mode":true}
+        """.data(using: .utf8)!
+        let msg = try JSONDecoder().decode(ProfileChangedMessage.self, from: json)
+        XCTAssertNil(msg.profile)
+        XCTAssertTrue(msg.guestMode)
+    }
+
+    // MARK: - ActiveProfileResponse
+
+    func testActiveProfileResponseDecodes() throws {
+        let json = """
+        {"profile":{"id":"abc","name":"Scott","color":"#d4c4a8","initials":"S",
+         "weight_lbs":180,"vest_lbs":0,"has_avatar":false},"guest_mode":false}
+        """.data(using: .utf8)!
+        let resp = try JSONDecoder().decode(ActiveProfileResponse.self, from: json)
+        XCTAssertEqual(resp.profile?.id, "abc")
+        XCTAssertFalse(resp.guestMode)
+    }
+
+    func testActiveProfileResponseDecodesNull() throws {
+        let json = """
+        {"profile":null,"guest_mode":true}
+        """.data(using: .utf8)!
+        let resp = try JSONDecoder().decode(ActiveProfileResponse.self, from: json)
+        XCTAssertNil(resp.profile)
+        XCTAssertTrue(resp.guestMode)
+    }
+
     // MARK: - ToolCallResponse
 
     func testToolCallResponseOk() throws {

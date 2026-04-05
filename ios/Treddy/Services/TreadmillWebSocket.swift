@@ -19,6 +19,7 @@ protocol TreadmillWebSocketClient: AnyObject {
     var onConnection: ((Bool) -> Void)? { get set }
     var onHR: ((HeartRateMessage) -> Void)? { get set }
     var onScanResult: ((ScanResultMessage) -> Void)? { get set }
+    var onProfileChanged: ((ProfileChangedMessage) -> Void)? { get set }
     var onConnect: (() -> Void)? { get set }
     var onDisconnect: (() -> Void)? { get set }
 
@@ -46,8 +47,11 @@ final class TreadmillWebSocket: TreadmillWebSocketClient {
     var onConnection: ((Bool) -> Void)?
     var onHR: ((HeartRateMessage) -> Void)?
     var onScanResult: ((ScanResultMessage) -> Void)?
+    var onProfileChanged: ((ProfileChangedMessage) -> Void)?
     var onConnect: (() -> Void)?
     var onDisconnect: (() -> Void)?
+
+    private let decoder = JSONDecoder()
 
     func connect(to baseURL: String) {
         shouldReconnect = true
@@ -71,15 +75,16 @@ final class TreadmillWebSocket: TreadmillWebSocketClient {
         isConnected = false
     }
 
+    private var hasReceivedFirstMessage = false
+
     private func doConnect() {
         guard let url = URL(string: serverURL) else { return }
         let ws = session!.webSocketTask(with: url)
         task = ws
+        hasReceivedFirstMessage = false
         ws.resume()
-        isConnected = true
         reconnectDelay = 1.0
-        logger.info("Connected to \(self.serverURL)")
-        onConnect?()
+        logger.info("Connecting to \(self.serverURL)")
         receiveLoop(ws)
     }
 
@@ -102,7 +107,13 @@ final class TreadmillWebSocket: TreadmillWebSocketClient {
 
     private func handleMessage(_ text: String) {
         guard let data = text.data(using: .utf8) else { return }
-        let decoder = JSONDecoder()
+
+        // Signal connection established on first message
+        if !hasReceivedFirstMessage {
+            hasReceivedFirstMessage = true
+            isConnected = true
+            onConnect?()
+        }
 
         // Route by "type" field
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -131,6 +142,10 @@ final class TreadmillWebSocket: TreadmillWebSocketClient {
             case "scan_result":
                 if let scan = try? decoder.decode(ScanResultMessage.self, from: data) {
                     self.onScanResult?(scan)
+                }
+            case "profile_changed":
+                if let msg = try? decoder.decode(ProfileChangedMessage.self, from: data) {
+                    self.onProfileChanged?(msg)
                 }
             default:
                 break

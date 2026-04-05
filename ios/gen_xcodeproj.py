@@ -105,7 +105,7 @@ def main():
         a("                PRODUCT_NAME = Treddy;")
         a("                SWIFT_VERSION = 6.0;")
         a("                INFOPLIST_GENERATION_MODE = GeneratedFile;")
-        a("                IPHONEOS_DEPLOYMENT_TARGET = 17.0;")
+        a("                IPHONEOS_DEPLOYMENT_TARGET = 26.0;")
         a("                SDKROOT = iphoneos;")
         a('                TARGETED_DEVICE_FAMILY = "1,2";')
         a('                CODE_SIGN_IDENTITY = "-";')

@@ -435,3 +435,90 @@ struct UserProfile: Codable {
 
     init() {}
 }
+
+// MARK: - Multi-user profiles
+
+struct Profile: Codable, Identifiable, Hashable {
+    var id: String = ""
+    var name: String = ""
+    var color: String = "#d4c4a8"
+    var initials: String = "?"
+    var weightLbs: Double = 154
+    var vestLbs: Double = 0
+    var hasAvatar: Bool = false
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, color, initials
+        case weightLbs = "weight_lbs"
+        case vestLbs = "vest_lbs"
+        case hasAvatar = "has_avatar"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.val(String.self, .id, "")
+        name = c.val(String.self, .name, "")
+        color = c.val(String.self, .color, "#d4c4a8")
+        initials = c.val(String.self, .initials, "?")
+        // weight_lbs/vest_lbs may arrive as int or double
+        if let d = try? c.decodeIfPresent(Double.self, forKey: .weightLbs) {
+            weightLbs = d
+        } else if let i = try? c.decodeIfPresent(Int.self, forKey: .weightLbs) {
+            weightLbs = Double(i)
+        }
+        if let d = try? c.decodeIfPresent(Double.self, forKey: .vestLbs) {
+            vestLbs = d
+        } else if let i = try? c.decodeIfPresent(Int.self, forKey: .vestLbs) {
+            vestLbs = Double(i)
+        }
+        // has_avatar may arrive as bool, int 0/1, or string
+        if let b = try? c.decodeIfPresent(Bool.self, forKey: .hasAvatar) {
+            hasAvatar = b
+        } else if let i = try? c.decodeIfPresent(Int.self, forKey: .hasAvatar) {
+            hasAvatar = i != 0
+        }
+    }
+
+    init() {}
+
+    /// First name for greetings
+    var firstName: String {
+        name.split(separator: " ").first.map(String.init) ?? name
+    }
+}
+
+struct ProfileChangedMessage: Codable {
+    var profile: Profile? = nil
+    var guestMode: Bool = false
+
+    enum CodingKeys: String, CodingKey {
+        case profile
+        case guestMode = "guest_mode"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        profile = try? c.decodeIfPresent(Profile.self, forKey: .profile)
+        guestMode = c.val(Bool.self, .guestMode, false)
+    }
+
+    init() {}
+}
+
+struct ActiveProfileResponse: Codable {
+    var profile: Profile? = nil
+    var guestMode: Bool = false
+
+    enum CodingKeys: String, CodingKey {
+        case profile
+        case guestMode = "guest_mode"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        profile = try? c.decodeIfPresent(Profile.self, forKey: .profile)
+        guestMode = c.val(Bool.self, .guestMode, false)
+    }
+
+    init() {}
+}

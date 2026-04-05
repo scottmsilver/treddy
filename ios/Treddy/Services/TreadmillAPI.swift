@@ -145,6 +145,13 @@ actor TreadmillAPI {
         try await postRaw("/api/workouts/\(id)/load")
     }
 
+    func deleteWorkout(id: String) async throws {
+        var request = URLRequest(url: URL(string: "\(baseURL)/api/workouts/\(id)")!)
+        request.httpMethod = "DELETE"
+        let (data, response) = try await perform(request)
+        try ensureSuccess(data: data, response: response)
+    }
+
     func loadHistory(id: String) async throws {
         try await postRaw("/api/programs/history/\(id)/load")
     }
@@ -183,6 +190,10 @@ actor TreadmillAPI {
         try await postRaw("/api/program/skip")
     }
 
+    func prevInterval() async throws {
+        try await postRaw("/api/program/prev")
+    }
+
     func reset() async throws {
         try await postRaw("/api/reset")
     }
@@ -207,6 +218,38 @@ actor TreadmillAPI {
 
     func adjustDuration(deltaSeconds: Int) async throws -> ProgramState {
         return try await post("/api/program/adjust-duration", body: ["delta_seconds": deltaSeconds])
+    }
+
+    // MARK: - Profiles
+
+    func getProfiles() async throws -> [Profile] {
+        try await get("/api/profiles")
+    }
+
+    func createProfile(name: String, color: String? = nil) async throws -> Profile {
+        var body: [String: Any] = ["name": name]
+        if let c = color { body["color"] = c }
+        struct Wrapper: Codable {
+            var profile: Profile
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                profile = try c.decode(Profile.self, forKey: .profile)
+            }
+        }
+        let resp: Wrapper = try await post("/api/profiles", body: body)
+        return resp.profile
+    }
+
+    func selectProfile(id: String) async throws {
+        try await postRaw("/api/profile/select", body: ["id": id])
+    }
+
+    func startGuest() async throws {
+        try await postRaw("/api/profile/guest")
+    }
+
+    func getActiveProfile() async throws -> ActiveProfileResponse {
+        try await get("/api/profile/active")
     }
 
     // MARK: - Generic tool execution (Postel's Law: single path for all tools)

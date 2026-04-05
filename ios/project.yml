@@ -2,7 +2,7 @@ name: Treddy
 options:
   bundleIdPrefix: com.treddy
   deploymentTarget:
-    iOS: '17.0'
+    iOS: '26.0'
 targets:
   Treddy:
     type: application

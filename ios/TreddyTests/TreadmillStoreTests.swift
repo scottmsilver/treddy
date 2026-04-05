@@ -42,6 +42,7 @@ private actor MockAPIClient: TreadmillAPIClient {
     func stopProgram() async throws {}
     func pauseProgram() async throws {}
     func skipInterval() async throws {}
+    func prevInterval() async throws {}
     func reset() async throws {}
 
     func loadWorkout(id: String) async throws { loadedWorkoutID = id }
@@ -55,6 +56,13 @@ private actor MockAPIClient: TreadmillAPIClient {
 
     func updateUser(weightLbs: Int?, vestLbs: Int?) async throws -> UserProfile { userToReturn }
     func getConfig() async throws -> AppConfig { AppConfig() }
+
+    func getProfiles() async throws -> [Profile] { [] }
+    func createProfile(name: String, color: String?) async throws -> Profile { Profile() }
+    func selectProfile(id: String) async throws {}
+    func startGuest() async throws {}
+    func getActiveProfile() async throws -> ActiveProfileResponse { ActiveProfileResponse() }
+    func deleteWorkout(id: String) async throws {}
 }
 
 private final class MockWebSocketClient: TreadmillWebSocketClient {
@@ -64,6 +72,7 @@ private final class MockWebSocketClient: TreadmillWebSocketClient {
     var onConnection: ((Bool) -> Void)?
     var onHR: ((HeartRateMessage) -> Void)?
     var onScanResult: ((ScanResultMessage) -> Void)?
+    var onProfileChanged: ((ProfileChangedMessage) -> Void)?
     var onConnect: (() -> Void)?
     var onDisconnect: (() -> Void)?
 

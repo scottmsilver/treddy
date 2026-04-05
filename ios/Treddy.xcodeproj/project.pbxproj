@@ -1,0 +1,151 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 56;
+    objects = {
+
+        DA9F87DE61D34EAFBF1CAE5A /* TreadmillAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Services/TreadmillAPI.swift"; sourceTree = "<group>"; };
+        7029C10F9DD24A0C8627AC38 /* TreadmillWebSocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Services/TreadmillWebSocket.swift"; sourceTree = "<group>"; };
+        F84A46A32046412C8D8B97C4 /* TrustAllDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Services/TrustAllDelegate.swift"; sourceTree = "<group>"; };
+        C91B3BC326E64DB195DC6635 /* AppRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/App/AppRoute.swift"; sourceTree = "<group>"; };
+        05FA81EA90FE4054B29C6099 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/App/AppShellView.swift"; sourceTree = "<group>"; };
+        851E431D38E6492380DD4C17 /* TreddyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/App/TreddyApp.swift"; sourceTree = "<group>"; };
+        5F6D18CA87F943BD9DD13350 /* AudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Voice/AudioCapture.swift"; sourceTree = "<group>"; };
+        DDB96B6B8E354D77861A2E5B /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Voice/AudioPlayer.swift"; sourceTree = "<group>"; };
+        E35EC81DE99146488F8ACF22 /* FunctionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Voice/FunctionBridge.swift"; sourceTree = "<group>"; };
+        5A71388015314778BBA2F973 /* GeminiLiveClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Voice/GeminiLiveClient.swift"; sourceTree = "<group>"; };
+        7BD228E08E2D43678EBE82C1 /* VoiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Voice/VoiceCoordinator.swift"; sourceTree = "<group>"; };
+        8A2911F2CF73458A9DBB4C31 /* TreadmillStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/State/TreadmillStore.swift"; sourceTree = "<group>"; };
+        F37F898EE7C54770B00A23B0 /* TreadmillModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Models/TreadmillModels.swift"; sourceTree = "<group>"; };
+        09388DC0DA89496E82439D04 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/DebugView.swift"; sourceTree = "<group>"; };
+        33E0BE76541F4F5E93DA6244 /* LobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/LobbyView.swift"; sourceTree = "<group>"; };
+        3C906C24B09C435FB1AA1160 /* ProfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/ProfilePickerView.swift"; sourceTree = "<group>"; };
+        1BFE8AE08BE94A8B8432254B /* RunningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/RunningView.swift"; sourceTree = "<group>"; };
+        46F6BC6DE08341378C0EC677 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/SettingsView.swift"; sourceTree = "<group>"; };
+        CB98136F02F94691A61508EF /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/SetupView.swift"; sourceTree = "<group>"; };
+        12E7BE30DA894A8E86E08E68 /* AppColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Components/AppColors.swift"; sourceTree = "<group>"; };
+        33BA029CCBA5419484FB5E7C /* DisconnectBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Components/DisconnectBanner.swift"; sourceTree = "<group>"; };
+        0916F4272E7C4F0888A791B8 /* ElevationProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Components/ElevationProfile.swift"; sourceTree = "<group>"; };
+        C98EB68614054F27AA30D4DC /* HrmSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Components/HrmSection.swift"; sourceTree = "<group>"; };
+        D11D3A59FC8B4A4AA6CD3930 /* MetricsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Components/MetricsRow.swift"; sourceTree = "<group>"; };
+        5A89BDCB6145436484DC0C80 /* NavRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Components/NavRail.swift"; sourceTree = "<group>"; };
+        9964E5A3CE5D46BFB9F02B5F /* SpeedInclineControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Components/SpeedInclineControls.swift"; sourceTree = "<group>"; };
+        7A8A30F7DD1743CA99373F76 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Components/ToastView.swift"; sourceTree = "<group>"; };
+        05DCDC811B964D4C9D9959C4 /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Treddy/Views/Utils/Formatters.swift"; sourceTree = "<group>"; };
+        994951C14957474BB7E45901 /* TreadmillAPI.swift */ = {isa = PBXBuildFile; fileRef = DA9F87DE61D34EAFBF1CAE5A; };
+        43AD107BADFE4411A9DB344F /* TreadmillWebSocket.swift */ = {isa = PBXBuildFile; fileRef = 7029C10F9DD24A0C8627AC38; };
+        D66ACD6D73D04760B5A6F3FC /* TrustAllDelegate.swift */ = {isa = PBXBuildFile; fileRef = F84A46A32046412C8D8B97C4; };
+        5109360537BA4A7889F9F10B /* AppRoute.swift */ = {isa = PBXBuildFile; fileRef = C91B3BC326E64DB195DC6635; };
+        C39A570FD14B46FBB4676210 /* AppShellView.swift */ = {isa = PBXBuildFile; fileRef = 05FA81EA90FE4054B29C6099; };
+        CB22B64612BE4DA695BAA004 /* TreddyApp.swift */ = {isa = PBXBuildFile; fileRef = 851E431D38E6492380DD4C17; };
+        38C7A6B8FC934E01AD1416CE /* AudioCapture.swift */ = {isa = PBXBuildFile; fileRef = 5F6D18CA87F943BD9DD13350; };
+        F1E5FCAA16274EA793384A43 /* AudioPlayer.swift */ = {isa = PBXBuildFile; fileRef = DDB96B6B8E354D77861A2E5B; };
+        2C6C741CB0F348EA9D1965CF /* FunctionBridge.swift */ = {isa = PBXBuildFile; fileRef = E35EC81DE99146488F8ACF22; };
+        7253AC64B8A04D9CB801B378 /* GeminiLiveClient.swift */ = {isa = PBXBuildFile; fileRef = 5A71388015314778BBA2F973; };
+        AEDBA368160B414B908649EC /* VoiceCoordinator.swift */ = {isa = PBXBuildFile; fileRef = 7BD228E08E2D43678EBE82C1; };
+        9AF70622B6CC48379753B42A /* TreadmillStore.swift */ = {isa = PBXBuildFile; fileRef = 8A2911F2CF73458A9DBB4C31; };
+        DE53F99A98BE4CEBA68F8D27 /* TreadmillModels.swift */ = {isa = PBXBuildFile; fileRef = F37F898EE7C54770B00A23B0; };
+        8B9BF7101BE74463B2D1F78E /* DebugView.swift */ = {isa = PBXBuildFile; fileRef = 09388DC0DA89496E82439D04; };
+        5AC6EA70113C4A0BB2D8A356 /* LobbyView.swift */ = {isa = PBXBuildFile; fileRef = 33E0BE76541F4F5E93DA6244; };
+        FE58A52353774B5F8EE31243 /* ProfilePickerView.swift */ = {isa = PBXBuildFile; fileRef = 3C906C24B09C435FB1AA1160; };
+        4A926755D2844AD4BAEEDE0C /* RunningView.swift */ = {isa = PBXBuildFile; fileRef = 1BFE8AE08BE94A8B8432254B; };
+        D727DA1573DA45E291C9FA54 /* SettingsView.swift */ = {isa = PBXBuildFile; fileRef = 46F6BC6DE08341378C0EC677; };
+        635B4590ED334C1BA11C4B2C /* SetupView.swift */ = {isa = PBXBuildFile; fileRef = CB98136F02F94691A61508EF; };
+        9205E0FF364246EFBC2A4115 /* AppColors.swift */ = {isa = PBXBuildFile; fileRef = 12E7BE30DA894A8E86E08E68; };
+        3313745530E544F092977125 /* DisconnectBanner.swift */ = {isa = PBXBuildFile; fileRef = 33BA029CCBA5419484FB5E7C; };
+        7BB6A9D91F1744E091765096 /* ElevationProfile.swift */ = {isa = PBXBuildFile; fileRef = 0916F4272E7C4F0888A791B8; };
+        C1965BE5E3F04739942586A1 /* HrmSection.swift */ = {isa = PBXBuildFile; fileRef = C98EB68614054F27AA30D4DC; };
+        DF842D736E774FA5B065EA63 /* MetricsRow.swift */ = {isa = PBXBuildFile; fileRef = D11D3A59FC8B4A4AA6CD3930; };
+        74CEB04D87A240B58DC7F788 /* NavRail.swift */ = {isa = PBXBuildFile; fileRef = 5A89BDCB6145436484DC0C80; };
+        184063BEBE204CD0857C4C82 /* SpeedInclineControls.swift */ = {isa = PBXBuildFile; fileRef = 9964E5A3CE5D46BFB9F02B5F; };
+        1AA33C01C1B54C06838E7E78 /* ToastView.swift */ = {isa = PBXBuildFile; fileRef = 7A8A30F7DD1743CA99373F76; };
+        591ECCB193CD49AF9447ADFA /* Formatters.swift */ = {isa = PBXBuildFile; fileRef = 05DCDC811B964D4C9D9959C4; };
+        F6F24F2E85FB47B8B49A7275 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Treddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+        F67AAB1C58F746649F015F0B = {isa = PBXGroup; children = (DA9F87DE61D34EAFBF1CAE5A, 7029C10F9DD24A0C8627AC38, F84A46A32046412C8D8B97C4, C91B3BC326E64DB195DC6635, 05FA81EA90FE4054B29C6099, 851E431D38E6492380DD4C17, 5F6D18CA87F943BD9DD13350, DDB96B6B8E354D77861A2E5B, E35EC81DE99146488F8ACF22, 5A71388015314778BBA2F973, 7BD228E08E2D43678EBE82C1, 8A2911F2CF73458A9DBB4C31, F37F898EE7C54770B00A23B0, 09388DC0DA89496E82439D04, 33E0BE76541F4F5E93DA6244, 3C906C24B09C435FB1AA1160, 1BFE8AE08BE94A8B8432254B, 46F6BC6DE08341378C0EC677, CB98136F02F94691A61508EF, 12E7BE30DA894A8E86E08E68, 33BA029CCBA5419484FB5E7C, 0916F4272E7C4F0888A791B8, C98EB68614054F27AA30D4DC, D11D3A59FC8B4A4AA6CD3930, 5A89BDCB6145436484DC0C80, 9964E5A3CE5D46BFB9F02B5F, 7A8A30F7DD1743CA99373F76, 05DCDC811B964D4C9D9959C4, AF902DC10E284861A62A3F29); sourceTree = "<group>"; };
+        AF902DC10E284861A62A3F29 = {isa = PBXGroup; children = (F6F24F2E85FB47B8B49A7275); name = Products; sourceTree = "<group>"; };
+        C83B6AEE6547436190290B55 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (994951C14957474BB7E45901, 43AD107BADFE4411A9DB344F, D66ACD6D73D04760B5A6F3FC, 5109360537BA4A7889F9F10B, C39A570FD14B46FBB4676210, CB22B64612BE4DA695BAA004, 38C7A6B8FC934E01AD1416CE, F1E5FCAA16274EA793384A43, 2C6C741CB0F348EA9D1965CF, 7253AC64B8A04D9CB801B378, AEDBA368160B414B908649EC, 9AF70622B6CC48379753B42A, DE53F99A98BE4CEBA68F8D27, 8B9BF7101BE74463B2D1F78E, 5AC6EA70113C4A0BB2D8A356, FE58A52353774B5F8EE31243, 4A926755D2844AD4BAEEDE0C, D727DA1573DA45E291C9FA54, 635B4590ED334C1BA11C4B2C, 9205E0FF364246EFBC2A4115, 3313745530E544F092977125, 7BB6A9D91F1744E091765096, C1965BE5E3F04739942586A1, DF842D736E774FA5B065EA63, 74CEB04D87A240B58DC7F788, 184063BEBE204CD0857C4C82, 1AA33C01C1B54C06838E7E78, 591ECCB193CD49AF9447ADFA); runOnlyForDeploymentPostprocessing = 0; };
+        6CDCC935269A47FFB7C67893 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        50AE75D18A264B2EA733B592 = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = CF197D4E91DC470E96121B98;
+            buildPhases = (C83B6AEE6547436190290B55, 6CDCC935269A47FFB7C67893);
+            buildRules = ();
+            dependencies = ();
+            name = Treddy;
+            productName = Treddy;
+            productReference = F6F24F2E85FB47B8B49A7275;
+            productType = "com.apple.product-type.application";
+        };
+        412547B635054D859A74AFBB = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                PRODUCT_BUNDLE_IDENTIFIER = "com.treddy.app";
+                PRODUCT_NAME = Treddy;
+                SWIFT_VERSION = 6.0;
+                INFOPLIST_GENERATION_MODE = GeneratedFile;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+                SDKROOT = iphoneos;
+                TARGETED_DEVICE_FAMILY = "1,2";
+                CODE_SIGN_IDENTITY = "-";
+                MARKETING_VERSION = 1.0.0;
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_NSMicrophoneUsageDescription = "Voice control for your treadmill";
+            };
+            name = Debug;
+        };
+        D289B2333E27431BB919A1EC = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                PRODUCT_BUNDLE_IDENTIFIER = "com.treddy.app";
+                PRODUCT_NAME = Treddy;
+                SWIFT_VERSION = 6.0;
+                INFOPLIST_GENERATION_MODE = GeneratedFile;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+                SDKROOT = iphoneos;
+                TARGETED_DEVICE_FAMILY = "1,2";
+                CODE_SIGN_IDENTITY = "-";
+                MARKETING_VERSION = 1.0.0;
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_NSMicrophoneUsageDescription = "Voice control for your treadmill";
+            };
+            name = Release;
+        };
+        A827400E7CB240BDBEBF02CB = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                SDKROOT = iphoneos;
+                CLANG_ENABLE_MODULES = YES;
+                CODE_SIGN_IDENTITY = "";
+                CODE_SIGNING_REQUIRED = NO;
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+            };
+            name = Debug;
+        };
+        984B198A4D6C45248D160A8F = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                SDKROOT = iphoneos;
+                CLANG_ENABLE_MODULES = YES;
+                CODE_SIGN_IDENTITY = "";
+                CODE_SIGNING_REQUIRED = NO;
+            };
+            name = Release;
+        };
+        CF197D4E91DC470E96121B98 = {isa = XCConfigurationList; buildConfigurations = (412547B635054D859A74AFBB, D289B2333E27431BB919A1EC); defaultConfigurationName = Debug; };
+        B2F1D9B847EE4D12852F4950 = {isa = XCConfigurationList; buildConfigurations = (A827400E7CB240BDBEBF02CB, 984B198A4D6C45248D160A8F); defaultConfigurationName = Debug; };
+        9C0F9E7E6B12442C99E60DE9 = {
+            isa = PBXProject;
+            buildConfigurationList = B2F1D9B847EE4D12852F4950;
+            compatibilityVersion = "Xcode 14.0";
+            mainGroup = F67AAB1C58F746649F015F0B;
+            productRefGroup = AF902DC10E284861A62A3F29;
+            targets = (50AE75D18A264B2EA733B592);
+        };
+    };
+    rootObject = 9C0F9E7E6B12442C99E60DE9;
+}

@@ -87,6 +87,13 @@ class VoiceViewModel(
         }
     }
 
+    /** Called when the active profile changes — invalidates cached config so the
+     *  next Gemini connection picks up any profile-specific system prompt changes. */
+    fun onProfileChanged() {
+        Log.d(TAG, "Profile changed — invalidating cached config")
+        config = null
+    }
+
     // ── Always-on connection lifecycle ──────────────────────────────────
 
     /** Called when server WebSocket connects. Starts background Gemini connection. */

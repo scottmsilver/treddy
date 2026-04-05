@@ -574,3 +574,460 @@ private fun HrmSection(
 
     HorizontalDivider(color = colors.separator, thickness = 0.5.dp)
 }
+
+/** Avatar colors from the warm muted palette. */
+private val AVATAR_COLORS = listOf(
+    "#d4c4a8", // tan
+    "#b8c9d4", // blue-gray
+    "#c9b8b0", // rose
+    "#b0c9b8", // sage
+    "#c4b8d4", // lavender
+)
+
+private fun parseHexColor(hex: String): Color {
+    return try {
+        Color(android.graphics.Color.parseColor(hex))
+    } catch (_: Exception) {
+        Color(android.graphics.Color.parseColor("#d4c4a8"))
+    }
+}
+
+/**
+ * Loads a bitmap from a URL on a background thread.
+ * Returns null on failure.
+ */
+@Composable
+private fun rememberAvatarBitmap(avatarUrl: String?): Bitmap? {
+    var bitmap by remember(avatarUrl) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(avatarUrl) {
+        if (avatarUrl.isNullOrBlank()) {
+            bitmap = null
+            return@LaunchedEffect
+        }
+        bitmap = withContext(Dispatchers.IO) {
+            try {
+                val conn = URL(avatarUrl).openConnection() as HttpURLConnection
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                conn.useCaches = true
+                conn.inputStream.use { BitmapFactory.decodeStream(it) }
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+    return bitmap
+}
+
+@Composable
+private fun ProfileSection(
+    viewModel: TreadmillViewModel,
+    onToast: (String) -> Unit,
+) {
+    val colors = LocalPrecorColors.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val activeProfile by viewModel.activeProfile.collectAsState()
+    val guestMode by viewModel.guestMode.collectAsState()
+    val serverPreferences: ServerPreferences = koinInject()
+    val serverUrl by serverPreferences.serverUrl.collectAsState(initial = "")
+
+    var editingName by remember { mutableStateOf(false) }
+    var nameText by remember { mutableStateOf("") }
+    var confirmingDelete by remember { mutableStateOf(false) }
+    // Bump this to force avatar reload after upload/delete
+    var avatarVersion by remember { mutableStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        viewModel.fetchActiveProfile()
+    }
+
+    // Photo picker launcher
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        val profile = activeProfile ?: return@rememberLauncherForActivityResult
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
+                    ?: return@launch
+                viewModel.uploadAvatar(
+                    id = profile.id,
+                    imageBytes = bytes,
+                    onSuccess = {
+                        avatarVersion++
+                        onToast("Avatar updated")
+                        haptic(context, 25)
+                    },
+                    onError = { err -> onToast("Upload failed: $err") },
+                )
+            }.onFailure { e ->
+                onToast("Failed to read image: ${e.message}")
+            }
+        }
+    }
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        val profile = activeProfile ?: return@rememberLauncherForActivityResult
+        if (bitmap == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val stream = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                val bytes = stream.toByteArray()
+                viewModel.uploadAvatar(
+                    id = profile.id,
+                    imageBytes = bytes,
+                    onSuccess = {
+                        avatarVersion++
+                        onToast("Avatar updated")
+                        haptic(context, 25)
+                    },
+                    onError = { err -> onToast("Upload failed: $err") },
+                )
+            }.onFailure { e ->
+                onToast("Failed to capture photo: ${e.message}")
+            }
+        }
+    }
+
+    Spacer(Modifier.height(20.dp))
+    Text(
+        text = "PROFILE",
+        color = colors.text3,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.3.sp,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+
+    val profile = activeProfile
+    val profileColor = profile?.color?.let {
+        try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { null }
+    }
+
+    if (profile != null) {
+        val avatarUrl = if (profile.hasAvatar && serverUrl.isNotBlank()) {
+            "${serverUrl.trimEnd('/')}/api/profiles/${profile.id}/avatar?v=$avatarVersion"
+        } else null
+        val avatarBitmap = rememberAvatarBitmap(avatarUrl)
+
+        // Avatar + editable name row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = colors.fill,
+                    shape = RoundedCornerShape(10.dp),
+                )
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(profileColor ?: colors.fill2),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (avatarBitmap != null) {
+                    Image(
+                        bitmap = avatarBitmap.asImageBitmap(),
+                        contentDescription = profile.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Text(
+                        text = profile.initials.ifBlank { profile.name.take(1).uppercase() },
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (profileColor != null) Color(0xFF1E1D1B) else colors.text3,
+                    )
+                }
+            }
+            if (editingName) {
+                androidx.compose.foundation.text.BasicTextField(
+                    value = nameText,
+                    onValueChange = { nameText = it.take(50) },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        color = colors.text,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp)
+                        .background(colors.fill2, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onDone = {
+                            val trimmed = nameText.trim()
+                            if (trimmed.isNotBlank() && trimmed != profile.name) {
+                                viewModel.renameProfile(
+                                    id = profile.id,
+                                    name = trimmed,
+                                    onSuccess = { onToast("Renamed to \"$trimmed\"") },
+                                    onError = { onToast("Rename failed") },
+                                )
+                            }
+                            editingName = false
+                        },
+                    ),
+                )
+            } else {
+                Text(
+                    text = profile.name,
+                    color = colors.text,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable {
+                            nameText = profile.name
+                            editingName = true
+                            haptic(context, 10)
+                        },
+                )
+                Text(
+                    text = "tap to rename",
+                    color = colors.text3,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // --- Avatar management section ---
+        Text(
+            text = "AVATAR",
+            color = colors.text3,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.3.sp,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+
+        // Upload image / Take photo row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Upload image button
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(colors.fill)
+                    .clickable {
+                        haptic(context, 15)
+                        photoPickerLauncher.launch("image/*")
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Upload Image",
+                    color = colors.teal,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            // Take photo button
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(colors.fill)
+                    .clickable {
+                        haptic(context, 15)
+                        cameraLauncher.launch(null)
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Take Photo",
+                    color = colors.teal,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Color picker row
+        Text(
+            text = "COLOR",
+            color = colors.text3,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.3.sp,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            AVATAR_COLORS.forEach { hex ->
+                val swatchColor = parseHexColor(hex)
+                val isSelected = profile.color == hex
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(swatchColor)
+                        .then(
+                            if (isSelected) {
+                                Modifier.border(3.dp, colors.green, CircleShape)
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .clickable {
+                            haptic(context, 15)
+                            viewModel.updateProfileColor(
+                                id = profile.id,
+                                color = hex,
+                                onSuccess = { onToast("Color updated") },
+                                onError = { onToast("Failed to update color") },
+                            )
+                        },
+                )
+            }
+        }
+
+        // Remove avatar (only if has_avatar)
+        if (profile.hasAvatar) {
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clickable {
+                        haptic(context, 15)
+                        viewModel.deleteAvatar(
+                            id = profile.id,
+                            onSuccess = {
+                                avatarVersion++
+                                onToast("Photo removed")
+                            },
+                            onError = { err -> onToast("Failed: $err") },
+                        )
+                    }
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Remove Photo",
+                    color = colors.red,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        // Delete profile
+        if (confirmingDelete) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Delete \u201c${profile.name}\u201d?",
+                    color = colors.text3,
+                    fontSize = 14.sp,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Delete",
+                        color = colors.red,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clickable {
+                                haptic(context, longArrayOf(25, 30, 25))
+                                viewModel.deleteProfile(
+                                    id = profile.id,
+                                    onSuccess = {
+                                        onToast("Deleted ${profile.name}")
+                                        confirmingDelete = false
+                                    },
+                                    onError = { err ->
+                                        onToast(err)
+                                        confirmingDelete = false
+                                    },
+                                )
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                    Text(
+                        text = "Cancel",
+                        color = colors.text3,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .clickable {
+                                confirmingDelete = false
+                                haptic(context, 10)
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clickable {
+                        confirmingDelete = true
+                        haptic(context, 15)
+                    }
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Delete Profile",
+                    color = colors.red,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+    } else if (guestMode) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = colors.fill,
+                    shape = RoundedCornerShape(10.dp),
+                )
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Running as Guest",
+                color = colors.text3,
+                fontSize = 15.sp,
+            )
+        }
+    }
+
+    Spacer(Modifier.height(4.dp))
+}

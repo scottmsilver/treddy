@@ -24,6 +24,7 @@ import com.precor.treadmill.data.preferences.ServerPreferences
 import com.precor.treadmill.ui.components.*
 import com.precor.treadmill.ui.screens.debug.DebugScreen
 import com.precor.treadmill.ui.screens.lobby.LobbyScreen
+import com.precor.treadmill.ui.screens.profiles.ProfilePickerScreen
 import com.precor.treadmill.ui.screens.running.RunningScreen
 import com.precor.treadmill.ui.screens.setup.SetupScreen
 import com.precor.treadmill.ui.theme.LocalPrecorColors
@@ -36,6 +37,7 @@ import org.koin.androidx.compose.koinViewModel
 
 object Routes {
     const val SETUP = "setup"
+    const val PROFILES = "profiles"
     const val LOBBY = "lobby"
     const val RUNNING = "running"
     const val DEBUG = "debug"
@@ -90,6 +92,10 @@ fun AppNavigation(
         else voiceViewModel.onServerDisconnected()
     }
 
+    // Profile state for nav bar
+    val activeProfile by viewModel.activeProfile.collectAsState()
+    val guestMode by viewModel.guestMode.collectAsState()
+
     // Keep voice context updated with treadmill state
     val treadmillStatus by viewModel.status.collectAsState()
     val programState by viewModel.program.collectAsState()
@@ -118,10 +124,17 @@ fun AppNavigation(
         voiceViewModel.updateTreadmillState(statusMsg, programMsg)
     }
 
+    // Wire profileChanged to VoiceViewModel so config is invalidated on profile switch
+    LaunchedEffect(Unit) {
+        viewModel.profileChanged.collect {
+            voiceViewModel.onProfileChanged()
+        }
+    }
+
     // Wait for DataStore to load before deciding start destination
     val url = serverUrl ?: return
 
-    val startDestination = if (url.isBlank()) Routes.SETUP else Routes.LOBBY
+    val startDestination = if (url.isBlank()) Routes.SETUP else Routes.PROFILES
 
     // Current route for tab bar highlighting
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -196,6 +209,8 @@ fun AppNavigation(
                 showSettings = true
                 scope.launch { settingsSheetState.show() }
             },
+            activeProfile = activeProfile,
+            guestMode = guestMode,
         )
     }
 
@@ -207,10 +222,20 @@ fun AppNavigation(
             composable(Routes.SETUP) {
                 SetupScreen(
                     onConnected = {
-                        navController.navigate(Routes.LOBBY) {
+                        navController.navigate(Routes.PROFILES) {
                             popUpTo(Routes.SETUP) { inclusive = true }
                         }
                     }
+                )
+            }
+            composable(Routes.PROFILES) {
+                ProfilePickerScreen(
+                    onProfileSelected = {
+                        navController.navigate(Routes.LOBBY) {
+                            popUpTo(Routes.PROFILES) { inclusive = true }
+                        }
+                    },
+                    viewModel = viewModel,
                 )
             }
             composable(Routes.LOBBY) {
@@ -233,6 +258,8 @@ fun AppNavigation(
         }
     }
 
+    val showChrome = currentRoute != Routes.SETUP && currentRoute != Routes.PROFILES
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -240,11 +267,11 @@ fun AppNavigation(
     ) {
         if (isLandscape) {
             Column(modifier = Modifier.fillMaxSize()) {
-                if (currentRoute != Routes.SETUP) {
+                if (showChrome) {
                     DisconnectBanner(connected = wsConnected)
                 }
                 Row(modifier = Modifier.weight(1f)) {
-                    navRail()
+                    if (showChrome) navRail()
                     Box(modifier = Modifier.weight(1f)) {
                         navHostContent()
                     }
@@ -252,13 +279,13 @@ fun AppNavigation(
             }
         } else {
             Column(modifier = Modifier.fillMaxSize()) {
-                if (currentRoute != Routes.SETUP) {
+                if (showChrome) {
                     DisconnectBanner(connected = wsConnected)
                 }
                 Box(modifier = Modifier.weight(1f)) {
                     navHostContent()
                 }
-                navRail()
+                if (showChrome) navRail()
             }
         }
 

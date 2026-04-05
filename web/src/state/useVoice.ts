@@ -37,6 +37,16 @@ export function useVoice(): UseVoiceReturn {
   const pendingPromptRef = useRef<string | null>(null);
   const treadmillState = useTreadmillState();
 
+  // Invalidate cached config when active profile changes
+  const lastProfileIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const profileId = treadmillState.activeProfile?.id ?? null;
+    if (lastProfileIdRef.current !== null && lastProfileIdRef.current !== profileId) {
+      configRef.current = null;
+    }
+    lastProfileIdRef.current = profileId;
+  }, [treadmillState.activeProfile?.id]);
+
   // Build state context string — only push to Gemini when speed/incline change
   const stateContextRef = useRef('');
   const lastSpeedRef = useRef(0);

@@ -1,7 +1,7 @@
 """WebSocket integration tests for session broadcast."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from starlette.testclient import TestClient
@@ -28,17 +28,35 @@ def mock_client():
 def test_app(mock_client):
     """Create test app with mocked dependencies, reset session state."""
     import server
+    from db import TreadmillDB
+    from workout_db import WorkoutDB
 
     orig_client = getattr(server, "client", None)
     orig_sess = getattr(server, "sess", None)
     orig_loop = getattr(server, "loop", None)
     orig_queue = getattr(server, "msg_queue", None)
+    orig_db = getattr(server, "db", None)
+    orig_workout_db = getattr(server, "workout_db", None)
+    orig_guest_mode = getattr(server, "_guest_mode", False)
 
+    test_db = TreadmillDB(":memory:")
+    test_profile = test_db.create_profile("Test User", weight_lbs=154)
+    test_db.set_active_profile_id(test_profile["id"])
+
+    server.db = test_db
+    server._guest_mode = False
     server.client = mock_client
     server.sess = WorkoutSession()
     server.loop = MagicMock()
     server.msg_queue = MagicMock()
     server.msg_queue.put_nowait = MagicMock()
+
+    server.workout_db = WorkoutDB(
+        history_loader=lambda: test_db.get_program_history(server._active_profile_id()),
+        workouts_loader=lambda: test_db.get_saved_workouts(server._active_profile_id()),
+        runs_loader=lambda: test_db.get_runs(server._active_profile_id()),
+        fingerprint_fn=server._program_fingerprint,
+    )
 
     # Reset state
     server.state["proxy"] = True
@@ -54,10 +72,14 @@ def test_app(mock_client):
     tc = TestClient(server.app, raise_server_exceptions=True)
     yield tc, server, mock_client
 
+    test_db.close()
     server.client = orig_client
     server.sess = orig_sess
     server.loop = orig_loop
     server.msg_queue = orig_queue
+    server.db = orig_db
+    server.workout_db = orig_workout_db
+    server._guest_mode = orig_guest_mode
 
 
 class TestSessionWebSocket:

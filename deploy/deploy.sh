@@ -31,7 +31,8 @@ stage() {
     # Python
     mkdir -p build/python
     cp python/server.py python/workout_session.py python/program_engine.py \
-       python/treadmill_client.py python/hrm_client.py python/workout_db.py build/python/
+       python/treadmill_client.py python/hrm_client.py python/workout_db.py \
+       python/db.py build/python/
     cp pyproject.toml build/
 
     # Setup script

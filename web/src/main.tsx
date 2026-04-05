@@ -7,6 +7,7 @@ import App from './App';
 import Lobby from './routes/Lobby';
 import Running from './routes/Running';
 import Debug from './routes/Debug';
+import ProfilePicker from './components/ProfilePicker';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -19,6 +20,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route path="/" component={Lobby} />
               <Route path="/run" component={Running} />
               <Route path="/debug" component={Debug} />
+              <Route path="/profiles" component={ProfilePicker} />
               <Route>
                 <Lobby />
               </Route>

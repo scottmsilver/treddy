@@ -43,28 +43,28 @@ data class KVMessage(
 @Serializable
 data class StatusMessage(
     val type: String = "status",
-    val proxy: Boolean,
-    val emulate: Boolean,
-    @SerialName("emu_speed") val emuSpeed: Int,
-    @SerialName("emu_speed_mph") val emuSpeedMph: Double,
-    @SerialName("emu_incline") val emuIncline: Double,
+    @Serializable(with = LenientBoolSerializer::class) val proxy: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val emulate: Boolean,
+    @Serializable(with = LenientIntSerializer::class) @SerialName("emu_speed") val emuSpeed: Int,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("emu_speed_mph") val emuSpeedMph: Double,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("emu_incline") val emuIncline: Double,
     val speed: Double? = null,
     val incline: Double? = null,
     val motor: Map<String, String> = emptyMap(),
-    @SerialName("treadmill_connected") val treadmillConnected: Boolean,
-    @SerialName("heart_rate") val heartRate: Int = 0,
-    @SerialName("hrm_connected") val hrmConnected: Boolean = false,
+    @Serializable(with = LenientBoolSerializer::class) @SerialName("treadmill_connected") val treadmillConnected: Boolean,
+    @Serializable(with = LenientIntSerializer::class) @SerialName("heart_rate") val heartRate: Int = 0,
+    @Serializable(with = LenientBoolSerializer::class) @SerialName("hrm_connected") val hrmConnected: Boolean = false,
     @SerialName("hrm_device") val hrmDevice: String = "",
 ) : ServerMessage
 
 @Serializable
 data class SessionMessage(
     val type: String = "session",
-    val active: Boolean,
-    val elapsed: Double,
-    val distance: Double,
-    @SerialName("vert_feet") val vertFeet: Double,
-    val calories: Double = 0.0,
+    @Serializable(with = LenientBoolSerializer::class) val active: Boolean,
+    @Serializable(with = LenientDoubleSerializer::class) val elapsed: Double,
+    @Serializable(with = LenientDoubleSerializer::class) val distance: Double,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("vert_feet") val vertFeet: Double,
+    @Serializable(with = LenientDoubleSerializer::class) val calories: Double = 0.0,
     @SerialName("wall_started_at") val wallStartedAt: String,
     @SerialName("end_reason") val endReason: String? = null,
 ) : ServerMessage
@@ -72,15 +72,15 @@ data class SessionMessage(
 @Serializable
 data class Interval(
     val name: String,
-    val duration: Int,
-    val speed: Double,
-    val incline: Double,
+    @Serializable(with = LenientIntSerializer::class) val duration: Int,
+    @Serializable(with = LenientDoubleSerializer::class) val speed: Double,
+    @Serializable(with = LenientDoubleSerializer::class) val incline: Double,
 )
 
 @Serializable
 data class Program(
     val name: String,
-    val manual: Boolean? = null,
+    @Serializable(with = LenientNullableBoolSerializer::class) val manual: Boolean? = null,
     val intervals: List<Interval>,
 )
 
@@ -88,27 +88,27 @@ data class Program(
 data class ProgramMessage(
     val type: String = "program",
     val program: Program? = null,
-    val running: Boolean,
-    val paused: Boolean,
-    val completed: Boolean,
-    @SerialName("current_interval") val currentInterval: Int,
-    @SerialName("interval_elapsed") val intervalElapsed: Double,
-    @SerialName("total_elapsed") val totalElapsed: Double,
-    @SerialName("total_duration") val totalDuration: Double,
+    @Serializable(with = LenientBoolSerializer::class) val running: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val paused: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val completed: Boolean,
+    @Serializable(with = LenientIntSerializer::class) @SerialName("current_interval") val currentInterval: Int,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("interval_elapsed") val intervalElapsed: Double,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("total_elapsed") val totalElapsed: Double,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("total_duration") val totalDuration: Double,
     val encouragement: String? = null,
 ) : ServerMessage
 
 @Serializable
 data class ConnectionMessage(
     val type: String = "connection",
-    val connected: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val connected: Boolean,
 ) : ServerMessage
 
 @Serializable
 data class HRMessage(
     val type: String = "hr",
     val bpm: Int,
-    val connected: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val connected: Boolean,
     val device: String = "",
     val address: String = "",
 ) : ServerMessage
@@ -130,7 +130,7 @@ data class ScanResultMessage(
 data class ProfileChangedMessage(
     val type: String = "profile_changed",
     val profile: Profile? = null,
-    @SerialName("guest_mode") val guestMode: Boolean = false,
+    @Serializable(with = LenientBoolSerializer::class) @SerialName("guest_mode") val guestMode: Boolean = false,
 ) : ServerMessage
 
 @Serializable

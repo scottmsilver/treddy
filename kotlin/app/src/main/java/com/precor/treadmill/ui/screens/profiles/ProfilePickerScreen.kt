@@ -343,28 +343,19 @@ private fun GuestAvatar(
             .padding(4.dp),
     ) {
         Box(
-            modifier = Modifier.size(80.dp),
+            modifier = Modifier
+                .size(80.dp)
+                .background(
+                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                        colors = listOf(Color(0xFFE8E4DF), Color(0xFFD4C4A8)),
+                    ),
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                ),
             contentAlignment = Alignment.Center,
         ) {
-            // Dashed circle border
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                drawCircle(
-                    color = Color(0x59E8E4DF), // text3
-                    style = Stroke(
-                        width = 2.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(
-                            floatArrayOf(8.dp.toPx(), 6.dp.toPx())
-                        )
-                    ),
-                )
-            }
             Text(
-                text = "?",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.text3,
+                text = "\uD83D\uDC4B",
+                fontSize = 32.sp,
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -372,7 +363,7 @@ private fun GuestAvatar(
             text = "Guest",
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-            color = colors.text3,
+            color = colors.text,
             textAlign = TextAlign.Center,
         )
         Text(

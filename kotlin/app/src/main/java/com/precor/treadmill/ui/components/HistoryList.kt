@@ -45,7 +45,8 @@ fun HistoryList(
     var history by remember { mutableStateOf<List<HistoryEntry>>(emptyList()) }
 
     LaunchedEffect(refreshKey) {
-        runCatching { history = api.getHistory() }.onFailure {
+        runCatching { history = api.getHistory() }.onFailure { e ->
+            android.util.Log.e("HistoryList", "Failed to load history", e)
             Toast.makeText(context, "Failed to load history", Toast.LENGTH_SHORT).show()
         }
     }

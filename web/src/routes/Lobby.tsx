@@ -23,19 +23,27 @@ const lobbyBtn: React.CSSProperties = {
 };
 
 export default function Lobby(): React.ReactElement {
-  const { session, program } = useTreadmillState();
+  const { session, program, activeProfile, guestMode } = useTreadmillState();
   const actions = useTreadmillActions();
   const pgm = useProgram();
   const [, setLocation] = useLocation();
 
   const workoutActive = session.active || program.running;
   const quickStartGuard = useRef(false);
+
+  // Build greeting with profile name
+  const greetingText = activeProfile?.name
+    ? `${greeting()}, ${activeProfile.name.split(/\s+/)[0]}`
+    : guestMode
+      ? `${greeting()}, Guest`
+      : greeting();
+
   return (
     <div className="lobby-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Greeting + action buttons */}
       <div style={{ textAlign: 'center', padding: '24px 16px 12px' }}>
         <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
-          {greeting()}
+          {greetingText}
         </div>
         <div style={{ fontSize: 14, color: 'var(--text3)', marginBottom: 16 }}>
           Ready for a run?

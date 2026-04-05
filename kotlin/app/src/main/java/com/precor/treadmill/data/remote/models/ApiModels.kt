@@ -70,7 +70,7 @@ data class ToolCallRequest(
 
 @Serializable
 data class ToolCallResponse(
-    val ok: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val ok: Boolean,
     val result: String? = null,
     val error: String? = null,
 )
@@ -81,7 +81,7 @@ data class HrmSelectRequest(val address: String)
 @Serializable
 data class HrmStatusResponse(
     @SerialName("heart_rate") val heartRate: Int = 0,
-    val connected: Boolean = false,
+    @Serializable(with = LenientBoolSerializer::class) val connected: Boolean = false,
     val device: String = "",
     @SerialName("available_devices") val availableDevices: List<HrmDevice> = emptyList(),
 )
@@ -90,27 +90,27 @@ data class HrmStatusResponse(
 
 @Serializable
 data class GenericOkResponse(
-    val ok: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val ok: Boolean,
     val error: String? = null,
 )
 
 @Serializable
 data class GenerateResponse(
-    val ok: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val ok: Boolean,
     val program: Program? = null,
     val error: String? = null,
 )
 
 @Serializable
 data class LoadHistoryResponse(
-    val ok: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val ok: Boolean,
     val program: Program? = null,
     val error: String? = null,
 )
 
 @Serializable
 data class GpxUploadResponse(
-    val ok: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val ok: Boolean,
     val program: Program? = null,
     val error: String? = null,
 )
@@ -137,44 +137,45 @@ data class ExtractIntentResponse(
 
 @Serializable
 data class RunRecord(
-    val id: String = "",
+    @Serializable(with = LenientStringSerializer::class) val id: String = "",
     @SerialName("started_at") val startedAt: String? = null,
     @SerialName("ended_at") val endedAt: String? = null,
-    val elapsed: Double = 0.0,
-    val distance: Double = 0.0,
-    @SerialName("vert_feet") val vertFeet: Double = 0.0,
+    @Serializable(with = LenientDoubleSerializer::class) val elapsed: Double = 0.0,
+    @Serializable(with = LenientDoubleSerializer::class) val distance: Double = 0.0,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("vert_feet") val vertFeet: Double = 0.0,
+    @Serializable(with = LenientDoubleSerializer::class) val calories: Double = 0.0,
     @SerialName("end_reason") val endReason: String = "",
     @SerialName("program_name") val programName: String? = null,
-    @SerialName("program_completed") val programCompleted: Boolean = false,
-    @SerialName("is_manual") val isManual: Boolean = false,
+    @Serializable(with = LenientBoolSerializer::class) @SerialName("program_completed") val programCompleted: Boolean = false,
+    @Serializable(with = LenientBoolSerializer::class) @SerialName("is_manual") val isManual: Boolean = false,
 )
 
 @Serializable
 data class HistoryEntry(
-    val id: String = "",
-    val prompt: String = "",
+    @Serializable(with = LenientStringSerializer::class) val id: String = "",
+    val prompt: String? = null,
     val program: Program? = null,
     @SerialName("created_at") val createdAt: String = "",
-    @SerialName("total_duration") val totalDuration: Double = 0.0,
-    val completed: Boolean = false,
-    @SerialName("last_interval") val lastInterval: Int = 0,
-    @SerialName("last_elapsed") val lastElapsed: Int = 0,
-    val saved: Boolean = false,
+    @Serializable(with = LenientIntSerializer::class) @SerialName("total_duration") val totalDuration: Int = 0,
+    @Serializable(with = LenientBoolSerializer::class) val completed: Boolean = false,
+    @Serializable(with = LenientIntSerializer::class) @SerialName("last_interval") val lastInterval: Int = 0,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("last_elapsed") val lastElapsed: Double = 0.0,
+    @Serializable(with = LenientBoolSerializer::class) val saved: Boolean = false,
     @SerialName("last_run") val lastRun: RunRecord? = null,
     @SerialName("last_run_text") val lastRunText: String = "",
 )
 
 @Serializable
 data class SavedWorkout(
-    val id: String = "",
+    @Serializable(with = LenientStringSerializer::class) val id: String = "",
     val name: String = "",
     val program: Program? = null,
     @SerialName("created_at") val createdAt: String = "",
     val source: String = "",
     val prompt: String = "",
-    @SerialName("times_used") val timesUsed: Int = 0,
+    @Serializable(with = LenientIntSerializer::class) @SerialName("times_used") val timesUsed: Int = 0,
     @SerialName("last_used") val lastUsed: String? = null,
-    @SerialName("total_duration") val totalDuration: Int = 0,
+    @Serializable(with = LenientIntSerializer::class) @SerialName("total_duration") val totalDuration: Int = 0,
     @SerialName("last_run") val lastRun: RunRecord? = null,
     @SerialName("last_run_text") val lastRunText: String = "",
     @SerialName("usage_text") val usageText: String = "",
@@ -190,7 +191,7 @@ data class SaveWorkoutRequest(
 
 @Serializable
 data class SaveWorkoutResponse(
-    val ok: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val ok: Boolean,
     val workout: SavedWorkout? = null,
     val error: String? = null,
 )
@@ -230,7 +231,7 @@ data class UpdateUserRequest(
 
 @Serializable
 data class TtsResponse(
-    val ok: Boolean,
+    @Serializable(with = LenientBoolSerializer::class) val ok: Boolean,
     val audio: String? = null,
     @SerialName("sample_rate") val sampleRate: Int? = null,
     val error: String? = null,
@@ -268,5 +269,5 @@ data class ConvertGuestRequest(
 @Serializable
 data class ActiveProfileResponse(
     val profile: Profile? = null,
-    @SerialName("guest_mode") val guestMode: Boolean = false,
+    @Serializable(with = LenientBoolSerializer::class) @SerialName("guest_mode") val guestMode: Boolean = false,
 )

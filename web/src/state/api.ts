@@ -1,4 +1,4 @@
-import type { ChatResponse, HistoryEntry, StatusMessage, ProgramMessage, SessionMessage, AppConfig, SavedWorkout, Program } from './types';
+import type { ChatResponse, HistoryEntry, StatusMessage, ProgramMessage, SessionMessage, AppConfig, SavedWorkout, Program, Profile } from './types';
 
 function apiBase(): string {
   return '';  // same origin; Vite proxy handles in dev
@@ -238,6 +238,57 @@ export async function forgetHrmDevice(): Promise<{ ok: boolean }> {
 
 export async function scanHrm(): Promise<{ ok: boolean }> {
   return post('/api/hrm/scan', {});
+}
+
+// --- Profiles ---
+
+export async function getProfiles(): Promise<Profile[]> {
+  return get('/api/profiles');
+}
+
+export async function createProfile(body: { name: string; color?: string; initials?: string; weight_lbs?: number }): Promise<Profile> {
+  return post('/api/profiles', body);
+}
+
+export async function updateProfile(id: string, body: { name?: string; weight_lbs?: number; vest_lbs?: number; color?: string }): Promise<Profile> {
+  const resp: any = await put(`/api/profiles/${id}`, body);
+  return resp.profile ?? resp;
+}
+
+export async function deleteProfile(id: string): Promise<{ ok: boolean }> {
+  return del(`/api/profiles/${id}`);
+}
+
+export async function selectProfile(id: string): Promise<{ ok: boolean; profile: Profile }> {
+  return post('/api/profile/select', { id });
+}
+
+export async function startGuest(): Promise<{ ok: boolean }> {
+  return post('/api/profile/guest', {});
+}
+
+export async function convertGuest(body: { name: string; color?: string }): Promise<Profile> {
+  return post('/api/profile/guest/convert', body);
+}
+
+export async function getActiveProfile(): Promise<{ profile: Profile | null; guest_mode: boolean }> {
+  return get('/api/profile/active');
+}
+
+export async function uploadAvatar(id: string, file: File): Promise<{ ok: boolean }> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${apiBase()}/api/profiles/${id}/avatar`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`Upload error: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteAvatar(id: string): Promise<{ ok: boolean }> {
+  return del(`/api/profiles/${id}/avatar`);
+}
+
+export function avatarUrl(id: string): string {
+  return `${apiBase()}/api/profiles/${id}/avatar`;
 }
 
 // --- Voice prompts ---

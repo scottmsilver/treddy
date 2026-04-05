@@ -4,6 +4,8 @@ import { useTreadmillState, useTreadmillActions, useToast } from '../state/Tread
 import * as api from '../state/api';
 import { haptic } from '../utils/haptics';
 import { hrColor } from '../utils/hrColor';
+import { AvatarCircle, AVATAR_COLORS } from './ProfilePicker';
+import type { Profile } from '../state/types';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -19,7 +21,7 @@ const rowStyle: React.CSSProperties = {
 };
 
 export default function SettingsPanel({ open, onClose }: SettingsPanelProps): React.ReactElement | null {
-  const { status, hrmDevices } = useTreadmillState();
+  const { status, hrmDevices, activeProfile } = useTreadmillState();
   const actions = useTreadmillActions();
   const showToast = useToast();
   const [debugUnlocked, setDebugUnlocked] = useState(false);
@@ -32,15 +34,34 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps): Re
   const [hrmScanning, setHrmScanning] = useState(false);
   const [weightLbs, setWeightLbs] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const debugTaps = useRef<number[]>([]);
   const [, setLocation] = useLocation();
 
-  // Fetch user profile when panel opens
+  // Profile editing state
+  const [editingName, setEditingName] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileColor, setProfileColor] = useState('');
+  const [localProfile, setLocalProfile] = useState<Profile | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync profile state when panel OPENS (not on every activeProfile change)
+  const prevOpen = useRef(false);
   useEffect(() => {
-    if (open) {
+    if (open && !prevOpen.current) {
+      // Panel just opened — sync from context
       api.getUser().then(u => setWeightLbs(u.weight_lbs)).catch(() => {});
+      if (activeProfile) {
+        setProfileName(activeProfile.name);
+        setProfileColor(activeProfile.color);
+        setLocalProfile(activeProfile);
+      }
+      setConfirmDelete(false);
+      setEditingName(false);
     }
-  }, [open]);
+    prevOpen.current = open;
+  }, [open]); // intentionally omit activeProfile — don't reset mid-edit
 
   // Reset debug unlock when panel closes
   useEffect(() => {
@@ -110,6 +131,165 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps): Re
         >
           Settings
         </h2>
+
+        {/* Profile Section */}
+        {localProfile && (
+          <div style={{ marginBottom: 20 }}>
+            {/* Avatar + Name */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 14,
+              padding: '8px 4px 16px',
+            }}>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <AvatarCircle profile={{ ...localProfile, name: profileName, color: profileColor }} size={56} fontSize={20} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {editingName ? (
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    value={profileName}
+                    onChange={e => setProfileName(e.target.value)}
+                    onBlur={() => {
+                      setEditingName(false);
+                      const trimmed = profileName.trim();
+                      if (trimmed && trimmed !== localProfile.name) {
+                        api.updateProfile(localProfile.id, { name: trimmed }).then(p => {
+                          setLocalProfile(p);
+                          setProfileName(p.name);
+                        }).catch(() => {
+                          setProfileName(localProfile.name);
+                        });
+                      } else {
+                        setProfileName(localProfile.name);
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    maxLength={30}
+                    style={{
+                      width: '100%', height: 32, borderRadius: 'var(--r-sm)',
+                      border: 'none', background: 'var(--fill2)',
+                      color: 'var(--text)', fontSize: 16, fontWeight: 700,
+                      padding: '0 8px', fontFamily: 'inherit',
+                    }}
+                  />
+                ) : (
+                  <div
+                    onClick={() => {
+                      setEditingName(true);
+                      // Focus after render, with enough delay for the input to mount
+                      setTimeout(() => nameInputRef.current?.focus(), 150);
+                    }}
+                    style={{
+                      fontSize: 16, fontWeight: 700, color: 'var(--text)',
+                      cursor: 'pointer',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    {profileName}
+                    <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 6 }}>edit</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Avatar actions */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                style={{
+                  flex: 1, height: 40, borderRadius: 'var(--r-sm)',
+                  border: 'none', background: 'var(--fill2)',
+                  color: 'var(--text)', fontSize: 13, fontWeight: 600,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {localProfile.has_avatar ? 'Change Photo' : 'Upload Photo'}
+              </button>
+              {localProfile.has_avatar && (
+                <button
+                  onClick={async () => {
+                    haptic(25);
+                    try {
+                      await api.deleteAvatar(localProfile.id);
+                      setLocalProfile({ ...localProfile, has_avatar: false });
+                      showToast('Photo removed');
+                    } catch {
+                      showToast('Failed to remove photo');
+                    }
+                  }}
+                  style={{
+                    height: 40, padding: '0 14px', borderRadius: 'var(--r-sm)',
+                    border: 'none', background: 'var(--fill2)',
+                    color: 'var(--red)', fontSize: 13, fontWeight: 600,
+                    fontFamily: 'inherit', cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  Remove
+                </button>
+              )}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    await api.uploadAvatar(localProfile.id, file);
+                    setLocalProfile({ ...localProfile, has_avatar: true });
+                    haptic(25);
+                    showToast('Photo updated');
+                  } catch {
+                    showToast('Upload failed');
+                  }
+                  if (avatarInputRef.current) avatarInputRef.current.value = '';
+                }}
+                style={{ display: 'none' }}
+              />
+            </div>
+
+            {/* Color swatches */}
+            <div style={{
+              display: 'flex', gap: 10, marginBottom: 16,
+              padding: '0 4px',
+            }}>
+              {AVATAR_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={async () => {
+                    setProfileColor(c);
+                    haptic(15);
+                    try {
+                      const p = await api.updateProfile(localProfile.id, { color: c });
+                      setLocalProfile(p);
+                    } catch {
+                      setProfileColor(localProfile.color);
+                    }
+                  }}
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: c,
+                    border: profileColor === c ? '3px solid var(--text)' : '3px solid transparent',
+                    cursor: 'pointer', padding: 0,
+                    transition: 'border 150ms var(--ease)',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                />
+              ))}
+            </div>
+
+            <div style={{ borderBottom: '1px solid var(--separator)' }} />
+          </div>
+        )}
 
         {/* Weight */}
         <div style={{ ...rowStyle, cursor: 'default' }}>
@@ -378,6 +558,70 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps): Re
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Delete Profile (danger zone) */}
+        {localProfile && (
+          <div style={{ marginTop: 32 }}>
+            {confirmDelete ? (
+              <div style={{
+                background: 'rgba(196,92,82,0.1)', borderRadius: 'var(--r-sm)',
+                padding: 16, textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 14, color: 'var(--red)', fontWeight: 600, marginBottom: 12 }}>
+                  Delete "{localProfile.name}"? This cannot be undone.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    style={{
+                      flex: 1, height: 40, borderRadius: 'var(--r-sm)',
+                      border: 'none', background: 'var(--fill)',
+                      color: 'var(--text2)', fontSize: 14, fontWeight: 600,
+                      fontFamily: 'inherit', cursor: 'pointer',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >Cancel</button>
+                  <button
+                    onClick={async () => {
+                      haptic([25, 50, 25]);
+                      try {
+                        await api.deleteProfile(localProfile.id);
+                        showToast('Profile deleted');
+                        onClose();
+                        setLocation('/profiles');
+                      } catch (err) {
+                        showToast(err instanceof Error && err.message.includes('400')
+                          ? 'Cannot delete the last profile'
+                          : 'Failed to delete profile');
+                      }
+                      setConfirmDelete(false);
+                    }}
+                    style={{
+                      flex: 1, height: 40, borderRadius: 'var(--r-sm)',
+                      border: 'none', background: 'var(--red)',
+                      color: '#fff', fontSize: 14, fontWeight: 700,
+                      fontFamily: 'inherit', cursor: 'pointer',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >Delete</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setConfirmDelete(true); haptic(25); }}
+                style={{
+                  width: '100%', height: 44, borderRadius: 'var(--r-sm)',
+                  border: 'none', background: 'transparent',
+                  color: 'var(--red)', fontSize: 14, fontWeight: 500,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Delete Profile
+              </button>
+            )}
           </div>
         )}
       </div>

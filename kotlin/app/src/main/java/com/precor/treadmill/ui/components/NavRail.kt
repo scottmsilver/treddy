@@ -13,18 +13,25 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.precor.treadmill.data.remote.models.Profile
 
 @Composable
 fun NavRail(
@@ -33,6 +40,8 @@ fun NavRail(
     onNavigate: (String) -> Unit,
     onVoiceToggle: () -> Unit,
     onSettingsToggle: () -> Unit,
+    activeProfile: Profile? = null,
+    guestMode: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isRunSelected = currentRoute.startsWith("running")
@@ -52,6 +61,13 @@ fun NavRail(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            ProfileTabItem(
+                profile = activeProfile,
+                guestMode = guestMode,
+                selected = currentRoute == "profiles",
+                onClick = { onNavigate("profiles") },
+                showLabel = false,
+            )
             TabItem(
                 icon = Icons.Default.Home,
                 label = "Home",
@@ -91,6 +107,12 @@ fun NavRail(
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            ProfileTabItem(
+                profile = activeProfile,
+                guestMode = guestMode,
+                selected = currentRoute == "profiles",
+                onClick = { onNavigate("profiles") },
+            )
             TabItem(
                 icon = Icons.Default.Home,
                 label = "Home",
@@ -231,6 +253,64 @@ private fun VoiceTabItem(
                 },
                 color = color,
                 fontSize = 10.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileTabItem(
+    profile: Profile?,
+    guestMode: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    showLabel: Boolean = true,
+) {
+    val label = profile?.name ?: if (guestMode) "Guest" else "Profile"
+    val initials = profile?.initials ?: if (guestMode) "?" else "?"
+    val bgColor = try {
+        Color(android.graphics.Color.parseColor(profile?.color ?: "#d4c4a8"))
+    } catch (_: Exception) {
+        Color(0xFFD4C4A8)
+    }
+
+    Column(
+        modifier = Modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(vertical = if (showLabel) 4.dp else 10.dp, horizontal = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(bgColor)
+                .then(
+                    if (selected) Modifier.border(2.dp, Color(0xFFE8E4DF), CircleShape)
+                    else Modifier
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = initials,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1E1D1B),
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (showLabel) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = label,
+                color = if (selected) Color(0xFFE8E4DF) else Color(0x59E8E4DF),
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

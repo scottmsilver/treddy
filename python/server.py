@@ -22,6 +22,7 @@ import time
 from contextlib import asynccontextmanager
 
 import uvicorn
+from db import DEFAULT_WEIGHT_LBS, GUEST_PROFILE_ID, TreadmillDB  # noqa: F401
 from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -59,14 +60,80 @@ _dirty_speed_until = 0.0
 _dirty_incline_until = 0.0
 _DIRTY_GRACE_SEC = 15.0  # motor can take 10+ seconds to reach target incline
 
+# --- Database & profile globals ---
+db: TreadmillDB = None
+workout_db: WorkoutDB = None
+_guest_mode = False
+
+
+def _active_profile_id():
+    """Return the active profile ID, or GUEST_PROFILE_ID in guest mode."""
+    if _guest_mode or db is None:
+        return GUEST_PROFILE_ID
+    pid = db.get_active_profile_id()
+    return pid if pid else GUEST_PROFILE_ID
+
+
+def _user_weight_kg():
+    """Get total weight in kg for calorie calculations (body + vest)."""
+    if db is None:
+        return DEFAULT_WEIGHT_LBS * 0.453592
+    p = db.get_profile(_active_profile_id())
+    if not p:
+        return DEFAULT_WEIGHT_LBS * 0.453592
+    total_lbs = (p.get("weight_lbs") or DEFAULT_WEIGHT_LBS) + (p.get("vest_lbs") or 0)
+    return total_lbs * 0.453592
+
+
+def _sync_workout_db():
+    """Sync the read-only WorkoutDB with current profile data."""
+    if workout_db:
+        workout_db.sync(active_program=sess.prog.program if sess else None)
+
+
+async def _broadcast_profile_changed():
+    """Broadcast status after profile switch so all clients update."""
+    await manager.broadcast(build_status())
+
 
 @asynccontextmanager
 async def lifespan(application):
-    global loop, msg_queue, client, hrm, sess
+    global loop, msg_queue, client, hrm, sess, db, workout_db
 
     loop = asyncio.get_event_loop()
     msg_queue = asyncio.Queue(maxsize=500)
     sess = WorkoutSession()
+
+    # Init database
+    db_path = os.environ.get("TREADMILL_DB", "treadmill.db")
+    db = TreadmillDB(db_path)
+
+    # Migrate from JSON files if this is first run (no real profiles yet)
+    if db.profile_count() == 0 and any(
+        os.path.exists(f)
+        for f in ["program_history.json", "saved_workouts.json", "run_history.json", "user_profile.json"]
+    ):
+        import socket
+
+        hostname = socket.gethostname()
+        profile_name = hostname.capitalize() if hostname and hostname != "localhost" else "Owner"
+        owner = db.create_profile(profile_name)
+        db.set_active_profile_id(owner["id"])
+        db.migrate_from_json(
+            owner["id"],
+            history_file="program_history.json",
+            workouts_file="saved_workouts.json",
+            runs_file="run_history.json",
+            user_file="user_profile.json",
+        )
+
+    # Init workout query DB with dynamic lambdas using active profile
+    workout_db = WorkoutDB(
+        history_loader=lambda: db.get_program_history(_active_profile_id()),
+        workouts_loader=lambda: db.get_saved_workouts(_active_profile_id()),
+        runs_loader=lambda: db.get_runs(_active_profile_id()),
+        fingerprint_fn=_program_fingerprint,
+    )
 
     # Connect to treadmill_io C binary (or mock for UI-only dev)
     mock_mode = os.environ.get("TREADMILL_MOCK")
@@ -221,6 +288,8 @@ async def lifespan(application):
     if hrm:
         hrm.close()
     client.close()
+    if db:
+        db.close()
     log.info("Server stopped")
 
 
@@ -266,77 +335,21 @@ latest = {
 chat_history: list = []
 _chat_lock = asyncio.Lock()  # serializes chat history mutations
 
-HISTORY_FILE = "program_history.json"
-MAX_HISTORY = 10
-
-
-def _load_history():
-    try:
-        with open(HISTORY_FILE) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-
-def _save_history(history):
-    tmp = HISTORY_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(history, f, indent=2)
-    os.replace(tmp, HISTORY_FILE)
-
 
 def _add_to_history(program, prompt=""):
-    history = _load_history()
-    entry = {
-        "id": f"{int(time.time())}",
-        "prompt": prompt,
-        "program": program,
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "total_duration": sum(iv["duration"] for iv in program.get("intervals", [])),
-        "completed": False,
-        "last_interval": 0,
-        "last_elapsed": 0,
-    }
-    # Deduplicate by name - replace if same name exists
-    history = [h for h in history if h["program"].get("name") != program.get("name")]
-    history.insert(0, entry)
-    history = history[:MAX_HISTORY]
-    _save_history(history)
-    workout_db.sync(active_program=sess.prog.program if sess else None)
+    """Add program to history via db, return entry dict."""
+    entry = db.add_to_history(_active_profile_id(), program, prompt=prompt)
+    _sync_workout_db()
     return entry
 
 
 def _update_history_position(program_name, interval, elapsed, completed=False):
     """Update the history entry for a program with its last position."""
-    history = _load_history()
+    history = db.get_program_history(_active_profile_id())
     for entry in history:
         if entry["program"].get("name") == program_name:
-            entry["last_interval"] = interval
-            entry["last_elapsed"] = elapsed
-            entry["completed"] = completed
-            break
-    else:
-        return  # Not in history
-    _save_history(history)
-
-
-WORKOUTS_FILE = "saved_workouts.json"
-MAX_SAVED_WORKOUTS = 100
-
-
-def _load_workouts():
-    try:
-        with open(WORKOUTS_FILE) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-
-def _save_workouts(workouts):
-    tmp = WORKOUTS_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(workouts, f, indent=2)
-    os.replace(tmp, WORKOUTS_FILE)
+            db.update_history_entry(entry["id"], completed=completed, last_interval=interval, last_elapsed=elapsed)
+            return
 
 
 def _program_fingerprint(program):
@@ -345,60 +358,7 @@ def _program_fingerprint(program):
     return "|".join(f"{iv.get('speed', 0)},{iv.get('incline', 0)},{iv.get('duration', 0)}" for iv in intervals)
 
 
-# --- User Profile ---
-
-USER_PROFILE_FILE = "user_profile.json"
-
-DEFAULT_USER = {
-    "id": "1",
-    "weight_lbs": 154,  # ~70 kg
-    "vest_lbs": 0,  # weight vest, added to body weight for calorie calc
-}
-
-
-def _load_user():
-    try:
-        with open(USER_PROFILE_FILE) as f:
-            user = json.load(f)
-            return {**DEFAULT_USER, **user}
-    except (FileNotFoundError, json.JSONDecodeError):
-        return dict(DEFAULT_USER)
-
-
-def _save_user(user):
-    tmp = USER_PROFILE_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(user, f, indent=2)
-    os.replace(tmp, USER_PROFILE_FILE)
-
-
-def _user_weight_kg():
-    """Get total weight in kg for calorie calculations (body + vest)."""
-    user = _load_user()
-    total_lbs = user.get("weight_lbs", 154) + user.get("vest_lbs", 0)
-    return total_lbs * 0.453592
-
-
-# --- Run History (completed/stopped runs) ---
-
-RUNS_FILE = "run_history.json"
-MAX_RUNS = 200
-
-
-def _load_runs():
-    try:
-        with open(RUNS_FILE) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-
-def _save_runs(runs):
-    tmp = RUNS_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(runs, f, indent=2)
-    os.replace(tmp, RUNS_FILE)
-
+# --- Run records (db-backed) ---
 
 _active_run_id = None  # ID of the in-progress run record, if any
 
@@ -427,26 +387,21 @@ def _start_run_record():
     global _active_run_id
     if not sess.active or sess.elapsed < 5:
         return
-    _active_run_id = f"{time.time_ns()}"
     record = _build_run_record("in_progress")
-    runs = _load_runs()
-    runs.insert(0, record)
-    if len(runs) > MAX_RUNS:
-        runs = runs[:MAX_RUNS]
-    _save_runs(runs)
+    _active_run_id = db.insert_run(_active_profile_id(), record)
 
 
 def _update_run_record():
     """Update the in-progress run record with current metrics. Called periodically."""
     if not _active_run_id or not sess.active:
         return
-    record = _build_run_record("in_progress")
-    runs = _load_runs()
-    for i, r in enumerate(runs):
-        if r.get("id") == _active_run_id:
-            runs[i] = record
-            _save_runs(runs)
-            return
+    db.update_run(
+        _active_run_id,
+        elapsed=round(sess.elapsed, 1),
+        distance=round(sess.distance, 3),
+        vert_feet=round(sess.vert_feet, 1),
+        calories=round(sess.calories, 1),
+    )
 
 
 def _save_run_record(reason):
@@ -456,45 +411,32 @@ def _save_run_record(reason):
         _active_run_id = None
         return
     record = _build_run_record(reason)
-    runs = _load_runs()
     if _active_run_id:
-        # Update existing in-progress record
-        for i, r in enumerate(runs):
-            if r.get("id") == _active_run_id:
-                runs[i] = record
-                break
-        else:
-            # Not found (shouldn't happen), insert as new
-            runs.insert(0, record)
+        db.update_run(
+            _active_run_id,
+            ended_at=record["ended_at"],
+            elapsed=record["elapsed"],
+            distance=record["distance"],
+            vert_feet=record["vert_feet"],
+            calories=record["calories"],
+            end_reason=reason,
+            program_completed=record["program_completed"],
+        )
     else:
-        # No in-progress record (legacy path), insert as new
-        runs.insert(0, record)
-    if len(runs) > MAX_RUNS:
-        runs = runs[:MAX_RUNS]
-    _save_runs(runs)
+        db.insert_run(_active_profile_id(), record)
     _active_run_id = None
-    workout_db.sync(active_program=sess.prog.program)
+    _sync_workout_db()
 
 
 def _last_run_by_fingerprint():
     """Build a lookup of most recent run per program fingerprint."""
-    runs = _load_runs()
+    runs = db.get_runs(_active_profile_id())
     by_fp = {}
     for r in runs:
         fp = r.get("program_fingerprint")
         if fp and fp not in by_fp:
             by_fp[fp] = r  # runs are newest-first, so first seen wins
     return by_fp
-
-
-# --- Workout Query Database ---
-
-workout_db = WorkoutDB(
-    history_loader=_load_history,
-    workouts_loader=_load_workouts,
-    runs_loader=_load_runs,
-    fingerprint_fn=_program_fingerprint,
-)
 
 
 def _relative_time(date_str):
@@ -579,23 +521,11 @@ def _validate_program(program):
 
 
 def _save_workout(program, source="generated", prompt=""):
-    workouts = _load_workouts()
-    entry = {
-        "id": f"{time.time_ns()}",
-        "name": program.get("name", "Untitled"),
-        "program": program,
-        "source": source,
-        "prompt": prompt,
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "last_used": None,
-        "times_used": 0,
-        "total_duration": sum(iv["duration"] for iv in program.get("intervals", [])),
-    }
-    workouts.append(entry)
-    if len(workouts) > MAX_SAVED_WORKOUTS:
-        workouts = workouts[-MAX_SAVED_WORKOUTS:]
-    _save_workouts(workouts)
-    workout_db.sync(active_program=sess.prog.program if sess else None)
+    """Save a workout to the active profile. Returns None in guest mode."""
+    if _guest_mode:
+        return None
+    entry = db.save_workout(_active_profile_id(), program, source=source, prompt=prompt)
+    _sync_workout_db()
     return entry
 
 
@@ -728,7 +658,7 @@ def build_status():
                 incline = int(inc, 16) / 2.0
             except ValueError:
                 pass
-    return {
+    result = {
         "type": "status",
         "proxy": state["proxy"],
         "emulate": state["emulate"],
@@ -742,7 +672,14 @@ def build_status():
         "heart_rate": state["heart_rate"],
         "hrm_connected": state["hrm_connected"],
         "hrm_device": state["hrm_device"],
+        "guest_mode": _guest_mode,
     }
+    if db:
+        pid = _active_profile_id()
+        p = db.get_profile(pid)
+        if p:
+            result["active_profile"] = p
+    return result
 
 
 async def broadcast_status():
@@ -1009,28 +946,174 @@ def _create_ephemeral_token() -> str | None:
         return None
 
 
-# --- User Profile API ---
+# --- User Profile API (proxies to active profile) ---
 
 
 @app.get("/api/user")
 async def api_get_user():
-    return _load_user()
+    """Return active profile as user dict for backward compat."""
+    p = db.get_profile(_active_profile_id()) if db else None
+    if p:
+        return {"id": p["id"], "weight_lbs": p.get("weight_lbs", DEFAULT_WEIGHT_LBS), "vest_lbs": p.get("vest_lbs", 0)}
+    return {"id": "1", "weight_lbs": DEFAULT_WEIGHT_LBS, "vest_lbs": 0}
 
 
 class UpdateUserRequest(BaseModel):
-    weight_lbs: int | None = Field(None, ge=50, le=500)
+    weight_lbs: int | None = Field(None, ge=0, le=500)
     vest_lbs: int | None = Field(None, ge=0, le=100)
 
 
 @app.put("/api/user")
 async def api_update_user(req: UpdateUserRequest):
-    user = _load_user()
+    """Update active profile weight/vest."""
+    pid = _active_profile_id()
+    kwargs = {}
     if req.weight_lbs is not None:
-        user["weight_lbs"] = req.weight_lbs
+        kwargs["weight_lbs"] = req.weight_lbs
     if req.vest_lbs is not None:
-        user["vest_lbs"] = req.vest_lbs
-    _save_user(user)
-    return user
+        kwargs["vest_lbs"] = req.vest_lbs
+    if kwargs and db:
+        db.update_profile(pid, **kwargs)
+    p = db.get_profile(pid) if db else None
+    if p:
+        return {"id": p["id"], "weight_lbs": p.get("weight_lbs", DEFAULT_WEIGHT_LBS), "vest_lbs": p.get("vest_lbs", 0)}
+    return {"id": "1", "weight_lbs": DEFAULT_WEIGHT_LBS, "vest_lbs": 0}
+
+
+# --- Profile Management API ---
+
+
+class CreateProfileRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    color: str = "#4A90D9"
+    weight_lbs: int = Field(default=DEFAULT_WEIGHT_LBS, ge=0, le=500)
+    vest_lbs: int = Field(default=0, ge=0, le=100)
+
+
+@app.get("/api/profiles")
+async def api_list_profiles():
+    return db.get_profiles() if db else []
+
+
+@app.post("/api/profiles")
+async def api_create_profile(req: CreateProfileRequest):
+    p = db.create_profile(req.name, color=req.color, weight_lbs=req.weight_lbs, vest_lbs=req.vest_lbs)
+    return {"ok": True, "profile": p}
+
+
+class UpdateProfileRequest(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=50)
+    color: str | None = None
+    weight_lbs: int | None = Field(None, ge=0, le=500)
+    vest_lbs: int | None = Field(None, ge=0, le=100)
+
+
+@app.put("/api/profiles/{profile_id}")
+async def api_update_profile(profile_id: str, req: UpdateProfileRequest):
+    if not db.get_profile(profile_id):
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    kwargs = {}
+    if req.name is not None:
+        kwargs["name"] = req.name
+        kwargs["initials"] = req.name[0].upper() if req.name else "?"
+    if req.color is not None:
+        kwargs["color"] = req.color
+    if req.weight_lbs is not None:
+        kwargs["weight_lbs"] = req.weight_lbs
+    if req.vest_lbs is not None:
+        kwargs["vest_lbs"] = req.vest_lbs
+    p = db.update_profile(profile_id, **kwargs) if kwargs else db.get_profile(profile_id)
+    if db.get_active_profile_id() == profile_id:
+        await _broadcast_profile_changed()
+    return {"ok": True, "profile": p}
+
+
+@app.delete("/api/profiles/{profile_id}")
+async def api_delete_profile(profile_id: str):
+    if profile_id == GUEST_PROFILE_ID:
+        return JSONResponse({"ok": False, "error": "Cannot delete guest"}, status_code=400)
+    if profile_id == _active_profile_id():
+        return JSONResponse({"ok": False, "error": "Cannot delete active profile"}, status_code=409)
+    if not db.delete_profile(profile_id):
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    return {"ok": True}
+
+
+class SelectProfileRequest(BaseModel):
+    id: str
+
+
+@app.post("/api/profile/select")
+async def api_select_profile(req: SelectProfileRequest):
+    if sess.active:
+        return JSONResponse({"ok": False, "error": "Cannot switch profiles during active session"}, status_code=409)
+    p = db.get_profile(req.id)
+    if not p:
+        return JSONResponse({"ok": False, "error": "Profile not found"}, status_code=404)
+    global _guest_mode
+    _guest_mode = False
+    db.set_active_profile_id(req.id)
+    _sync_workout_db()
+    await _broadcast_profile_changed()
+    return {"ok": True, "profile": p}
+
+
+@app.get("/api/profile/active")
+async def api_get_active_profile():
+    pid = _active_profile_id()
+    p = db.get_profile(pid) if db else None
+    return {"profile": p, "guest_mode": _guest_mode}
+
+
+@app.post("/api/profile/guest")
+async def api_enter_guest_mode():
+    if sess.active:
+        return JSONResponse({"ok": False, "error": "Cannot switch during active session"}, status_code=409)
+    global _guest_mode
+    _guest_mode = True
+    _sync_workout_db()
+    await _broadcast_profile_changed()
+    return {"ok": True, "guest_mode": True}
+
+
+@app.post("/api/profile/guest/convert")
+async def api_convert_guest():
+    """Transfer all guest data to the active non-guest profile."""
+    global _guest_mode
+    pid = db.get_active_profile_id()
+    if not pid or pid == GUEST_PROFILE_ID:
+        return JSONResponse({"ok": False, "error": "No active non-guest profile"}, status_code=400)
+    db.convert_guest(pid)
+    _guest_mode = False
+    _sync_workout_db()
+    return {"ok": True, "profile_id": pid}
+
+
+@app.post("/api/profiles/{profile_id}/avatar")
+async def api_upload_avatar(profile_id: str, file: UploadFile = File(...)):
+    if not db.get_profile(profile_id):
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    data = await file.read(1_000_000)  # 1MB max
+    db.set_avatar(profile_id, data)
+    return {"ok": True}
+
+
+@app.delete("/api/profiles/{profile_id}/avatar")
+async def api_delete_avatar(profile_id: str):
+    if not db.get_profile(profile_id):
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    db.clear_avatar(profile_id)
+    return {"ok": True}
+
+
+@app.get("/api/profiles/{profile_id}/avatar")
+async def api_get_avatar(profile_id: str):
+    data = db.get_avatar(profile_id)
+    if not data:
+        return JSONResponse({"ok": False, "error": "No avatar"}, status_code=404)
+    from fastapi.responses import Response
+
+    return Response(content=data, media_type="image/png")
 
 
 @app.get("/api/config")
@@ -1285,8 +1368,8 @@ async def api_get_program():
 
 @app.get("/api/programs/history")
 async def api_get_history():
-    history = _load_history()
-    saved_fps = {_program_fingerprint(w["program"]) for w in _load_workouts()}
+    history = db.get_program_history(_active_profile_id())
+    saved_fps = {_program_fingerprint(w["program"]) for w in db.get_saved_workouts(_active_profile_id())}
     run_by_fp = _last_run_by_fingerprint()
     for entry in history:
         fp = _program_fingerprint(entry["program"])
@@ -1299,10 +1382,12 @@ async def api_get_history():
 
 @app.post("/api/programs/history/{entry_id}/load")
 async def api_load_from_history(entry_id: str):
-    history = _load_history()
-    entry = next((h for h in history if h["id"] == entry_id), None)
+    entry = db.get_history_entry(entry_id)
     if not entry:
         return {"ok": False, "error": "Not found"}
+    # Ownership check
+    if entry.get("profile_id") != _active_profile_id():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
     sess.prog.load(entry["program"])
     return {"ok": True, "program": entry["program"]}
 
@@ -1310,11 +1395,13 @@ async def api_load_from_history(entry_id: str):
 @app.post("/api/programs/history/{entry_id}/resume")
 async def api_resume_from_history(entry_id: str):
     """Load a program from history and start from the saved position."""
-    history = _load_history()
-    entry = next((h for h in history if h["id"] == entry_id), None)
+    entry = db.get_history_entry(entry_id)
     if not entry:
         return {"ok": False, "error": "Not found"}
-    if entry.get("completed", False):
+    # Ownership check
+    if entry.get("profile_id") != _active_profile_id():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    if entry.get("completed"):
         return {"ok": False, "error": "Program already completed — use load to start over"}
     sess.prog.load(entry["program"])
     resume_iv = entry.get("last_interval", 0)
@@ -1333,9 +1420,7 @@ async def api_resume_from_history(entry_id: str):
 
 @app.get("/api/workouts")
 async def api_list_workouts():
-    workouts = _load_workouts()
-    # Sort by last_used desc, None sorts to end
-    workouts.sort(key=lambda w: w.get("last_used") or "", reverse=True)
+    workouts = db.get_saved_workouts(_active_profile_id())
     run_by_fp = _last_run_by_fingerprint()
     for w in workouts:
         run = run_by_fp.get(_program_fingerprint(w["program"]))
@@ -1347,20 +1432,22 @@ async def api_list_workouts():
 
 @app.get("/api/runs")
 async def api_list_runs():
-    return _load_runs()
+    return db.get_runs(_active_profile_id())
 
 
 @app.post("/api/workouts")
 async def api_save_workout(req: SaveWorkoutRequest):
     if req.history_id:
-        history = _load_history()
-        entry = next((h for h in history if h["id"] == req.history_id), None)
+        entry = db.get_history_entry(req.history_id)
         if not entry:
             return {"ok": False, "error": "History entry not found"}
+        # Ownership check
+        if entry.get("profile_id") != _active_profile_id():
+            return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
         program = entry["program"]
         prompt = entry.get("prompt", "")
         # Infer source
-        if prompt.startswith("GPX:"):
+        if prompt and prompt.startswith("GPX:"):
             source = "gpx"
         elif program.get("manual"):
             source = "manual"
@@ -1377,46 +1464,46 @@ async def api_save_workout(req: SaveWorkoutRequest):
         return {"ok": False, "error": "Provide history_id or program"}
 
     workout = _save_workout(program, source=source, prompt=prompt)
+    if workout is None:
+        return {"ok": False, "error": "Create a profile to save workouts"}
     return {"ok": True, "workout": workout}
 
 
 @app.put("/api/workouts/{workout_id}")
 async def api_rename_workout(workout_id: str, req: RenameWorkoutRequest):
-    workouts = _load_workouts()
-    workout = next((w for w in workouts if w["id"] == workout_id), None)
-    if not workout:
+    w = db.get_saved_workout(workout_id)
+    if not w:
         return {"ok": False, "error": "Not found"}
-    workout["name"] = req.name
-    workout["program"]["name"] = req.name
-    _save_workouts(workouts)
-    workout_db.sync(active_program=sess.prog.program)
+    # Ownership check
+    if w.get("profile_id") != _active_profile_id():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    workout = db.rename_workout(workout_id, req.name)
+    _sync_workout_db()
     return {"ok": True, "workout": workout}
 
 
 @app.delete("/api/workouts/{workout_id}")
 async def api_delete_workout(workout_id: str):
-    workouts = _load_workouts()
-    before = len(workouts)
-    workouts = [w for w in workouts if w["id"] != workout_id]
-    if len(workouts) == before:
+    w = db.get_saved_workout(workout_id)
+    if not w:
         return {"ok": False, "error": "Not found"}
-    _save_workouts(workouts)
-    workout_db.sync(active_program=sess.prog.program)
+    # Ownership check
+    if w.get("profile_id") != _active_profile_id():
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    db.delete_workout(workout_id)
+    _sync_workout_db()
     return {"ok": True}
 
 
 @app.post("/api/workouts/{workout_id}/load")
 async def api_load_workout(workout_id: str):
-    workouts = _load_workouts()
-    workout = next((w for w in workouts if w["id"] == workout_id), None)
+    workout = db.get_saved_workout(workout_id)
     if not workout:
         return {"ok": False, "error": "Not found"}
-    workout["times_used"] = workout.get("times_used", 0) + 1
-    workout["last_used"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-    _save_workouts(workouts)
+    db.update_workout_usage(workout_id)
     sess.prog.load(workout["program"])
     _add_to_history(workout["program"], prompt=workout.get("prompt", ""))
-    workout_db.sync(active_program=sess.prog.program)
+    _sync_workout_db()
     return {"ok": True, "program": workout["program"]}
 
 
@@ -1722,22 +1809,18 @@ async def _exec_fn(name, args):
         start = args.get("start", True)
         # Check saved workouts first, then history
         program = None
-        workouts = _load_workouts()
-        workout = next((w for w in workouts if w["id"] == wid), None)
+        workout = db.get_saved_workout(wid)
         if workout:
-            workout["times_used"] = workout.get("times_used", 0) + 1
-            workout["last_used"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-            _save_workouts(workouts)
+            db.update_workout_usage(wid)
             program = workout["program"]
         else:
-            history = _load_history()
-            entry = next((h for h in history if h["id"] == wid), None)
+            entry = db.get_history_entry(wid)
             if entry:
                 program = entry["program"]
         if not program:
             return f"Workout id '{wid}' not found"
         sess.prog.load(program)
-        workout_db.sync(active_program=sess.prog.program)
+        _sync_workout_db()
         if start:
             await sess.start_program(_prog_on_change(), _prog_on_update())
             n = len(program.get("intervals", []))
@@ -1787,8 +1870,8 @@ def _build_chat_system(smartass=False):
             "current_workout_fingerprint": _program_fingerprint(sess.prog.program),
         }
 
-    history = _load_history()
-    workouts = _load_workouts()
+    history = db.get_program_history(_active_profile_id()) if db else []
+    workouts = db.get_saved_workouts(_active_profile_id()) if db else []
     library_lines = []
     for w in workouts[:10]:
         wname = w.get("name") or w["program"].get("name", "?")

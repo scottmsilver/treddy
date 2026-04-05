@@ -79,7 +79,13 @@ export interface ScanResultMessage {
   devices: Array<{ address: string; name: string; rssi: number }>;
 }
 
-export type ServerMessage = KVMessage | StatusMessage | SessionMessage | ProgramMessage | ConnectionMessage | HRMessage | ScanResultMessage;
+export interface ProfileChangedMessage {
+  type: 'profile_changed';
+  profile: Profile | null;
+  guest_mode: boolean;
+}
+
+export type ServerMessage = KVMessage | StatusMessage | SessionMessage | ProgramMessage | ConnectionMessage | HRMessage | ScanResultMessage | ProfileChangedMessage;
 
 // --- Client state ---
 
@@ -124,6 +130,8 @@ export interface AppState {
   program: ProgramState;
   kvLog: KVEntry[];
   hrmDevices: Array<{ address: string; name: string; rssi: number }>;
+  activeProfile: Profile | null;
+  guestMode: boolean;
   _dirtySpeed: number;
   _dirtyIncline: number;
 }
@@ -187,6 +195,18 @@ export interface ChatResponse {
   text: string;
   actions: Array<{ name: string; args: Record<string, unknown>; result: string }>;
   transcription?: string;
+}
+
+// --- Profile ---
+
+export interface Profile {
+  id: string;
+  name: string;
+  color: string;
+  initials: string;
+  weight_lbs: number;
+  vest_lbs: number;
+  has_avatar: boolean;
 }
 
 // --- Config ---

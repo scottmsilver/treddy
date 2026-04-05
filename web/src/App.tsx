@@ -5,7 +5,8 @@ import Toast from './components/Toast';
 import DisconnectBanner from './components/DisconnectBanner';
 import SettingsPanel from './components/SettingsPanel';
 import VoiceOverlay from './components/VoiceOverlay';
-import { ToastContext, registerToast } from './state/TreadmillContext';
+import GuestPrompt from './components/GuestPrompt';
+import { ToastContext, registerToast, useTreadmillState } from './state/TreadmillContext';
 import { useVoiceContext } from './state/VoiceContext';
 
 function useWakeLock() {
@@ -39,11 +40,22 @@ export default function App({ children }: { children: React.ReactNode }) {
   const [toastMsg, setToastMsg] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [guestPromptVisible, setGuestPromptVisible] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { voiceState, toggle: toggleVoice } = useVoiceContext();
   const isLandscape = useIsLandscape();
+  const { session, guestMode } = useTreadmillState();
+  const prevSessionActive = useRef(session.active);
 
   useWakeLock();
+
+  // Show guest prompt when a guest session ends
+  useEffect(() => {
+    if (prevSessionActive.current && !session.active && guestMode && session.endReason) {
+      setGuestPromptVisible(true);
+    }
+    prevSessionActive.current = session.active;
+  }, [session.active, session.endReason, guestMode]);
 
   const showToast = useCallback((message: string) => {
     setToastMsg(message);
@@ -78,6 +90,7 @@ export default function App({ children }: { children: React.ReactNode }) {
         <VoiceOverlay voiceState={voiceState} />
         <Toast message={toastMsg} visible={toastVisible} />
         <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <GuestPrompt visible={guestPromptVisible} onDismiss={() => setGuestPromptVisible(false)} />
       </ToastContext.Provider>
     </ErrorBoundary>
   );

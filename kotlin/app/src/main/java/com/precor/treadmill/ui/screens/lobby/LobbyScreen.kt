@@ -42,10 +42,21 @@ fun LobbyScreen(
     val context = LocalContext.current
     val session by viewModel.derivedSession.collectAsState()
     val program by viewModel.derivedProgram.collectAsState()
+    val activeProfile by viewModel.activeProfile.collectAsState()
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val tablet = isTablet(configuration.screenWidthDp)
 
     val workoutActive = session.active || program.running
+
+    // Personalized greeting: "Good afternoon, Scott"
+    val greetingText = buildString {
+        append(greeting())
+        val firstName = activeProfile?.name?.split(" ")?.firstOrNull()
+        if (!firstName.isNullOrBlank()) {
+            append(", ")
+            append(firstName)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -62,7 +73,7 @@ fun LobbyScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = greeting(),
+                text = greetingText,
                 fontSize = if (tablet) 28.sp else 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.text,

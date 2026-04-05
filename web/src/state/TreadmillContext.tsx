@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react';
-import type { AppState, KVEntry, ServerMessage, TreadmillStatus, SessionState, ProgramState } from './types';
+import type { AppState, KVEntry, ServerMessage, TreadmillStatus, SessionState, ProgramState, Profile } from './types';
 import * as api from './api';
 
 // --- Debounce helpers ---
@@ -67,6 +67,8 @@ const initialState: AppState = {
   program: initialProgram,
   kvLog: [],
   hrmDevices: [],
+  activeProfile: null,
+  guestMode: false,
   _dirtySpeed: 0,
   _dirtyIncline: 0,
 };
@@ -84,7 +86,8 @@ type Action =
   | { type: 'OPTIMISTIC_SPEED'; payload: number }
   | { type: 'OPTIMISTIC_INCLINE'; payload: number }
   | { type: 'HR_UPDATE'; payload: ServerMessage & { type: 'hr' } }
-  | { type: 'SCAN_RESULT'; payload: ServerMessage & { type: 'scan_result' } };
+  | { type: 'SCAN_RESULT'; payload: ServerMessage & { type: 'scan_result' } }
+  | { type: 'PROFILE_CHANGED'; payload: { profile: Profile | null; guestMode: boolean } };
 
 const MAX_KV_LOG = 500;
 
@@ -112,7 +115,7 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, wsConnected: false, hrmDevices: [] };
 
     case 'STATUS_UPDATE': {
-      const m = action.payload;
+      const m = action.payload as any;
       const now = Date.now();
       const speedDirty = now - state._dirtySpeed < DIRTY_GRACE_MS;
       const inclineDirty = now - state._dirtyIncline < DIRTY_GRACE_MS;
@@ -128,8 +131,16 @@ function reducer(state: AppState, action: Action): AppState {
         heartRate: m.heart_rate ?? state.status.heartRate,
         hrmConnected: m.hrm_connected ?? state.status.hrmConnected,
       };
-      if (shallowEqual(next, state.status)) return state;
-      return { ...state, status: next };
+      // Parse active_profile / guest_mode from status if present
+      const profileUpdate: Partial<AppState> = {};
+      if (m.active_profile !== undefined) {
+        profileUpdate.activeProfile = m.active_profile ?? null;
+      }
+      if (m.guest_mode !== undefined) {
+        profileUpdate.guestMode = !!m.guest_mode;
+      }
+      if (shallowEqual(next, state.status) && !('activeProfile' in profileUpdate) && !('guestMode' in profileUpdate)) return state;
+      return { ...state, status: next, ...profileUpdate };
     }
 
     case 'SESSION_UPDATE': {
@@ -206,6 +217,12 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SCAN_RESULT': {
       const m = action.payload;
       return { ...state, hrmDevices: m.devices };
+    }
+
+    case 'PROFILE_CHANGED': {
+      const { profile, guestMode } = action.payload;
+      if (state.activeProfile?.id === profile?.id && state.guestMode === guestMode) return state;
+      return { ...state, activeProfile: profile, guestMode };
     }
 
     case 'OPTIMISTIC_SPEED':
@@ -297,6 +314,9 @@ export function TreadmillProvider({ children }: { children: React.ReactNode }) {
         api.getSession().then(d => {
           dispatch({ type: 'SESSION_UPDATE', payload: d as ServerMessage & { type: 'session' } });
         }).catch(() => {});
+        api.getActiveProfile().then(d => {
+          dispatch({ type: 'PROFILE_CHANGED', payload: { profile: d.profile, guestMode: d.guest_mode } });
+        }).catch(() => {});
       };
 
       ws.onclose = () => {
@@ -340,6 +360,9 @@ export function TreadmillProvider({ children }: { children: React.ReactNode }) {
             break;
           case 'scan_result':
             dispatch({ type: 'SCAN_RESULT', payload: msg });
+            break;
+          case 'profile_changed':
+            dispatch({ type: 'PROFILE_CHANGED', payload: { profile: msg.profile, guestMode: msg.guest_mode } });
             break;
         }
       };

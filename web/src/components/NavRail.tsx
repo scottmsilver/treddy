@@ -97,13 +97,14 @@ function SettingsIcon() {
 }
 
 export default function NavRail({ voiceState, onVoiceToggle, onSettingsToggle }: NavRailProps): React.ReactElement {
-  const { wsConnected } = useTreadmillState();
+  const { wsConnected, activeProfile, guestMode } = useTreadmillState();
   const [location, setLocation] = useLocation();
   const isLandscape = useIsLandscape();
 
   const voiceActive = voiceState === 'connecting' || voiceState === 'listening' || voiceState === 'speaking';
   const isHome = location === '/' || location === '';
   const isRun = location.startsWith('/run');
+  const isProfiles = location === '/profiles';
   const voiceColor = voiceActive
     ? (voiceState === 'connecting' ? 'var(--yellow)' : voiceState === 'listening' ? 'var(--green)' : 'var(--purple)')
     : undefined;
@@ -111,8 +112,36 @@ export default function NavRail({ voiceState, onVoiceToggle, onSettingsToggle }:
   const grow = !isLandscape;
   const hideLabel = isLandscape;
 
+  // Profile avatar icon for the nav bar
+  const profileIcon = activeProfile ? (
+    <div style={{
+      width: 24, height: 24, borderRadius: '50%',
+      background: activeProfile.color || '#d4c4a8',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 11, fontWeight: 700, color: '#1e1d1b',
+      border: isProfiles ? '2px solid var(--text)' : '2px solid transparent',
+    }}>
+      {activeProfile.initials || '?'}
+    </div>
+  ) : (
+    <div style={{
+      width: 24, height: 24, borderRadius: '50%',
+      border: '1.5px dashed var(--text3)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 12, color: 'var(--text3)',
+    }}>?</div>
+  );
+
   const navItems = (
     <>
+      <NavItem
+        grow={grow}
+        hideLabel={hideLabel}
+        icon={profileIcon}
+        label={activeProfile?.name || (guestMode ? 'Guest' : 'Profile')}
+        active={isProfiles}
+        onClick={() => { setLocation('/profiles'); haptic(15); }}
+      />
       <NavItem
         grow={grow}
         hideLabel={hideLabel}

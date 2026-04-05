@@ -9,7 +9,7 @@ data class Profile(
     val name: String = "",
     val color: String = "#d4c4a8",
     val initials: String = "?",
-    @SerialName("weight_lbs") val weightLbs: Double = 154.0,
-    @SerialName("vest_lbs") val vestLbs: Double = 0.0,
-    @SerialName("has_avatar") val hasAvatar: Boolean = false,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("weight_lbs") val weightLbs: Double = 154.0,
+    @Serializable(with = LenientDoubleSerializer::class) @SerialName("vest_lbs") val vestLbs: Double = 0.0,
+    @Serializable(with = LenientBoolSerializer::class) @SerialName("has_avatar") val hasAvatar: Boolean = false,
 )

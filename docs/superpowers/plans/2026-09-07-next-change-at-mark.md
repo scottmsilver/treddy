@@ -214,7 +214,7 @@ git diff --name-only origin/main...HEAD
 git status --short
 ```
 
-Expected: only the approved spec/plan and four Kotlin source/test files differ; no image is tracked or staged.
+Expected: only the approved spec/plan and five Kotlin source/test files differ; no image is tracked or staged.
 
 - [ ] **Step 3: Request code review and address only verified findings**
 

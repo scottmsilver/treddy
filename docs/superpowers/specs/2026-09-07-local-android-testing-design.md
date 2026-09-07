@@ -31,7 +31,9 @@ directory/database. Bind HTTP only to 127.0.0.1 using a parent-reserved socket
 passed to uvicorn (`--fd`), avoiding free-port races. Force TREADMILL_MOCK=1 and
 isolate the server working directory so real DB, JSON migration files, TLS keys,
 and API keys are not picked up. Health checks must not accept an unrelated
-process. Install explicit APKs, force-stop the app, write dedicated test-profile
+process. Explicitly override GEMINI_API_KEY with an invalid local-test placeholder
+to bypass inherited credentials and the home-directory key fallback. Cloud/voice
+features are out of scope. Install explicit APKs, force-stop the app, write dedicated test-profile
 DataStore preferences directly (server_url to emulator host alias, voice off,
 microphone prompt already handled), and verify readback before launching.
 Never tap Setup discovery. Test runs instrumentation; view launches MainActivity

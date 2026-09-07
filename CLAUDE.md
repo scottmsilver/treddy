@@ -87,6 +87,12 @@ TREADMILL_MOCK=1 ./scripts/dev.sh  # mock mode, no Pi needed
 
 **Key files:** `scripts/dev.sh` (launcher), `scripts/worktree-env.sh` (port sourcing), `scripts/setup-worktree.sh` (port allocation).
 
+**Fast local Android tests:** Follow [the warm-emulator workflow](docs/local-android-testing.md).
+Builds may run in parallel; emulator jobs must use `scripts/android_local.py`
+(`start`, `test`, `view`) for exclusive access to the dedicated test AVD and
+mock-only backend. Do not bypass an active job's lock with raw adb commands.
+This workflow never deploys to the physical tablet or real treadmill.
+
 **Verifying UI changes:** The UI is the Android app (`kotlin/`). Build and install it on the emulator or tablet (see Kotlin/Android notes) and point it at the dev server or the Pi.
 
 ## Issue Closure Evidence

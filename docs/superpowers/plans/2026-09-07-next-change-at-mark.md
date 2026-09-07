@@ -90,6 +90,7 @@ git commit -m "refactor: separate next-change clock values"
 
 **Files:**
 - Modify: `kotlin/app/src/test/java/com/precor/treadmill/ui/screens/running/RidgelineNextChangeClockSourceTest.kt`
+- Create: `kotlin/app/src/androidTest/java/com/precor/treadmill/ui/screens/running/NextChangeValueRowTest.kt`
 - Modify: `kotlin/app/src/main/java/com/precor/treadmill/ui/screens/running/RidgelineHud.kt`
 
 - [ ] **Step 1: Add failing structural presentation tests**
@@ -105,18 +106,43 @@ assertTrue(source.contains("color = RidgelineTheme.accent"))
 assertFalse(source.contains("value = next.text"))
 ```
 
-Also isolate the `NextChangeRow` source block and assert it contains a `Row`, baseline alignment, `12.sp` for `at`, `14.sp` for `Y`, and `clearAndSetSemantics`, and contains neither a literal parenthesis nor visible `remaining`/`elapsed` text.
+Also isolate the `NextChangeRow` source block and assert it contains baseline alignment, `12.sp` for `at`, `14.sp` for `Y`, and `clearAndSetSemantics`, and contains neither a literal parenthesis nor visible `remaining`/`elapsed` text. This guard covers presentation intent; the instrumented test in the next step covers actual measurement.
 
-- [ ] **Step 2: Run the structural test and verify RED**
+- [ ] **Step 2: Add a failing instrumented one-line measurement test**
+
+Create `NextChangeValueRowTest.kt` using `createComposeRule`. Render `NextChangeValueRow` inside `Box(Modifier.width(180.dp))` for each required pair:
+
+```kotlin
+private val cases = listOf(
+    "59:59" to "1:00:00",
+    "1:00:00" to "12:34:56",
+)
+```
+
+For each case, fetch the unmerged semantics bounds of `X`, literal `at`, and `Y`, plus the root bounds. Require:
+
+```kotlin
+assertTrue(xBounds.right <= atBounds.left)
+assertTrue(atBounds.right <= yBounds.left)
+assertTrue(yBounds.right <= rootBounds.right)
+assertTrue(xBounds.top < yBounds.bottom && yBounds.top < xBounds.bottom)
+```
+
+Use the exact full text selectors and `assertIsDisplayed()` before measuring, so truncating or substituting a value fails. These assertions prove left-to-right order, one-row vertical overlap, and containment at a width narrower than the target tablet’s available map space.
+
+- [ ] **Step 3: Run the structural and instrumented tests and verify RED**
 
 ```bash
 cd kotlin
 ./gradlew testDebugUnitTest --tests com.precor.treadmill.ui.screens.running.RidgelineNextChangeClockSourceTest
+ANDROID_SERIAL='adb-R9ZY90P5LZP-WMXOYu._adb-tls-connect._tcp' \
+  ./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.precor.treadmill.ui.screens.running.NextChangeValueRowTest
 ```
 
-Expected: failure because `NextChangeRow` and the split rendering do not exist.
+Expected: the unit guard fails and the instrumented test does not compile because `NextChangeRow`/`NextChangeValueRow` and the split rendering do not exist.
 
-- [ ] **Step 3: Implement `NextChangeRow`**
+- [ ] **Step 4: Implement `NextChangeRow` and its measurable value row**
 
 In `MetricsPill`, change the panel accents to:
 
@@ -124,34 +150,38 @@ In `MetricsPill`, change the panel accents to:
 accents = listOf(RidgelineTheme.fg, RidgelineTheme.accent)
 ```
 
-Replace the special `MetricRow` call with `NextChangeRow(next)`. Implement a private composable with:
+Replace the special `MetricRow` call with `NextChangeRow(next)`. Implement a private semantic/label wrapper plus an internal `NextChangeValueRow(next)` containing:
 
 - the existing `NEXT IN` label styling;
-- one non-wrapping Compose `Row`;
+- one non-wrapping Compose `Row`, with the exact text nodes left visible when `NextChangeValueRow` is tested directly;
 - `tightNum(next.timeUntilText)` in `RidgelineTheme.fg`, `RidgelineMonoFamily`, 17sp, medium weight;
 - literal `at` in `RidgelineTheme.accent`, `RidgelineLabelFamily`, 12sp, medium weight, with 4dp start padding;
 - `next.timerAtChangeText` in `RidgelineTheme.accent`, `RidgelineMonoFamily`, 14sp, medium weight, with 3dp start padding;
 - `alignByBaseline()` on all three pieces;
-- `clearAndSetSemantics { contentDescription = next.accessibilityDescription }` on the containing column.
+- `clearAndSetSemantics { contentDescription = next.accessibilityDescription }` on the containing `NextChangeRow` column, outside `NextChangeValueRow`.
 
 Use `Color.legibleOn` for the raw `Text` values that require `AnnotatedString`; use `LegibleText` for the literal `at` and any plain string. Do not add a new design token or modify the generic `MetricRow`.
 
-- [ ] **Step 4: Run the focused model and presentation tests**
+- [ ] **Step 5: Run the focused model, presentation, and measured-layout tests**
 
 ```bash
 cd kotlin
 ./gradlew testDebugUnitTest \
   --tests com.precor.treadmill.ui.screens.running.NextChangeDisplayTest \
   --tests com.precor.treadmill.ui.screens.running.RidgelineNextChangeClockSourceTest
+ANDROID_SERIAL='adb-R9ZY90P5LZP-WMXOYu._adb-tls-connect._tcp' \
+  ./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.precor.treadmill.ui.screens.running.NextChangeValueRowTest
 ```
 
-Expected: both focused classes pass.
+Expected: both JVM classes and the instrumented measurement class pass for both long-value pairs at 180dp.
 
-- [ ] **Step 5: Commit the UI change**
+- [ ] **Step 6: Commit the UI change**
 
 ```bash
 git add kotlin/app/src/main/java/com/precor/treadmill/ui/screens/running/RidgelineHud.kt \
-  kotlin/app/src/test/java/com/precor/treadmill/ui/screens/running/RidgelineNextChangeClockSourceTest.kt
+  kotlin/app/src/test/java/com/precor/treadmill/ui/screens/running/RidgelineNextChangeClockSourceTest.kt \
+  kotlin/app/src/androidTest/java/com/precor/treadmill/ui/screens/running/NextChangeValueRowTest.kt
 git commit -m "feat: polish next-change clock hierarchy"
 ```
 

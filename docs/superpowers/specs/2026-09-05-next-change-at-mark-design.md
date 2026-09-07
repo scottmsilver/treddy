@@ -27,7 +27,7 @@ The visual text never includes parentheses or the words `remaining` or `elapsed`
 
 `formatNextChange` retains all current arithmetic, rounding, clock-domain, and clamping behavior. It only returns the two formatted strings separately.
 
-`MetricsPill` continues using the generic `MetricRow` for elevation, distance, heart rate, and calories. The next-change item becomes a small dedicated `NextChangeRow`, because its primary and secondary values require different typography and colors. This keeps special presentation out of the generic metric abstraction.
+`MetricsPill` continues using the generic `MetricRow` for elevation, distance, heart rate, and calories. The next-change item becomes a small dedicated `NextChangeRow`, because its primary and secondary values require different typography and colors. Its inner `NextChangeValueRow` is internal solely so an instrumented Compose test can measure the real one-line layout; the semantic wrapper remains in `NextChangeRow`. This keeps special presentation out of the generic metric abstraction.
 
 `NextChangeRow` uses the existing `LocalOverlayBackground` and `Color.legibleOn` path for the primary monospaced value. The secondary `at Y` pieces use `LegibleText` with `RidgelineTheme.accent`. The enclosing `LegibleGlassPanel` declares both foreground and accent as required accents so its adaptive scrim accounts for every over-photo text color.
 
@@ -52,6 +52,7 @@ The shorter visual language therefore does not reduce nonvisual clarity or expos
 
 - Update `NextChangeDisplayTest` to assert separate `X` and `Y` fields while preserving every arithmetic and accessibility assertion.
 - Add or extend a structural source test to prove the row renders `X`, literal `at`, and `Y` separately; uses the foreground/accent hierarchy; and does not reintroduce parentheses or a visible mode word.
+- Add an instrumented Compose measurement test at a conservative 180dp row width. For both `59:59 at 1:00:00` and `1:00:00 at 12:34:56`, require the three measured text bounds to remain ordered left-to-right, vertically overlapping on one baseline row, fully inside the root, and untruncated.
 - Run the focused next-change tests and the full Android unit/build gate.
 - Install the exact merged APK on the tablet and validate both timer modes against a `TREADMILL_MOCK=1` backend without moving the treadmill.
 - Attach a post-fix screenshot directly to GitHub issue #64. Do not add evidence images to the repository.

@@ -128,7 +128,14 @@ assertTrue(yBounds.right <= rootBounds.right)
 assertTrue(xBounds.top < yBounds.bottom && yBounds.top < xBounds.bottom)
 ```
 
-Use the exact full text selectors and `assertIsDisplayed()` before measuring, so truncating or substituting a value fails. These assertions prove left-to-right order, one-row vertical overlap, and containment at a width narrower than the target tablet’s available map space.
+Use the exact full text selectors and `assertIsDisplayed()` before measuring. For each of the three text nodes, invoke `SemanticsActions.GetTextLayoutResult`, require exactly one result, and assert:
+
+```kotlin
+assertEquals(1, layoutResult.lineCount)
+assertFalse(layoutResult.hasVisualOverflow)
+```
+
+The layout-result checks prove the actual glyph layout is neither wrapped, clipped, nor ellipsized; semantics text alone is not accepted as evidence of this. Together with the bounds assertions, the test proves left-to-right order, one-row vertical overlap, and containment at a width narrower than the target tablet’s available map space.
 
 - [ ] **Step 3: Run the structural and instrumented tests and verify RED**
 

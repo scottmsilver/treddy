@@ -52,7 +52,7 @@ The shorter visual language therefore does not reduce nonvisual clarity or expos
 
 - Update `NextChangeDisplayTest` to assert separate `X` and `Y` fields while preserving every arithmetic and accessibility assertion.
 - Add or extend a structural source test to prove the row renders `X`, literal `at`, and `Y` separately; uses the foreground/accent hierarchy; and does not reintroduce parentheses or a visible mode word.
-- Add an instrumented Compose measurement test at a conservative 180dp row width. For both `59:59 at 1:00:00` and `1:00:00 at 12:34:56`, require the three measured text bounds to remain ordered left-to-right, vertically overlapping on one baseline row, fully inside the root, and untruncated.
+- Add an instrumented Compose measurement test at a conservative 180dp row width. For both `59:59 at 1:00:00` and `1:00:00 at 12:34:56`, require the three measured text bounds to remain ordered left-to-right, vertically overlapping on one baseline row, and fully inside the root. Retrieve each node's real `TextLayoutResult` and require one line with no visual overflow, proving the rendered glyphs are not clipped or ellipsized rather than relying on semantics text alone.
 - Run the focused next-change tests and the full Android unit/build gate.
 - Install the exact merged APK on the tablet and validate both timer modes against a `TREADMILL_MOCK=1` backend without moving the treadmill.
 - Attach a post-fix screenshot directly to GitHub issue #64. Do not add evidence images to the repository.

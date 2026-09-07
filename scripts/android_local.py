@@ -368,18 +368,20 @@ def execute_view(config: Config, app: Path, timeout: float) -> None:
 
 def execute_start(config: Config, timeout: float) -> None:
     with file_lock(avd_owner_lock(), timeout), file_lock(lifecycle_lock(config.port), timeout):
-        check_emulator_ports_free(config.port)
-        env, command = emulator_command(config)
-        child = subprocess.Popen(command, env=os.environ | env)
+        child = None
         try:
+            check_emulator_ports_free(config.port)
+            env, command = emulator_command(config)
             with file_lock(job_lock(), timeout):
+                child = subprocess.Popen(command, env=os.environ | env)
                 verify_device(adb_path(config), config.port, timeout, owner=child)
                 apply_display_profile(adb_path(config), config, timeout)
                 print(f"emulator ready: {serial(config.port)} profile={config.profile}")
             while child.poll() is None:
                 time.sleep(.5)
         finally:
-            stop_owned(child)
+            if child is not None:
+                stop_owned(child)
 
 
 def parser() -> argparse.ArgumentParser:

@@ -124,12 +124,15 @@ class AndroidLocalTests(unittest.TestCase):
         child = mock.Mock()
         child.poll.return_value = 0
         config = runner.Config(Path("/sdk"), Path("/vgl"), 5582)
+        def launch(*_args, **_kwargs):
+            self.assertIn(runner.job_lock(), active)
+            return child
         def verify(*_args, **_kwargs):
             self.assertIn(runner.job_lock(), active)
         with mock.patch.object(runner, "file_lock", side_effect=lock), \
                 mock.patch.object(runner, "check_emulator_ports_free"), \
                 mock.patch.object(runner, "emulator_command", return_value=({}, ["qemu"])), \
-                mock.patch.object(runner.subprocess, "Popen", return_value=child), \
+                mock.patch.object(runner.subprocess, "Popen", side_effect=launch), \
                 mock.patch.object(runner, "verify_device", side_effect=verify), \
                 mock.patch.object(runner, "apply_display_profile"), \
                 mock.patch.object(runner, "stop_owned"):

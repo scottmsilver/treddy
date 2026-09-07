@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 import urllib.request
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -367,12 +367,13 @@ def execute_view(config: Config, app: Path, timeout: float) -> None:
 
 
 def execute_start(config: Config, timeout: float) -> None:
-    with file_lock(avd_owner_lock(), timeout), file_lock(lifecycle_lock(config.port), timeout):
+    with file_lock(avd_owner_lock(), timeout), ExitStack() as lifetime:
         child = None
         try:
-            check_emulator_ports_free(config.port)
-            env, command = emulator_command(config)
             with file_lock(job_lock(), timeout):
+                lifetime.enter_context(file_lock(lifecycle_lock(config.port), timeout))
+                check_emulator_ports_free(config.port)
+                env, command = emulator_command(config)
                 child = subprocess.Popen(command, env=os.environ | env)
                 verify_device(adb_path(config), config.port, timeout, owner=child)
                 apply_display_profile(adb_path(config), config, timeout)

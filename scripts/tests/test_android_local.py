@@ -116,11 +116,13 @@ class AndroidLocalTests(unittest.TestCase):
         active = []
         @contextlib.contextmanager
         def lock(path, _timeout):
+            if path == runner.lifecycle_lock(5582):
+                self.assertIn(runner.job_lock(), active)
             active.append(path)
             try:
                 yield
             finally:
-                active.pop()
+                active.remove(path)
         child = mock.Mock()
         child.poll.return_value = 0
         config = runner.Config(Path("/sdk"), Path("/vgl"), 5582)
@@ -146,7 +148,7 @@ class AndroidLocalTests(unittest.TestCase):
             try:
                 yield
             finally:
-                active.pop()
+                active.remove(path)
         child = mock.Mock()
         child.poll.side_effect = [None, 0]
         config = runner.Config(Path("/sdk"), Path("/vgl"), 5582)

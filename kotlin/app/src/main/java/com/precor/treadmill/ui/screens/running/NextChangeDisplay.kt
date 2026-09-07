@@ -37,7 +37,8 @@ internal data class NextChangeClock(
 
 /** Visual and screen-reader representations of a next-change clock pair. */
 internal data class NextChangeDisplay(
-    val text: String,
+    val timeUntilText: String,
+    val timerAtChangeText: String,
     val accessibilityDescription: String,
 )
 
@@ -58,7 +59,8 @@ internal fun formatNextChange(
         WorkoutTimeMark.REMAINING -> "remaining"
     }
     return NextChangeDisplay(
-        text = "$timeLeftText ($timerAtChangeText)",
+        timeUntilText = timeLeftText,
+        timerAtChangeText = timerAtChangeText,
         accessibilityDescription =
             "Next change in $timeLeftText; workout $markLabel at change $timerAtChangeText",
     )

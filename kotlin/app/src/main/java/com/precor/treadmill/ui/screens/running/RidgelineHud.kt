@@ -65,6 +65,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -517,7 +518,7 @@ private fun MetricsPill(
 ) {
     // Values are RidgelineTheme.fg; let the panel dim the photo behind it so they clear APCA.
     LegibleGlassPanel(
-        accents = listOf(RidgelineTheme.fg),
+        accents = listOf(RidgelineTheme.fg, RidgelineTheme.accent),
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -532,14 +533,89 @@ private fun MetricsPill(
             MetricRow("CALORIES", cal, "cal")
             // Not running -> no NEXT row (nothing is coming).
             if (next != null) {
-                MetricRow(
-                    label = "NEXT IN",
-                    value = next.text,
-                    unit = "",
-                    contentDescription = next.accessibilityDescription,
-                )
+                NextChangeRow(next)
             }
         }
+    }
+}
+
+@Composable
+private fun NextChangeRow(display: NextChangeDisplay) {
+    Column(
+        modifier = Modifier.clearAndSetSemantics {
+            this.contentDescription = display.accessibilityDescription
+        },
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        LegibleText(
+            text = "NEXT IN",
+            color = RidgelineTheme.dim,
+            style = TextStyle(
+                fontFamily = RidgelineLabelFamily,
+                fontSize = 9.sp,
+                letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+        )
+        NextChangeValueRow(
+            timeUntilText = display.timeUntilText,
+            timerAtChangeText = display.timerAtChangeText,
+        )
+    }
+}
+
+internal const val NEXT_CHANGE_VALUE_ROW_TAG = "next-change-value-row"
+internal const val NEXT_CHANGE_TIME_UNTIL_TAG = "next-change-time-until"
+internal const val NEXT_CHANGE_AT_TAG = "next-change-at"
+internal const val NEXT_CHANGE_TIMER_AT_CHANGE_TAG = "next-change-timer-at-change"
+
+@Composable
+internal fun NextChangeValueRow(
+    timeUntilText: String,
+    timerAtChangeText: String,
+    modifier: Modifier = Modifier,
+) {
+    val bg = LocalOverlayBackground.current
+    Row(modifier = modifier.testTag(NEXT_CHANGE_VALUE_ROW_TAG)) {
+        Text( // legible-exempt: solved via legibleOn over the photo
+            text = tightNum(timeUntilText),
+            color = RidgelineTheme.fg.legibleOn(bg, targetLc = 70.0),
+            fontFamily = RidgelineMonoFamily,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .width(IntrinsicSize.Max)
+                .alignByBaseline()
+                .testTag(NEXT_CHANGE_TIME_UNTIL_TAG),
+        )
+        LegibleText(
+            text = "at",
+            color = RidgelineTheme.accent,
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .width(IntrinsicSize.Max)
+                .alignByBaseline()
+                .testTag(NEXT_CHANGE_AT_TAG),
+            style = TextStyle(
+                fontFamily = RidgelineLabelFamily,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+        )
+        LegibleText(
+            text = timerAtChangeText,
+            color = RidgelineTheme.accent,
+            modifier = Modifier
+                .padding(start = 3.dp)
+                .width(IntrinsicSize.Max)
+                .alignByBaseline()
+                .testTag(NEXT_CHANGE_TIMER_AT_CHANGE_TAG),
+            style = TextStyle(
+                fontFamily = RidgelineMonoFamily,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+        )
     }
 }
 

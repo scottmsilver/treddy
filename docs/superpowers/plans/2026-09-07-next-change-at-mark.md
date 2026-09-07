@@ -143,7 +143,7 @@ The layout-result checks prove the actual glyph layout is neither wrapped, clipp
 cd kotlin
 ./gradlew testDebugUnitTest --tests com.precor.treadmill.ui.screens.running.RidgelineNextChangeClockSourceTest
 ANDROID_SERIAL='adb-R9ZY90P5LZP-WMXOYu._adb-tls-connect._tcp' \
-  ./gradlew connectedDebugAndroidTest \
+  ./gradlew connectedUiTestAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=com.precor.treadmill.ui.screens.running.NextChangeValueRowTest
 ```
 
@@ -177,7 +177,7 @@ cd kotlin
   --tests com.precor.treadmill.ui.screens.running.NextChangeDisplayTest \
   --tests com.precor.treadmill.ui.screens.running.RidgelineNextChangeClockSourceTest
 ANDROID_SERIAL='adb-R9ZY90P5LZP-WMXOYu._adb-tls-connect._tcp' \
-  ./gradlew connectedDebugAndroidTest \
+  ./gradlew connectedUiTestAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=com.precor.treadmill.ui.screens.running.NextChangeValueRowTest
 ```
 

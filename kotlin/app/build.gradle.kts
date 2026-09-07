@@ -19,6 +19,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    testBuildType = "uiTest"
+
     signingConfigs {
         getByName("debug") {
             // Disable v3/v4 signing to shrink debug APK (~10MB vs ~62MB)
@@ -34,6 +36,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        create("uiTest") {
+            initWith(getByName("debug"))
+            isMinifyEnabled = false
+            matchingFallbacks += listOf("debug")
         }
         release {
             isMinifyEnabled = true
@@ -111,4 +118,5 @@ dependencies {
     androidTestImplementation(composeBom)
     androidTestImplementation(libs.compose.ui.test)
     debugImplementation(libs.compose.ui.test.manifest)
+    add("uiTestImplementation", libs.compose.ui.test.manifest)
 }

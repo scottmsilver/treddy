@@ -22,7 +22,8 @@ class NextChangeDisplayTest {
             timeMark = WorkoutTimeMark.ELAPSED,
         )
 
-        assertEquals("4:43 (16:33)", display.text)
+        assertEquals("4:43", display.timeUntilText)
+        assertEquals("16:33", display.timerAtChangeText)
         assertEquals(
             "Next change in 4:43; workout elapsed at change 16:33",
             display.accessibilityDescription,
@@ -41,7 +42,8 @@ class NextChangeDisplayTest {
             timeMark = WorkoutTimeMark.ELAPSED,
         )
 
-        assertEquals("0:50 (1:00)", display.text)
+        assertEquals("0:50", display.timeUntilText)
+        assertEquals("1:00", display.timerAtChangeText)
     }
 
     @Test
@@ -56,7 +58,8 @@ class NextChangeDisplayTest {
             timeMark = WorkoutTimeMark.REMAINING,
         )
 
-        assertEquals("1:00 (24:00)", display.text)
+        assertEquals("1:00", display.timeUntilText)
+        assertEquals("24:00", display.timerAtChangeText)
         assertEquals(
             "Next change in 1:00; workout remaining at change 24:00",
             display.accessibilityDescription,
@@ -90,22 +93,22 @@ class NextChangeDisplayTest {
             programDuration = 600.0,
         )
 
-        assertEquals(
-            "1:00 (2:40)",
-            formatNextChange(boundary, before, WorkoutTimeMark.ELAPSED).text,
-        )
-        assertEquals(
-            "0:59 (2:40)",
-            formatNextChange(boundary, oneSecondLater, WorkoutTimeMark.ELAPSED).text,
-        )
-        assertEquals(
-            "1:00 (5:40)",
-            formatNextChange(boundary, before, WorkoutTimeMark.REMAINING).text,
-        )
-        assertEquals(
-            "0:59 (5:40)",
-            formatNextChange(boundary, oneSecondLater, WorkoutTimeMark.REMAINING).text,
-        )
+        formatNextChange(boundary, before, WorkoutTimeMark.ELAPSED).also {
+            assertEquals("1:00", it.timeUntilText)
+            assertEquals("2:40", it.timerAtChangeText)
+        }
+        formatNextChange(boundary, oneSecondLater, WorkoutTimeMark.ELAPSED).also {
+            assertEquals("0:59", it.timeUntilText)
+            assertEquals("2:40", it.timerAtChangeText)
+        }
+        formatNextChange(boundary, before, WorkoutTimeMark.REMAINING).also {
+            assertEquals("1:00", it.timeUntilText)
+            assertEquals("5:40", it.timerAtChangeText)
+        }
+        formatNextChange(boundary, oneSecondLater, WorkoutTimeMark.REMAINING).also {
+            assertEquals("0:59", it.timeUntilText)
+            assertEquals("5:40", it.timerAtChangeText)
+        }
     }
 
     @Test
@@ -120,34 +123,55 @@ class NextChangeDisplayTest {
             timeMark = WorkoutTimeMark.ELAPSED,
         )
 
-        assertEquals("0:59 (1:00)", display.text)
+        assertEquals("0:59", display.timeUntilText)
+        assertEquals("1:00", display.timerAtChangeText)
+    }
+
+    @Test
+    fun `long clocks retain independent hour formatting`() {
+        val display = formatNextChange(
+            nextChangeProgramPosition = 3_599.0,
+            clock = NextChangeClock(
+                sessionElapsed = 39_597.0,
+                programElapsed = 0.0,
+                programDuration = 43_200.0,
+            ),
+            timeMark = WorkoutTimeMark.ELAPSED,
+        )
+
+        assertEquals("59:59", display.timeUntilText)
+        assertEquals("11:59:56", display.timerAtChangeText)
+        assertEquals(
+            "Next change in 59:59; workout elapsed at change 11:59:56",
+            display.accessibilityDescription,
+        )
     }
 
     @Test
     fun `times clamp at workout boundaries`() {
-        assertEquals(
-            "0:00 (0:00)",
-            formatNextChange(
-                nextChangeProgramPosition = 1_799.4,
-                clock = NextChangeClock(
-                    sessionElapsed = 1_800.4,
-                    programElapsed = 1_800.4,
-                    programDuration = 1_800.0,
-                ),
-                timeMark = WorkoutTimeMark.REMAINING,
-            ).text,
-        )
-        assertEquals(
-            "0:00 (0:00)",
-            formatNextChange(
-                nextChangeProgramPosition = -1.4,
-                clock = NextChangeClock(
-                    sessionElapsed = -0.4,
-                    programElapsed = -0.4,
-                    programDuration = 1_800.0,
-                ),
-                timeMark = WorkoutTimeMark.ELAPSED,
-            ).text,
-        )
+        formatNextChange(
+            nextChangeProgramPosition = 1_799.4,
+            clock = NextChangeClock(
+                sessionElapsed = 1_800.4,
+                programElapsed = 1_800.4,
+                programDuration = 1_800.0,
+            ),
+            timeMark = WorkoutTimeMark.REMAINING,
+        ).also {
+            assertEquals("0:00", it.timeUntilText)
+            assertEquals("0:00", it.timerAtChangeText)
+        }
+        formatNextChange(
+            nextChangeProgramPosition = -1.4,
+            clock = NextChangeClock(
+                sessionElapsed = -0.4,
+                programElapsed = -0.4,
+                programDuration = 1_800.0,
+            ),
+            timeMark = WorkoutTimeMark.ELAPSED,
+        ).also {
+            assertEquals("0:00", it.timeUntilText)
+            assertEquals("0:00", it.timerAtChangeText)
+        }
     }
 }

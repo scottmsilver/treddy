@@ -33,6 +33,7 @@ class RidgelineNextChangeClockSourceTest {
 
     @Test
     fun `next change row exposes its semantic description`() {
-        assertTrue(hudSource.contains("contentDescription = next.accessibilityDescription"))
+        assertTrue(hudSource.contains("NextChangeRow(next)"))
+        assertTrue(hudSource.contains("this.contentDescription = display.accessibilityDescription"))
     }
 }

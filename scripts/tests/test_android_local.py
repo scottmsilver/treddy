@@ -135,6 +135,30 @@ class AndroidLocalTests(unittest.TestCase):
                 mock.patch.object(runner, "stop_owned"):
             runner.execute_start(config, 1)
 
+    def test_start_releases_job_lock_while_owned_emulator_stays_warm(self):
+        active = []
+        @contextlib.contextmanager
+        def lock(path, _timeout):
+            active.append(path)
+            try:
+                yield
+            finally:
+                active.pop()
+        child = mock.Mock()
+        child.poll.side_effect = [None, 0]
+        config = runner.Config(Path("/sdk"), Path("/vgl"), 5582)
+        def warm_sleep(_seconds):
+            self.assertNotIn(runner.job_lock(), active)
+        with mock.patch.object(runner, "file_lock", side_effect=lock), \
+                mock.patch.object(runner, "check_emulator_ports_free"), \
+                mock.patch.object(runner, "emulator_command", return_value=({}, ["qemu"])), \
+                mock.patch.object(runner.subprocess, "Popen", return_value=child), \
+                mock.patch.object(runner, "verify_device"), \
+                mock.patch.object(runner, "apply_display_profile"), \
+                mock.patch.object(runner, "stop_owned"), \
+                mock.patch.object(runner.time, "sleep", side_effect=warm_sleep):
+            runner.execute_start(config, 1)
+
     def test_successful_test_still_force_stops_and_reaps_mock_server(self):
         server = mock.Mock()
         server.url = "http://10.0.2.2:1234"

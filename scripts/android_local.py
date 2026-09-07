@@ -297,7 +297,9 @@ def install_and_prepare(adb_executable: str | Path, port: int, app: Path, test: 
 
 
 def parse_instrumentation(output: str) -> int:
-    if re.search(r"(?:FAILURES|FAILURE|CRASH|Exception|Process crashed)", output, re.IGNORECASE):
+    failure_summary = (r"^(?:FAILURES!!!|INSTRUMENTATION_(?:STATUS|RESULT): "
+                       r"(?:Error|shortMsg|longMsg|stack)=|INSTRUMENTATION_ABORTED|Process crashed)")
+    if re.search(failure_summary, output, re.IGNORECASE | re.MULTILINE):
         raise RuntimeError("instrumentation reported failure")
     match = re.search(r"^OK \((\d+) tests?\)$", output, re.MULTILINE)
     if not match or int(match.group(1)) == 0 or not re.search(r"^INSTRUMENTATION_CODE: -1$", output, re.MULTILINE):

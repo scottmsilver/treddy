@@ -107,6 +107,19 @@ class AndroidLocalTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "instrumentation"):
                 runner.parse_instrumentation(bad)
 
+    def test_instrumentation_allows_passing_test_names_with_failure_words(self):
+        output = ("INSTRUMENTATION_STATUS: test=handlesConnectionFailure\n"
+                  "INSTRUMENTATION_STATUS: test=recoversFromCrash\n"
+                  "INSTRUMENTATION_STATUS: test=showsExceptionMessage\n"
+                  "OK (3 tests)\nINSTRUMENTATION_CODE: -1\n")
+        self.assertEqual(runner.parse_instrumentation(output), 3)
+
+    def test_instrumentation_rejects_actual_protocol_failure_summary(self):
+        output = ("INSTRUMENTATION_RESULT: shortMsg=java.lang.RuntimeException: app crashed\n"
+                  "OK (1 test)\nINSTRUMENTATION_CODE: -1\n")
+        with self.assertRaisesRegex(RuntimeError, "instrumentation"):
+            runner.parse_instrumentation(output)
+
     def test_start_checks_console_and_adb_ports_before_launch(self):
         with mock.patch.object(runner, "check_port_free") as check:
             runner.check_emulator_ports_free(5582)

@@ -464,6 +464,9 @@ NETS = {
 NC = []
 DNP = {"C13"}
 
+def jlc_cpl_placement(lcsc, x_mm, y_mm, rotation_deg):
+    return x_mm, -y_mm, rotation_deg % 360.0
+
 def validate():
     return None
 """

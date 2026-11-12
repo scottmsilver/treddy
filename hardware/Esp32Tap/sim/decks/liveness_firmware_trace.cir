@@ -11,7 +11,11 @@ Esp32Tap Rev E liveness switch driven by the firmware's own RELAY_PULSE waveform
 * Scenarios: HANG (entry, then the safety loop stops at 300 ms while the timer
 * keeps running), CANCEL (entry, then the permission is withdrawn at 300 ms),
 * STALL (timer held off 9 ms in every 100 ms), SLOW (one tick every 10 ms,
-* the slowest ticking the firmware still counts as unbroken).
+* the slowest ticking the firmware still counts as unbroken), FLASH45/100/400
+* (the safety loop AND the timer both stop for 45, 100 or 400 ms from 150 ms,
+* as ESP-IDF does to every task during a flash erase, then resume; 45 ms is
+* an assumed typical 4 KB sector erase and 400 ms the datasheet worst case
+* the firmware budgets for; RELAY_CMD is held high throughout).
 * NON-CLAIMS:
 * Tick and loop times are chosen, not measured on a chip: the real esp_timer
 * task's jitter under Wi-Fi, BLE and flash load is not modeled. Coil current
@@ -71,7 +75,40 @@ XSHI_CLAMP v5_shi shi_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
 SSHI_Q1 shi_col shi_rtn v33 0 ESP_SWITCH
 XSHI shi_rtn gate_stall ESP_Q3 params: VT=1.45
 
-.tran 2u 500m 0 2u
+* FLASH: coil behind a statically-on Q1, at both Q3 threshold corners.
+XPUMP_F45 pin_flash45 gate_f45 PUMP
+XPUMP_F100 pin_flash100 gate_f100 PUMP
+XPUMP_F400 pin_flash400 gate_f400 PUMP
+V5_F45HI v5_f45hi 0 5
+LF45HI v5_f45hi f45hi_r 0.5
+RF45HI f45hi_r f45hi_s 237
+VF45HI_COIL_SENSE f45hi_s f45hi_col 0
+XF45HI_CLAMP v5_f45hi f45hi_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SF45HI_Q1 f45hi_col f45hi_rtn v33 0 ESP_SWITCH
+XF45HI f45hi_rtn gate_f45 ESP_Q3 params: VT=1.45
+V5_F100HI v5_f100hi 0 5
+LF100HI v5_f100hi f100hi_r 0.5
+RF100HI f100hi_r f100hi_s 237
+VF100HI_COIL_SENSE f100hi_s f100hi_col 0
+XF100HI_CLAMP v5_f100hi f100hi_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SF100HI_Q1 f100hi_col f100hi_rtn v33 0 ESP_SWITCH
+XF100HI f100hi_rtn gate_f100 ESP_Q3 params: VT=1.45
+V5_F100LO v5_f100lo 0 5
+LF100LO v5_f100lo f100lo_r 0.5
+RF100LO f100lo_r f100lo_s 237
+VF100LO_COIL_SENSE f100lo_s f100lo_col 0
+XF100LO_CLAMP v5_f100lo f100lo_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SF100LO_Q1 f100lo_col f100lo_rtn v33 0 ESP_SWITCH
+XF100LO f100lo_rtn gate_f100 ESP_Q3 params: VT=0.65
+V5_F400LO v5_f400lo 0 5
+LF400LO v5_f400lo f400lo_r 0.5
+RF400LO f400lo_r f400lo_s 237
+VF400LO_COIL_SENSE f400lo_s f400lo_col 0
+XF400LO_CLAMP v5_f400lo f400lo_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SF400LO_Q1 f400lo_col f400lo_rtn v33 0 ESP_SWITCH
+XF400LO f400lo_rtn gate_f400 ESP_Q3 params: VT=0.65
+
+.tran 2u 800m 0 2u
 
 .meas tran fw_precharge_wait_s TRIG v(mark_entry) VAL=1.65 RISE=1 TARG v(cmd) VAL=1.65 RISE=1
 .meas tran fw_gate_at_command_v FIND v(gate_hang) WHEN v(cmd)=1.65 RISE=1
@@ -81,8 +118,15 @@ XSHI shi_rtn gate_stall ESP_Q3 params: VT=1.45
 .meas tran fw_hang_release_vt_lo_s TRIG v(mark_stop) VAL=1.65 RISE=1 TARG i(VHLO_COIL_SENSE) VAL=0.0021 FALL=1
 .meas tran fw_cancel_release_vt_hi_s TRIG v(mark_cancel) VAL=1.65 RISE=1 TARG i(VCHI_COIL_SENSE) VAL=0.0021 FALL=1
 .meas tran fw_cancel_release_vt_lo_s TRIG v(mark_cancel) VAL=1.65 RISE=1 TARG i(VCLO_COIL_SENSE) VAL=0.0021 FALL=1
-.meas tran fw_stall_gate_min_v MIN v(gate_stall) FROM=100m TO=500m
-.meas tran fw_stall_coil_min_a MIN i(VSHI_COIL_SENSE) FROM=100m TO=500m
+.meas tran fw_stall_gate_min_v MIN v(gate_stall) FROM=100m TO=800m
+.meas tran fw_stall_coil_min_a MIN i(VSHI_COIL_SENSE) FROM=100m TO=800m
+.meas tran fw_flash45_gate_min_v MIN v(gate_f45) FROM=140m TO=300m
+.meas tran fw_flash45_coil_min_vt_hi_a MIN i(VF45HI_COIL_SENSE) FROM=140m TO=300m
+.meas tran fw_flash100_gate_min_v MIN v(gate_f100) FROM=140m TO=400m
+.meas tran fw_flash100_coil_min_vt_hi_a MIN i(VF100HI_COIL_SENSE) FROM=140m TO=400m
+.meas tran fw_flash100_coil_min_vt_lo_a MIN i(VF100LO_COIL_SENSE) FROM=140m TO=400m
+.meas tran fw_flash400_gate_min_v MIN v(gate_f400) FROM=140m TO=700m
+.meas tran fw_flash400_coil_min_vt_lo_a MIN i(VF400LO_COIL_SENSE) FROM=140m TO=700m
 .meas tran fw_slow_tick_gate_max_v MAX v(gate_slow) FROM=400m TO=500m
 
 .end

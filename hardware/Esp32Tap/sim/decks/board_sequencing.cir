@@ -1,0 +1,556 @@
+Esp32Tap Rev E whole-board sequencing: 8 V rail to K1 coil current, one connected behavioral chain (.include models/behavioral.inc)
+* ASSUMPTIONS:
+* WHAT IS CONNECTED. Every scenario is a separate copy of ONE subcircuit,
+* SEQCHAIN, built from tools/design.py: 8 V source -> 0.5 ohm source ->
+* F1 (0.11 ohm) -> D1 SS34 -> VIN (26 uF, 22 uF in the one marked copy) with
+* D3 SMBJ10A; U2 buck -> +3V3; U4 window (R17/R18 150k/10k, R19/R20 255k/10k,
+* C18/C19 1 nF, R21 10k pull-up to +3V3, R22 100k, R33 1 Mohm from TREAD_OK to
+* UV_SENSE) -> TREAD_OK; U6 AND (ESP_AND_GATE) -> RELAY_GATE; RELAY_GATE enables
+* U5 (5 V LDO from VIN) AND drives Q1 through R9/R10; Q1 emitter -> Q3 (ESP_Q3)
+* fed by the RELAY_PULSE charge pump (PUMP); K1 coil 237 ohm, 0.5 H, D4 clamp,
+* C16 4.7 uF. NOTE: the task brief says TREAD_OK enables U5; tools/design.py
+* (net RELAY_GATE: U5.3 EN, U6.7, R9.1, R24.1) says RELAY_GATE enables U5. The
+* netlist is followed here.
+* BUCK. Averaged: UVLO 4.2 V rising / 3.9 V falling (an engineering
+* assumption, not re-read from the TPS54202 data sheet), 5 ms linear soft
+* start, 0.1 ohm output resistance into 50 uF, 50 mA 3V3 load, 90 percent
+* efficiency input current plus 45 uA. VIN loading therefore follows VIN.
+* U4. Thresholds are a nominal 400 mV rising / 393.5 mV falling (the midpoints
+* of the 396...404 and 387...400 mV corners used by tread_permission.cir) on
+* UV_SENSE (falling for UV) and OV_SENSE (rising for OV). The "narrow" copies
+* use 397.0 / 396.5 mV, because those data-sheet corners overlap and do not
+* guarantee positive hysteresis. Outputs are held low below VIN = 1.8 V,
+* asserted 18 us after a violation, released 450 us after the window is
+* satisfied (RC delays as in tread_permission.cir). TREAD_OK is a real node:
+* R21 pull-up to the modelled +3V3, R22, R33 into UV_SENSE, open-drain switch.
+* R33 therefore feeds back through the real divider (no hand-set hysteresis).
+* U5. 5 V Thevenin source (2 ohm) = min(5, VIN - 0.3) when RELAY_GATE > 1.2 V
+* (0.3 V dropout and 1.2 V EN threshold are assumptions), 1.5 ms soft start.
+* Its input current equals its output current.
+* Q1. Generic Gummel-Poon NPN (Is 5e-16, Bf 250, assumed), NOT a BC817-40
+* vendor model. Q3/D8/C22/C23/R34/R35 are the existing relay_drive_release.cir
+* blocks, Q3 threshold 1.05 V (0.65 / 1.45 V in the corners marked).
+* MCU. RELAY_CMD and RELAY_PULSE are ideal logic levels multiplied by the
+* modelled +3V3 voltage, so a pin never exceeds its supply and falls with the
+* rail. RELAY_PULSE is a 1 kHz, 50 percent square wave with 20 us edges
+* (existing decks use 1 us; slower edges are used to keep run time down).
+* While +3V3 is alive the pins re-assert the instant it returns: no MCU
+* reboot, no firmware logic, no watchdog is modelled.
+* STIMULUS. The 8 V source ramps 0 -> 8 V in 1 ms. Brownouts are applied at
+* the SOURCE (ahead of F1/D1) with 20 us edges; D1 blocks reverse current, so
+* VIN falls only as fast as its loads discharge 26 uF. Scenario 3 ramps 1 V
+* per 100 ms with a 1 kHz sine ripple at the source (about 100 mV peak-to-peak
+* at VIN, see s3a_vin_ripple_pp_v).
+* SCENARIOS (copy names): s1 normal power-up and shutdown; s2 pins asserted
+* from t=0; s3a/s3b/s3c slow ramp, R33 fitted / removed / removed with the
+* narrow comparator band; s4_<level>_<duration> brownout while emulating
+* (6.5, 6.0, 5.0, 3.0 V for 10 ms, 6.5 and 3.0 V also for 100 ms, and 3.0 V
+* for 1 ms with VIN at 22 uF; the other level/duration pairs were not run
+* for run time); s5 12 V step; s6a/s6b power removed in 20 us / 50 ms; s7a-c MCU
+* hang with RELAY_CMD high (a/b held low at the 0.65 / 1.45 V Q3 corners, c held
+* high). All copies start at 0 V with no stored energy.
+* MEASUREMENT TRICKS. Edge counts are "cnt" capacitors integrating
+* (digitised level - 100 us lag)+ / 100 us, so one clean edge adds 1 V; they
+* are resolution limited, so a chatter burst of short pulses reads as a
+* non-integer. nlt / nlc are 1 minus a latched "first TREAD_OK-low / first
+* coil-below-2 mA after T0" flag: INTEGrating them gives the time from T0 to the
+* first event, or the whole window if it never happens.
+* SOLVER. .options reltol=0.01 is used to keep the 18-copy run near 7 s. A
+* trial with the default reltol moved timing results by under 0.1 percent;
+* chatter counts moved by about one count (they carry wide limits).
+* NON-CLAIMS:
+* Behavioral model only: the AND gate is a truth table with a rail
+* dependence, U4 is thresholds plus RC delays, U2 is an averaged source with
+* an assumed UVLO, U5 is an ideal source with an assumed dropout. Nothing
+* here is measured. K1 contact motion is not modeled; coil current is the only
+* output, so "release" means coil current below 2 mA (nothing proves the
+* contacts have opened) and "pickup" means 14.7 mA.
+* AFTER A BROWNOUT THE COIL RE-ENERGIZES BY ITSELF when VIN returns if the
+* MCU still asserts RELAY_CMD and RELAY_PULSE and +3V3 never dropped (in the
+* 3 V cases +3V3 collapses and this model re-asserts the pins instantly when
+* it returns, which a real ESP32 reboot would not). Hardware
+* does not latch a fault. Firmware must treat TREAD_OK loss as a latched
+* event; this deck does not show it does.
+* MCU boot/reset behavior, GPIO threshold and pad-leakage corners, ESP32
+* brownout detector, TX_GATE/UART path, EMI, and relay mechanical timing are
+* not modeled. Tolerance corners are covered only where named above.
+* A 1 ms dip is at the edge of VIN ride-through at 26 uF (VIN falls about
+* 1.7 V in 1 ms from 7.7 V toward the 5.9 V trip point); a 3 V / 1 ms copy at
+* 26 uF flipped between "trip" and "no trip" with solver step, so it is not
+* asserted. Only the 22 uF copy, which trips with margin, is.
+
+
+.include models/behavioral.inc
+
+* Generic Gummel-Poon stand-in for Q1 (assumed Is/Bf, NOT a BC817-40 vendor model).
+.model ESP_Q1 NPN(Is=5e-16 Bf=250 Vaf=80 Rb=5 Re=0.3 Rc=0.3 Cje=10p Cjc=5p)
+* Hysteretic comparator switch: control is scaled so that +/-1 V is the band.
+.model ESP_SWH SW(Ron=1 Roff=1e12 Vt=0 Vh=1)
+.model ESP_SW_PULLDOWN SW(Ron=100 Roff=1e12 Vt=-1.65 Vh=0.05)
+.model ESP_SW_LATCH SW(Ron=0.05 Roff=1e15 Vt=1.65 Vh=0.05)
+.model ESP_SW_U5 SW(Ron=0.05 Roff=1e12 Vt=1.2 Vh=0.05)
+
+* The whole Rev E sequencing chain: protected VIN -> U4 window (with R33) ->
+* TREAD_OK -> U6 AND -> RELAY_GATE -> U5 / Q1 -> K1 coil, Q3 behind Q1's
+* emitter fed by the RELAY_PULSE charge pump.  src is the 8 V treadmill rail
+* before F1.  cmdl / pls are LOGIC levels 0..1 from the MCU, scaled by the
+* modelled +3V3 rail so a pin can never exceed its supply.
+* Observation nodes (read hierarchically as x<n>.<name>): icoil (1 V = 1 A),
+* col, nlt/nlc (latch-based time-to-event), cnt_* (edge counters), gv, cv.
+.subckt SEQCHAIN src cmdl pls params: R33V=1Meg HYS=3.25m VMID=0.39675 Q3VT=1.05 T0=0 CINV=26u
+
+* --- input protection: source, F1, D1, D3, VIN capacitance ---
+RSRC src f1a 0.5
+RF1 f1a d1a 0.11
+DD1 d1a vin ESP_SS34
+CIN vin 0 {CINV}
+DD3 0 vin ESP_SMBJ10A
+
+* --- U2 TPS54202: averaged buck, UVLO 4.2 V rise / 3.9 V fall (assumed),
+* 5 ms soft start, 90 percent efficiency, 50 mA 3V3 load ---
+VLG lg 0 3.3
+BBC bc 0 V={(v(vin)-4.05)/0.15}
+SBEN lg en bc 0 ESP_SWH
+REN en 0 1k
+CSS ss 0 1u
+BSSI 0 ss I={u(v(en)-1.65)*min(max((3.3-v(ss))/0.01,0),1)*0.66m}
+SSSD ss 0 0 en ESP_SW_PULLDOWN
+BREG 0 rail I={max(v(ss)-v(rail),0)/0.1}
+CRAIL rail 0 50u
+BLOAD rail 0 I={0.05*min(max(v(rail)/3.3,0),1)}
+BIN vin 0 I={u(v(en)-1.65)*(45u+v(rail)*max(v(ss)-v(rail),0)/0.1/(0.9*max(v(vin),2)))}
+
+* --- U4 TPS3700 window with R33 hysteresis, TREAD_OK wired net ---
+R17 vin uv 150k
+R18 uv 0 10k
+C18 uv 0 1n
+R33 tok uv {R33V}
+R19 vin ov 255k
+R20 ov 0 10k
+C19 ov 0 1n
+BUVC uvc 0 V={(VMID-v(uv))/HYS}
+BOVC ovc 0 V={(v(ov)-VMID)/HYS}
+SUVF lg fu uvc 0 ESP_SWH
+SOVF lg fo ovc 0 ESP_SWH
+RFU fu 0 1k
+RFO fo 0 1k
+BOKR okr 0 V={3.3*u(v(vin)-1.8)*u(1.65-v(fu))*u(1.65-v(fo))}
+RSTART okr ready 649.213k
+CSTART ready 0 1n
+RRESET ready rres 25.97k
+DRESET rres okr ESP_SIGNAL_DIODE
+R21 rail tok 10k
+R22 tok 0 100k
+STOK tok 0 0 ready ESP_SW_PULLDOWN
+
+* --- MCU pins (powered from +3V3), U6 AND, RELAY_GATE ---
+BCMD cmdp 0 V={v(rail)*min(max(v(cmdl),0),1)}
+R23 cmdp 0 10k
+BPLS pp 0 V={v(rail)*min(max(v(pls),0),1)}
+XU6 cmdp tok rail gate ESP_AND_GATE
+R24 gate 0 10k
+
+* --- U5 TPS70950: 5 V from VIN (assumed 0.3 V dropout), enable = RELAY_GATE,
+* 1.5 ms soft start, 2 ohm Thevenin output, C16 ---
+BU5T u5t 0 V={u(v(gate)-1.2)*max(min(5,v(vin)-0.3),0)}
+RU5S u5t u5r 469k
+CU5S u5r 0 1n
+DU5R u5r u5t ESP_SIGNAL_DIODE
+BU5O u5o 0 V=v(u5r)
+SU5 u5o u5s gate 0 ESP_SW_U5
+VS5 u5s u5m 0
+RU5 u5m r5 2
+BLDO vin 0 I={max(i(VS5),0)}
+C16 r5 0 4.7u
+
+* --- K1 coil, D4, Q1 (R9/R10), Q3 behind Q1 emitter, charge pump ---
+LK1 r5 kl 0.5
+RK1 kl ks 237
+VCS ks col 0
+XD4 r5 col ESP_BIDI_TVS params: VCLAMP=7.02 RDYN=0.094
+R9 gate qb 560
+R10 qb 0 10k
+Q1 col qb qe ESP_Q1
+XPUMP pp q3g PUMP
+XQ3 qe q3g ESP_Q3 params: VT={Q3VT}
+HCOIL icoil 0 VCS 1
+
+* --- observation only: digitised levels and edge counters (1 V of cnt per
+* edge: current (level - 100 us lag)+ / 100 us integrated on a 1 F capacitor) ---
+BDT dt 0 V={u(v(tok)-1.65)}
+RLT dt tl 1
+CLT tl 0 100u
+* coil 'on' = above 15.5 mA (certain operate), 'off' = below 2 mA (certain
+* release); a dip that stays between the two is not counted as an event
+BDCC dcc 0 V={(v(icoil)-0.00875)/0.00675}
+SDC lg dcr dcc 0 ESP_SWH
+RDC dcr 0 1k
+BDC dc 0 V={u(v(dcr)-1.65)}
+RLC dc cl 1
+CLC cl 0 100u
+BDG dg 0 V={u(v(gate)-1.65)}
+RLG dg gl 1
+CLG gl 0 100u
+BTU 0 cnt_tu I={u(time-T0)*max(v(dt)-v(tl),0)/100u}
+BTD 0 cnt_td I={u(time-T0)*max(v(tl)-v(dt),0)/100u}
+BCU 0 cnt_cu I={u(time-T0)*max(v(dc)-v(cl),0)/100u}
+BCD 0 cnt_cd I={u(time-T0)*max(v(cl)-v(dc),0)/100u}
+BGU 0 cnt_gu I={u(time-T0)*max(v(dg)-v(gl),0)/100u}
+CTU cnt_tu 0 1
+CTD cnt_td 0 1
+CCU cnt_cu 0 1
+CCD cnt_cd 0 1
+CGU cnt_gu 0 1
+RTU cnt_tu 0 1e12
+RTD cnt_td 0 1e12
+RCU cnt_cu 0 1e12
+RCD cnt_cd 0 1e12
+RGU cnt_gu 0 1e12
+* latches (a capacitor charged through a switch whose Roff is 1e15 ohm, so only
+* gmin discharges it): first TREAD_OK-low and first coil<2 mA after T0, never reset
+BLTC ltc 0 V={3.3*u(1.65-v(tok))*u(time-T0)}
+SLT lg lt ltc 0 ESP_SW_LATCH
+CLTL lt 0 100n
+BLCC lcc 0 V={3.3*u(0.002-v(icoil))*u(time-T0)}
+SLCL lg lc lcc 0 ESP_SW_LATCH
+CLCL lc 0 100n
+BNLT nlt 0 V={1-u(v(lt)-1.65)}
+BNLC nlc 0 V={1-u(v(lc)-1.65)}
+* coil current while TREAD_OK is low; RELAY_GATE while TREAD_OK is low
+BCV cv 0 V={v(icoil)*u(1.65-v(tok))}
+BGV gv 0 V={v(gate)*u(0.8-v(tok))}
+* re-energize / glitch detectors: coil current from 0.35 ms after it first
+* fell below 0.5 mA, and RELAY_GATE from 0.35 ms after it first fell below
+* 0.1 V (the 0.5 ms RC lag skips the final decay tail)
+BL5C l5c 0 V={3.3*u(0.0005-v(icoil))*u(time-T0)}
+SL5 lg l5 l5c 0 ESP_SW_LATCH
+CL5 l5 0 100n
+BLGC lgc 0 V={3.3*u(0.1-v(gate))*u(time-T0)}
+SLG lg lgl lgc 0 ESP_SW_LATCH
+CLGL lgl 0 100n
+RL5D l5 l5d 1k
+CL5D l5d 0 500n
+RLGD lgl lgd 1k
+CLGD lgd 0 500n
+* start every latch cleared
+.ic v(lt)=0 v(lc)=0 v(l5)=0 v(lgl)=0
+BPK pk 0 V={v(icoil)*u(v(l5d)-1.65)}
+BPKG pkg 0 V={v(gate)*u(v(lgd)-1.65)}
+.ends SEQCHAIN
+
+* ---- copy s1 ----
+Vs1SRC ss1 0 PWL(0 0 1m 0 2m 8 140m 8 141m 0 200m 0)
+Vs1CMD cs1 0 PWL(0 0 50m 0 50.01m 1 100m 1 100.01m 0)
+Vs1SQ qs1 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs1ENV es1 0 PWL(0 0 20m 0 20.001m 1 110m 1 110.001m 0)
+Vs1HLD hs1 0 0
+Bs1PLS ps1 0 V=v(qs1)*v(es1)+v(hs1)*(1-v(es1))
+Xs1 ss1 cs1 ps1 SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0 CINV=26u
+* ---- copy s2 ----
+Vs2SRC ss2 0 PWL(0 0 1m 0 2m 8 60m 8)
+Vs2CMD cs2 0 1
+Vs2SQ qs2 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs2ENV es2 0 1
+Vs2HLD hs2 0 0
+Bs2PLS ps2 0 V=v(qs2)*v(es2)+v(hs2)*(1-v(es2))
+Xs2 ss2 cs2 ps2 SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0 CINV=26u
+* ---- copy s3a ----
+Vs3aBASE bs3a 0 PWL(0 0 1m 0 3m 5.9 30m 5.9 130m 6.9 150m 6.9 290m 5.5 300m 5.5)
+Bs3aSRC ss3a 0 V=v(bs3a)+0.055*sin(6.2832e3*time)*u(time-0.03)
+Vs3aCMD cs3a 0 1
+Vs3aSQ qs3a 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs3aENV es3a 0 1
+Vs3aHLD hs3a 0 0
+Bs3aPLS ps3a 0 V=v(qs3a)*v(es3a)+v(hs3a)*(1-v(es3a))
+Xs3a ss3a cs3a ps3a SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0 CINV=26u
+* ---- copy s3b ----
+Vs3bBASE bs3b 0 PWL(0 0 1m 0 3m 5.9 30m 5.9 130m 6.9 150m 6.9 290m 5.5 300m 5.5)
+Bs3bSRC ss3b 0 V=v(bs3b)+0.055*sin(6.2832e3*time)*u(time-0.03)
+Vs3bCMD cs3b 0 1
+Vs3bSQ qs3b 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs3bENV es3b 0 1
+Vs3bHLD hs3b 0 0
+Bs3bPLS ps3b 0 V=v(qs3b)*v(es3b)+v(hs3b)*(1-v(es3b))
+Xs3b ss3b cs3b ps3b SEQCHAIN params: R33V=1G HYS=3.25m Q3VT=1.05 T0=0 CINV=26u
+* ---- copy s3c ----
+Vs3cBASE bs3c 0 PWL(0 0 1m 0 3m 5.9 30m 5.9 130m 6.9 150m 6.9 290m 5.5 300m 5.5)
+Bs3cSRC ss3c 0 V=v(bs3c)+0.055*sin(6.2832e3*time)*u(time-0.03)
+Vs3cCMD cs3c 0 1
+Vs3cSQ qs3c 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs3cENV es3c 0 1
+Vs3cHLD hs3c 0 0
+Bs3cPLS ps3c 0 V=v(qs3c)*v(es3c)+v(hs3c)*(1-v(es3c))
+Xs3c ss3c cs3c ps3c SEQCHAIN params: R33V=1G HYS=0.25m Q3VT=1.05 T0=0 CINV=26u
+* ---- copy s4_65_10m ----
+Vs4_65_10mSRC ss4_65_10m 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 6.5 70.00000m 6.5 70.02000m 8 300m 8)
+Vs4_65_10mCMD cs4_65_10m 0 1
+Vs4_65_10mSQ qs4_65_10m 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs4_65_10mENV es4_65_10m 0 1
+Vs4_65_10mHLD hs4_65_10m 0 0
+Bs4_65_10mPLS ps4_65_10m 0 V=v(qs4_65_10m)*v(es4_65_10m)+v(hs4_65_10m)*(1-v(es4_65_10m))
+Xs4_65_10m ss4_65_10m cs4_65_10m ps4_65_10m SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s4_65_100m ----
+Vs4_65_100mSRC ss4_65_100m 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 6.5 160.00000m 6.5 160.02000m 8 300m 8)
+Vs4_65_100mCMD cs4_65_100m 0 1
+Vs4_65_100mSQ qs4_65_100m 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs4_65_100mENV es4_65_100m 0 1
+Vs4_65_100mHLD hs4_65_100m 0 0
+Bs4_65_100mPLS ps4_65_100m 0 V=v(qs4_65_100m)*v(es4_65_100m)+v(hs4_65_100m)*(1-v(es4_65_100m))
+Xs4_65_100m ss4_65_100m cs4_65_100m ps4_65_100m SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s4_60_10m ----
+Vs4_60_10mSRC ss4_60_10m 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 6.0 70.00000m 6.0 70.02000m 8 300m 8)
+Vs4_60_10mCMD cs4_60_10m 0 1
+Vs4_60_10mSQ qs4_60_10m 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs4_60_10mENV es4_60_10m 0 1
+Vs4_60_10mHLD hs4_60_10m 0 0
+Bs4_60_10mPLS ps4_60_10m 0 V=v(qs4_60_10m)*v(es4_60_10m)+v(hs4_60_10m)*(1-v(es4_60_10m))
+Xs4_60_10m ss4_60_10m cs4_60_10m ps4_60_10m SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s4_50_10m ----
+Vs4_50_10mSRC ss4_50_10m 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 5.0 70.00000m 5.0 70.02000m 8 300m 8)
+Vs4_50_10mCMD cs4_50_10m 0 1
+Vs4_50_10mSQ qs4_50_10m 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs4_50_10mENV es4_50_10m 0 1
+Vs4_50_10mHLD hs4_50_10m 0 0
+Bs4_50_10mPLS ps4_50_10m 0 V=v(qs4_50_10m)*v(es4_50_10m)+v(hs4_50_10m)*(1-v(es4_50_10m))
+Xs4_50_10m ss4_50_10m cs4_50_10m ps4_50_10m SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s4_30_10m ----
+Vs4_30_10mSRC ss4_30_10m 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 3.0 70.00000m 3.0 70.02000m 8 300m 8)
+Vs4_30_10mCMD cs4_30_10m 0 1
+Vs4_30_10mSQ qs4_30_10m 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs4_30_10mENV es4_30_10m 0 1
+Vs4_30_10mHLD hs4_30_10m 0 0
+Bs4_30_10mPLS ps4_30_10m 0 V=v(qs4_30_10m)*v(es4_30_10m)+v(hs4_30_10m)*(1-v(es4_30_10m))
+Xs4_30_10m ss4_30_10m cs4_30_10m ps4_30_10m SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s4_30_100m ----
+Vs4_30_100mSRC ss4_30_100m 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 3.0 160.00000m 3.0 160.02000m 8 300m 8)
+Vs4_30_100mCMD cs4_30_100m 0 1
+Vs4_30_100mSQ qs4_30_100m 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs4_30_100mENV es4_30_100m 0 1
+Vs4_30_100mHLD hs4_30_100m 0 0
+Bs4_30_100mPLS ps4_30_100m 0 V=v(qs4_30_100m)*v(es4_30_100m)+v(hs4_30_100m)*(1-v(es4_30_100m))
+Xs4_30_100m ss4_30_100m cs4_30_100m ps4_30_100m SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s4_30_1m ----
+Vs4_30_1mSRC ss4_30_1m 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 3.0 61.00000m 3.0 61.02000m 8 300m 8)
+Vs4_30_1mCMD cs4_30_1m 0 1
+Vs4_30_1mSQ qs4_30_1m 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs4_30_1mENV es4_30_1m 0 1
+Vs4_30_1mHLD hs4_30_1m 0 0
+Bs4_30_1mPLS ps4_30_1m 0 V=v(qs4_30_1m)*v(es4_30_1m)+v(hs4_30_1m)*(1-v(es4_30_1m))
+Xs4_30_1m ss4_30_1m cs4_30_1m ps4_30_1m SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=22u
+* ---- copy s5 ----
+Vs5SRC ss5 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 12 80m 12 80.02m 8 200m 8)
+Vs5CMD cs5 0 1
+Vs5SQ qs5 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs5ENV es5 0 1
+Vs5HLD hs5 0 0
+Bs5PLS ps5 0 V=v(qs5)*v(es5)+v(hs5)*(1-v(es5))
+Xs5 ss5 cs5 ps5 SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s6a ----
+Vs6aSRC ss6a 0 PWL(0 0 1m 0 2m 8 60m 8 60.02m 0 160m 0)
+Vs6aCMD cs6a 0 1
+Vs6aSQ qs6a 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs6aENV es6a 0 1
+Vs6aHLD hs6a 0 0
+Bs6aPLS ps6a 0 V=v(qs6a)*v(es6a)+v(hs6a)*(1-v(es6a))
+Xs6a ss6a cs6a ps6a SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s6b ----
+Vs6bSRC ss6b 0 PWL(0 0 1m 0 2m 8 60m 8 110m 0 160m 0)
+Vs6bCMD cs6b 0 1
+Vs6bSQ qs6b 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs6bENV es6b 0 1
+Vs6bHLD hs6b 0 0
+Bs6bPLS ps6b 0 V=v(qs6b)*v(es6b)+v(hs6b)*(1-v(es6b))
+Xs6b ss6b cs6b ps6b SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.05 T0=0.06 CINV=26u
+* ---- copy s7a ----
+Vs7aSRC ss7a 0 PWL(0 0 1m 0 2m 8 300m 8)
+Vs7aCMD cs7a 0 1
+Vs7aSQ qs7a 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs7aENV es7a 0 PWL(0 1 60m 1 60.001m 0)
+Vs7aHLD hs7a 0 0
+Bs7aPLS ps7a 0 V=v(qs7a)*v(es7a)+v(hs7a)*(1-v(es7a))
+Xs7a ss7a cs7a ps7a SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=0.65 T0=0.06 CINV=26u
+* ---- copy s7b ----
+Vs7bSRC ss7b 0 PWL(0 0 1m 0 2m 8 300m 8)
+Vs7bCMD cs7b 0 1
+Vs7bSQ qs7b 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs7bENV es7b 0 PWL(0 1 60m 1 60.001m 0)
+Vs7bHLD hs7b 0 0
+Bs7bPLS ps7b 0 V=v(qs7b)*v(es7b)+v(hs7b)*(1-v(es7b))
+Xs7b ss7b cs7b ps7b SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=1.45 T0=0.06 CINV=26u
+* ---- copy s7c ----
+Vs7cSRC ss7c 0 PWL(0 0 1m 0 2m 8 300m 8)
+Vs7cCMD cs7c 0 1
+Vs7cSQ qs7c 0 PULSE(0 1 0 20u 20u 0.48m 1m)
+Vs7cENV es7c 0 PWL(0 1 60m 1 60.001m 0)
+Vs7cHLD hs7c 0 1
+Bs7cPLS ps7c 0 V=v(qs7c)*v(es7c)+v(hs7c)*(1-v(es7c))
+Xs7c ss7c cs7c ps7c SEQCHAIN params: R33V=1Meg HYS=3.25m Q3VT=0.65 T0=0.06 CINV=26u
+
+.meas tran s1_coil_max_before_cmd_a MAX v(xs1.icoil) FROM=0 TO=49m
+.meas tran s1_gate_max_before_cmd_v MAX v(xs1.gate) FROM=0 TO=49m
+.meas tran s1_pickup_after_cmd_s TRIG v(cs1) VAL=0.5 RISE=1 TARG v(xs1.icoil) VAL=0.0147 RISE=1
+.meas tran s1_coil_on_a AVG v(xs1.icoil) FROM=80m TO=95m
+.meas tran s1_release_after_cmd_s TRIG v(cs1) VAL=0.5 FALL=1 TARG v(xs1.icoil) VAL=0.002 FALL=1
+.meas tran s1_coil_after_release_max_a MAX v(xs1.icoil) FROM=120m TO=200m
+.meas tran s1_r5_peak_v MAX v(xs1.r5) FROM=0 TO=200m
+.meas tran s1_col_peak_v MAX v(xs1.col) FROM=0 TO=200m
+.meas tran s1_gate_high_tread_low_v MAX v(xs1.gv) FROM=0 TO=200m
+.meas tran s1_tread_up_n FIND v(xs1.cnt_tu) AT=0.2
+.meas tran s1_tread_dn_n FIND v(xs1.cnt_td) AT=0.2
+.meas tran s1_coil_up_n FIND v(xs1.cnt_cu) AT=0.2
+.meas tran s1_coil_dn_n FIND v(xs1.cnt_cd) AT=0.2
+.meas tran s1_gate_up_n FIND v(xs1.cnt_gu) AT=0.2
+.meas tran s2_coil_while_tread_low_a MAX v(xs2.cv) FROM=0 TO=60m
+.meas tran s2_gate_high_tread_low_v MAX v(xs2.gv) FROM=0 TO=60m
+.meas tran s2_tread_to_coil_1ma_s TRIG v(xs2.tok) VAL=1.65 RISE=1 TARG v(xs2.icoil) VAL=0.001 RISE=1
+.meas tran s2_tread_to_pickup_s TRIG v(xs2.tok) VAL=1.65 RISE=1 TARG v(xs2.icoil) VAL=0.0147 RISE=1
+.meas tran s2_coil_on_a AVG v(xs2.icoil) FROM=45m TO=60m
+.meas tran s2_tread_up_n FIND v(xs2.cnt_tu) AT=0.06
+.meas tran s2_tread_dn_n FIND v(xs2.cnt_td) AT=0.06
+.meas tran s2_coil_up_n FIND v(xs2.cnt_cu) AT=0.06
+.meas tran s2_coil_dn_n FIND v(xs2.cnt_cd) AT=0.06
+.meas tran s3a_tread_up_n FIND v(xs3a.cnt_tu) AT=0.299
+.meas tran s3a_tread_dn_n FIND v(xs3a.cnt_td) AT=0.299
+.meas tran s3a_coil_up_n FIND v(xs3a.cnt_cu) AT=0.299
+.meas tran s3a_coil_dn_n FIND v(xs3a.cnt_cd) AT=0.299
+.meas tran s3b_tread_up_n FIND v(xs3b.cnt_tu) AT=0.299
+.meas tran s3b_tread_dn_n FIND v(xs3b.cnt_td) AT=0.299
+.meas tran s3b_coil_up_n FIND v(xs3b.cnt_cu) AT=0.299
+.meas tran s3b_coil_dn_n FIND v(xs3b.cnt_cd) AT=0.299
+.meas tran s3c_tread_up_n FIND v(xs3c.cnt_tu) AT=0.299
+.meas tran s3c_tread_dn_n FIND v(xs3c.cnt_td) AT=0.299
+.meas tran s3c_coil_up_n FIND v(xs3c.cnt_cu) AT=0.299
+.meas tran s3c_coil_dn_n FIND v(xs3c.cnt_cd) AT=0.299
+.meas tran s3a_vin_ripple_pp_v PP v(xs3a.vin) FROM=100m TO=101m
+.meas tran s3a_tread_rise_vin_v FIND v(xs3a.vin) WHEN v(xs3a.tok)=1.65 RISE=1 TD=20m
+.meas tran s3a_tread_fall_vin_v FIND v(xs3a.vin) WHEN v(xs3a.tok)=1.65 FALL=1
+.meas tran s4_65_10m_tread_up_n FIND v(xs4_65_10m.cnt_tu) AT=0.299
+.meas tran s4_65_10m_tread_dn_n FIND v(xs4_65_10m.cnt_td) AT=0.299
+.meas tran s4_65_10m_coil_up_n FIND v(xs4_65_10m.cnt_cu) AT=0.299
+.meas tran s4_65_10m_coil_dn_n FIND v(xs4_65_10m.cnt_cd) AT=0.299
+.meas tran s4_65_10m_coil_release_s INTEG v(xs4_65_10m.nlc) FROM=60m TO=290m
+.meas tran s4_65_10m_tread_low_s INTEG v(xs4_65_10m.nlt) FROM=60m TO=290m
+.meas tran s4_65_10m_vin_min_v MIN v(xs4_65_10m.vin) FROM=60m TO=300m
+.meas tran s4_65_10m_rail_min_v MIN v(xs4_65_10m.rail) FROM=60m TO=300m
+.meas tran s4_65_10m_coil_min_a MIN v(xs4_65_10m.icoil) FROM=60m TO=250m
+.meas tran s4_65_10m_coil_final_a AVG v(xs4_65_10m.icoil) FROM=280m TO=290m
+.meas tran s4_65_100m_tread_up_n FIND v(xs4_65_100m.cnt_tu) AT=0.299
+.meas tran s4_65_100m_tread_dn_n FIND v(xs4_65_100m.cnt_td) AT=0.299
+.meas tran s4_65_100m_coil_up_n FIND v(xs4_65_100m.cnt_cu) AT=0.299
+.meas tran s4_65_100m_coil_dn_n FIND v(xs4_65_100m.cnt_cd) AT=0.299
+.meas tran s4_65_100m_coil_release_s INTEG v(xs4_65_100m.nlc) FROM=60m TO=290m
+.meas tran s4_65_100m_tread_low_s INTEG v(xs4_65_100m.nlt) FROM=60m TO=290m
+.meas tran s4_65_100m_vin_min_v MIN v(xs4_65_100m.vin) FROM=60m TO=300m
+.meas tran s4_65_100m_rail_min_v MIN v(xs4_65_100m.rail) FROM=60m TO=300m
+.meas tran s4_65_100m_coil_min_a MIN v(xs4_65_100m.icoil) FROM=60m TO=250m
+.meas tran s4_65_100m_coil_final_a AVG v(xs4_65_100m.icoil) FROM=280m TO=290m
+.meas tran s4_60_10m_tread_up_n FIND v(xs4_60_10m.cnt_tu) AT=0.299
+.meas tran s4_60_10m_tread_dn_n FIND v(xs4_60_10m.cnt_td) AT=0.299
+.meas tran s4_60_10m_coil_up_n FIND v(xs4_60_10m.cnt_cu) AT=0.299
+.meas tran s4_60_10m_coil_dn_n FIND v(xs4_60_10m.cnt_cd) AT=0.299
+.meas tran s4_60_10m_coil_release_s INTEG v(xs4_60_10m.nlc) FROM=60m TO=290m
+.meas tran s4_60_10m_tread_low_s INTEG v(xs4_60_10m.nlt) FROM=60m TO=290m
+.meas tran s4_60_10m_vin_min_v MIN v(xs4_60_10m.vin) FROM=60m TO=300m
+.meas tran s4_60_10m_rail_min_v MIN v(xs4_60_10m.rail) FROM=60m TO=300m
+.meas tran s4_60_10m_coil_min_a MIN v(xs4_60_10m.icoil) FROM=60m TO=250m
+.meas tran s4_60_10m_coil_final_a AVG v(xs4_60_10m.icoil) FROM=280m TO=290m
+.meas tran s4_50_10m_tread_up_n FIND v(xs4_50_10m.cnt_tu) AT=0.299
+.meas tran s4_50_10m_tread_dn_n FIND v(xs4_50_10m.cnt_td) AT=0.299
+.meas tran s4_50_10m_coil_up_n FIND v(xs4_50_10m.cnt_cu) AT=0.299
+.meas tran s4_50_10m_coil_dn_n FIND v(xs4_50_10m.cnt_cd) AT=0.299
+.meas tran s4_50_10m_coil_release_s INTEG v(xs4_50_10m.nlc) FROM=60m TO=290m
+.meas tran s4_50_10m_tread_low_s INTEG v(xs4_50_10m.nlt) FROM=60m TO=290m
+.meas tran s4_50_10m_vin_min_v MIN v(xs4_50_10m.vin) FROM=60m TO=300m
+.meas tran s4_50_10m_rail_min_v MIN v(xs4_50_10m.rail) FROM=60m TO=300m
+.meas tran s4_50_10m_coil_min_a MIN v(xs4_50_10m.icoil) FROM=60m TO=250m
+.meas tran s4_50_10m_coil_final_a AVG v(xs4_50_10m.icoil) FROM=280m TO=290m
+.meas tran s4_30_10m_tread_up_n FIND v(xs4_30_10m.cnt_tu) AT=0.299
+.meas tran s4_30_10m_tread_dn_n FIND v(xs4_30_10m.cnt_td) AT=0.299
+.meas tran s4_30_10m_coil_up_n FIND v(xs4_30_10m.cnt_cu) AT=0.299
+.meas tran s4_30_10m_coil_dn_n FIND v(xs4_30_10m.cnt_cd) AT=0.299
+.meas tran s4_30_10m_coil_release_s INTEG v(xs4_30_10m.nlc) FROM=60m TO=290m
+.meas tran s4_30_10m_tread_low_s INTEG v(xs4_30_10m.nlt) FROM=60m TO=290m
+.meas tran s4_30_10m_vin_min_v MIN v(xs4_30_10m.vin) FROM=60m TO=300m
+.meas tran s4_30_10m_rail_min_v MIN v(xs4_30_10m.rail) FROM=60m TO=300m
+.meas tran s4_30_10m_coil_min_a MIN v(xs4_30_10m.icoil) FROM=60m TO=250m
+.meas tran s4_30_10m_coil_final_a AVG v(xs4_30_10m.icoil) FROM=280m TO=290m
+.meas tran s4_30_100m_tread_up_n FIND v(xs4_30_100m.cnt_tu) AT=0.299
+.meas tran s4_30_100m_tread_dn_n FIND v(xs4_30_100m.cnt_td) AT=0.299
+.meas tran s4_30_100m_coil_up_n FIND v(xs4_30_100m.cnt_cu) AT=0.299
+.meas tran s4_30_100m_coil_dn_n FIND v(xs4_30_100m.cnt_cd) AT=0.299
+.meas tran s4_30_100m_coil_release_s INTEG v(xs4_30_100m.nlc) FROM=60m TO=290m
+.meas tran s4_30_100m_tread_low_s INTEG v(xs4_30_100m.nlt) FROM=60m TO=290m
+.meas tran s4_30_100m_vin_min_v MIN v(xs4_30_100m.vin) FROM=60m TO=300m
+.meas tran s4_30_100m_rail_min_v MIN v(xs4_30_100m.rail) FROM=60m TO=300m
+.meas tran s4_30_100m_coil_min_a MIN v(xs4_30_100m.icoil) FROM=60m TO=250m
+.meas tran s4_30_100m_coil_final_a AVG v(xs4_30_100m.icoil) FROM=280m TO=290m
+.meas tran s4_30_1m_tread_up_n FIND v(xs4_30_1m.cnt_tu) AT=0.299
+.meas tran s4_30_1m_tread_dn_n FIND v(xs4_30_1m.cnt_td) AT=0.299
+.meas tran s4_30_1m_coil_up_n FIND v(xs4_30_1m.cnt_cu) AT=0.299
+.meas tran s4_30_1m_coil_dn_n FIND v(xs4_30_1m.cnt_cd) AT=0.299
+.meas tran s4_30_1m_coil_release_s INTEG v(xs4_30_1m.nlc) FROM=60m TO=290m
+.meas tran s4_30_1m_tread_low_s INTEG v(xs4_30_1m.nlt) FROM=60m TO=290m
+.meas tran s4_30_1m_vin_min_v MIN v(xs4_30_1m.vin) FROM=60m TO=300m
+.meas tran s4_30_1m_rail_min_v MIN v(xs4_30_1m.rail) FROM=60m TO=300m
+.meas tran s4_30_1m_coil_min_a MIN v(xs4_30_1m.icoil) FROM=60m TO=250m
+.meas tran s4_30_1m_coil_final_a AVG v(xs4_30_1m.icoil) FROM=280m TO=290m
+.meas tran s5_tread_up_n FIND v(xs5.cnt_tu) AT=0.199
+.meas tran s5_tread_dn_n FIND v(xs5.cnt_td) AT=0.199
+.meas tran s5_coil_up_n FIND v(xs5.cnt_cu) AT=0.199
+.meas tran s5_coil_dn_n FIND v(xs5.cnt_cd) AT=0.199
+.meas tran s5_vin_peak_v MAX v(xs5.vin) FROM=60m TO=80m
+.meas tran s5_coil_release_s INTEG v(xs5.nlc) FROM=60m TO=199m
+.meas tran s5_tread_low_s INTEG v(xs5.nlt) FROM=60m TO=199m
+.meas tran s5_coil_min_a MIN v(xs5.icoil) FROM=60m TO=150m
+.meas tran s5_coil_final_a AVG v(xs5.icoil) FROM=190m TO=199m
+.meas tran s5_r5_peak_v MAX v(xs5.r5) FROM=60m TO=199m
+.meas tran s5_col_peak_v MAX v(xs5.col) FROM=60m TO=199m
+.meas tran s6a_tread_dn_n FIND v(xs6a.cnt_td) AT=0.159
+.meas tran s6a_coil_up_n FIND v(xs6a.cnt_cu) AT=0.159
+.meas tran s6a_gate_up_n FIND v(xs6a.cnt_gu) AT=0.159
+.meas tran s6a_coil_release_s INTEG v(xs6a.nlc) FROM=60m TO=159m
+.meas tran s6a_tread_low_s INTEG v(xs6a.nlt) FROM=60m TO=159m
+.meas tran s6a_coil_after_release_max_a MAX v(xs6a.pk) FROM=60m TO=159m
+.meas tran s6a_gate_after_fall_max_v MAX v(xs6a.pkg) FROM=60m TO=159m
+.meas tran s6a_gate_high_tread_low_v MAX v(xs6a.gv) FROM=60m TO=159m
+.meas tran s6a_rail_final_v FIND v(xs6a.rail) AT=159m
+.meas tran s6b_tread_dn_n FIND v(xs6b.cnt_td) AT=0.159
+.meas tran s6b_coil_up_n FIND v(xs6b.cnt_cu) AT=0.159
+.meas tran s6b_gate_up_n FIND v(xs6b.cnt_gu) AT=0.159
+.meas tran s6b_coil_release_s INTEG v(xs6b.nlc) FROM=60m TO=159m
+.meas tran s6b_tread_low_s INTEG v(xs6b.nlt) FROM=60m TO=159m
+.meas tran s6b_coil_after_release_max_a MAX v(xs6b.pk) FROM=60m TO=159m
+.meas tran s6b_gate_after_fall_max_v MAX v(xs6b.pkg) FROM=60m TO=159m
+.meas tran s6b_gate_high_tread_low_v MAX v(xs6b.gv) FROM=60m TO=159m
+.meas tran s6b_rail_final_v FIND v(xs6b.rail) AT=159m
+.meas tran s7a_tread_dn_n FIND v(xs7a.cnt_td) AT=0.299
+.meas tran s7a_coil_up_n FIND v(xs7a.cnt_cu) AT=0.299
+.meas tran s7a_coil_dn_n FIND v(xs7a.cnt_cd) AT=0.299
+.meas tran s7a_gate_up_n FIND v(xs7a.cnt_gu) AT=0.299
+.meas tran s7a_coil_release_s INTEG v(xs7a.nlc) FROM=60m TO=299m
+.meas tran s7a_coil_before_hang_a AVG v(xs7a.icoil) FROM=50m TO=59m
+.meas tran s7a_coil_final_a AVG v(xs7a.icoil) FROM=290m TO=299m
+.meas tran s7a_coil_after_release_max_a MAX v(xs7a.pk) FROM=60m TO=299m
+.meas tran s7a_gate_min_v MIN v(xs7a.gate) FROM=60m TO=299m
+.meas tran s7b_tread_dn_n FIND v(xs7b.cnt_td) AT=0.299
+.meas tran s7b_coil_up_n FIND v(xs7b.cnt_cu) AT=0.299
+.meas tran s7b_coil_dn_n FIND v(xs7b.cnt_cd) AT=0.299
+.meas tran s7b_gate_up_n FIND v(xs7b.cnt_gu) AT=0.299
+.meas tran s7b_coil_release_s INTEG v(xs7b.nlc) FROM=60m TO=299m
+.meas tran s7b_coil_before_hang_a AVG v(xs7b.icoil) FROM=50m TO=59m
+.meas tran s7b_coil_final_a AVG v(xs7b.icoil) FROM=290m TO=299m
+.meas tran s7b_coil_after_release_max_a MAX v(xs7b.pk) FROM=60m TO=299m
+.meas tran s7b_gate_min_v MIN v(xs7b.gate) FROM=60m TO=299m
+.meas tran s7c_tread_dn_n FIND v(xs7c.cnt_td) AT=0.299
+.meas tran s7c_coil_up_n FIND v(xs7c.cnt_cu) AT=0.299
+.meas tran s7c_coil_dn_n FIND v(xs7c.cnt_cd) AT=0.299
+.meas tran s7c_gate_up_n FIND v(xs7c.cnt_gu) AT=0.299
+.meas tran s7c_coil_release_s INTEG v(xs7c.nlc) FROM=60m TO=299m
+.meas tran s7c_coil_before_hang_a AVG v(xs7c.icoil) FROM=50m TO=59m
+.meas tran s7c_coil_final_a AVG v(xs7c.icoil) FROM=290m TO=299m
+.meas tran s7c_coil_after_release_max_a MAX v(xs7c.pk) FROM=60m TO=299m
+.meas tran s7c_gate_min_v MIN v(xs7c.gate) FROM=60m TO=299m
+.options reltol=0.01
+.tran 20u 0.3 0 50u
+
+.end

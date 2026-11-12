@@ -204,8 +204,14 @@ def validate_assembly_records(
     board: dict[str, Any],
     bom_rows: list[dict[str, str]],
     cpl_rows: list[dict[str, str]],
+    rotation_offsets: dict[str, float] | None = None,
 ) -> None:
-    """Cross-check exact references and purchasing metadata across artifacts."""
+    """Cross-check exact references and purchasing metadata across artifacts.
+
+    ``rotation_offsets`` maps an LCSC part number to the fixed angle JLC's
+    model of that part needs added to the KiCad rotation.
+    """
+    rotation_offsets = rotation_offsets or {}
     design_references = set(components)
     populated = {
         reference for reference, component in components.items() if reference not in dnp and component[4] != "none"
@@ -299,8 +305,8 @@ def validate_assembly_records(
     ):
         raise FabExportError("PCB outline min/max must be [x, y]")
     try:
-        origin_x = float(outline_min[0])
-        maximum_y = float(outline_max[1])
+        float(outline_min[0])
+        float(outline_max[1])
     except (TypeError, ValueError) as error:
         raise FabExportError("PCB outline coordinates are not numeric") from error
 
@@ -391,7 +397,7 @@ def validate_assembly_records(
             actual_rotation = float(cpl.get("Rotation", ""))
         except (TypeError, ValueError) as error:
             raise FabExportError(f"CPL {reference} Rotation is not numeric") from error
-        expected_rotation = float(rounded_rotation)
+        expected_rotation = float(rounded_rotation) + float(rotation_offsets.get(lcsc, 0))
         rotation_delta = abs((actual_rotation - expected_rotation + 180.0) % 360.0 - 180.0)
         if not math.isfinite(actual_rotation) or rotation_delta > 1e-9:
             raise FabExportError(
@@ -402,8 +408,9 @@ def validate_assembly_records(
         position = board_footprint.get("at")
         if not isinstance(position, list) or len(position) != 2:
             raise FabExportError(f"PCB {reference}.at must be [x, y]")
-        expected_x = float(position[0]) - origin_x
-        expected_y = maximum_y - float(position[1])
+        # Gerber coordinates: the placement file is overlaid on the Gerbers.
+        expected_x = float(position[0])
+        expected_y = -float(position[1])
         actual_x = _parse_mm(cpl.get("Mid X", ""), f"CPL {reference} Mid X")
         actual_y = _parse_mm(cpl.get("Mid Y", ""), f"CPL {reference} Mid Y")
         if not math.isclose(actual_x, expected_x, abs_tol=0.0005):
@@ -615,6 +622,7 @@ def audit_assembly(root: Path = ROOT) -> None:
         board=_load_board_record(root),
         bom_rows=_load_csv_rows(root / "bom" / "BOM.csv"),
         cpl_rows=_load_csv_rows(root / "bom" / "CPL-positions.csv"),
+        rotation_offsets=dict(design.JLC_ROTATION_OFFSET_DEG),
     )
 
 

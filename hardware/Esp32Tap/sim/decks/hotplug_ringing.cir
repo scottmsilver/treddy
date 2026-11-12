@@ -1,0 +1,782 @@
+Esp32Tap Rev E hot-plug ringing: cable inductance into the F1 D1 D3 ceramic input
+* Plugging the RJ45 into a live source is modeled as an ideal voltage step
+* (2 us rise) behind source+cable resistance Rs, cable loop inductance L, F1,
+* D1 and the VIN capacitor bank. Each branch is a separate flat copy.
+* Branch names: <d3>_v<source V>_l<uH>_r<ohm>_c<uF>. d3: h = ESP_SMBJ10A_HIGH
+* (12.3 V breakdown, worst for peak VIN), l = ESP_SMBJ10A (11.1 V, worst for
+* D3 current/energy), n = D3 absent.
+* ASSUMPTIONS:
+* Source: 8 V nominal treadmill rail, and 9 V as an ASSUMED highest plausible
+* source (not a datasheet or measured value). The step is ideal and infinitely
+* stiff apart from Rs.
+* Loop inductance 0.5, 2 and 5 uH. Assumed from about 1 uH per metre of loop
+* for a patch cable, plus connector/board loop; not a measured cable value.
+* Rs (source+cable, excluding F1) 0.1 ohm as a low-damping corner and 0.5 ohm
+* as a higher one (0.5 ohm matches decks/input_protection.cir).
+* F1 held at its 0.11 ohm cold resistance (the least damped corner). D1 is
+* ESP_SS34 with the same model as the other decks.
+* VIN capacitance 43.2 uF nominal, 26 uF effective at 7.5 V bias, 22 uF
+* worst corner (derating estimate from decks/input_protection.cir, not a
+* measurement), with 5 mohm ESR as the low-ESR worst case for ringing.
+* Load: 10 kohm, i.e. only dividers and supervisor draw before U2 starts. The
+* buck starts later and is not modeled, so no load damping is credited.
+* D3 uses the existing 11.1 V and 12.3 V breakdown models; D3 absent branches
+* show the undamped cable/ceramic ringing.
+* NON-CLAIMS:
+* Real cable inductance and resistance, contact bounce or arcing during
+* insertion, source output impedance and any source-side capacitance, PTC
+* thermal behavior, repetitive hot-plug events, ceramic ESL and capacitance
+* loss at the actual peak voltage (modeled as fixed values), buck start-up
+* interaction, and part damage thresholds are not shown by this deck. Peak
+* VIN is a simulation result with simple models, not a measurement.
+
+.include models/behavioral.inc
+
+* h_v8_l0p5_r0p1_c22: 8 V step, L=0.5 uH, Rs=0.1 ohm, C=22 uF, D3=HIGH
+Vh_v8_l0p5_r0p1_c22 h_v8_l0p5_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rh_v8_l0p5_r0p1_c22_RS h_v8_l0p5_r0p1_c22_src h_v8_l0p5_r0p1_c22_l 0.1
+Lh_v8_l0p5_r0p1_c22_L h_v8_l0p5_r0p1_c22_l h_v8_l0p5_r0p1_c22_f 0.5u
+Rh_v8_l0p5_r0p1_c22_F1 h_v8_l0p5_r0p1_c22_f h_v8_l0p5_r0p1_c22_a 0.11
+Vh_v8_l0p5_r0p1_c22_D1S h_v8_l0p5_r0p1_c22_a h_v8_l0p5_r0p1_c22_d1a 0
+Dh_v8_l0p5_r0p1_c22_D1 h_v8_l0p5_r0p1_c22_d1a h_v8_l0p5_r0p1_c22_vin ESP_SS34
+Vh_v8_l0p5_r0p1_c22_D3S h_v8_l0p5_r0p1_c22_d3a 0 0
+Dh_v8_l0p5_r0p1_c22_D3 h_v8_l0p5_r0p1_c22_d3a h_v8_l0p5_r0p1_c22_vin ESP_SMBJ10A_HIGH
+Rh_v8_l0p5_r0p1_c22_LOAD h_v8_l0p5_r0p1_c22_vin 0 10k
+Rh_v8_l0p5_r0p1_c22_ESR h_v8_l0p5_r0p1_c22_vin h_v8_l0p5_r0p1_c22_cx 5m
+Ch_v8_l0p5_r0p1_c22 h_v8_l0p5_r0p1_c22_cx 0 22u
+
+* h_v8_l0p5_r0p5_c22: 8 V step, L=0.5 uH, Rs=0.5 ohm, C=22 uF, D3=HIGH
+Vh_v8_l0p5_r0p5_c22 h_v8_l0p5_r0p5_c22_src 0 PWL(0 0 2u 8)
+Rh_v8_l0p5_r0p5_c22_RS h_v8_l0p5_r0p5_c22_src h_v8_l0p5_r0p5_c22_l 0.5
+Lh_v8_l0p5_r0p5_c22_L h_v8_l0p5_r0p5_c22_l h_v8_l0p5_r0p5_c22_f 0.5u
+Rh_v8_l0p5_r0p5_c22_F1 h_v8_l0p5_r0p5_c22_f h_v8_l0p5_r0p5_c22_a 0.11
+Vh_v8_l0p5_r0p5_c22_D1S h_v8_l0p5_r0p5_c22_a h_v8_l0p5_r0p5_c22_d1a 0
+Dh_v8_l0p5_r0p5_c22_D1 h_v8_l0p5_r0p5_c22_d1a h_v8_l0p5_r0p5_c22_vin ESP_SS34
+Vh_v8_l0p5_r0p5_c22_D3S h_v8_l0p5_r0p5_c22_d3a 0 0
+Dh_v8_l0p5_r0p5_c22_D3 h_v8_l0p5_r0p5_c22_d3a h_v8_l0p5_r0p5_c22_vin ESP_SMBJ10A_HIGH
+Rh_v8_l0p5_r0p5_c22_LOAD h_v8_l0p5_r0p5_c22_vin 0 10k
+Rh_v8_l0p5_r0p5_c22_ESR h_v8_l0p5_r0p5_c22_vin h_v8_l0p5_r0p5_c22_cx 5m
+Ch_v8_l0p5_r0p5_c22 h_v8_l0p5_r0p5_c22_cx 0 22u
+
+* h_v8_l2_r0p1_c22: 8 V step, L=2 uH, Rs=0.1 ohm, C=22 uF, D3=HIGH
+Vh_v8_l2_r0p1_c22 h_v8_l2_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rh_v8_l2_r0p1_c22_RS h_v8_l2_r0p1_c22_src h_v8_l2_r0p1_c22_l 0.1
+Lh_v8_l2_r0p1_c22_L h_v8_l2_r0p1_c22_l h_v8_l2_r0p1_c22_f 2u
+Rh_v8_l2_r0p1_c22_F1 h_v8_l2_r0p1_c22_f h_v8_l2_r0p1_c22_a 0.11
+Vh_v8_l2_r0p1_c22_D1S h_v8_l2_r0p1_c22_a h_v8_l2_r0p1_c22_d1a 0
+Dh_v8_l2_r0p1_c22_D1 h_v8_l2_r0p1_c22_d1a h_v8_l2_r0p1_c22_vin ESP_SS34
+Vh_v8_l2_r0p1_c22_D3S h_v8_l2_r0p1_c22_d3a 0 0
+Dh_v8_l2_r0p1_c22_D3 h_v8_l2_r0p1_c22_d3a h_v8_l2_r0p1_c22_vin ESP_SMBJ10A_HIGH
+Rh_v8_l2_r0p1_c22_LOAD h_v8_l2_r0p1_c22_vin 0 10k
+Rh_v8_l2_r0p1_c22_ESR h_v8_l2_r0p1_c22_vin h_v8_l2_r0p1_c22_cx 5m
+Ch_v8_l2_r0p1_c22 h_v8_l2_r0p1_c22_cx 0 22u
+
+* h_v8_l2_r0p5_c22: 8 V step, L=2 uH, Rs=0.5 ohm, C=22 uF, D3=HIGH
+Vh_v8_l2_r0p5_c22 h_v8_l2_r0p5_c22_src 0 PWL(0 0 2u 8)
+Rh_v8_l2_r0p5_c22_RS h_v8_l2_r0p5_c22_src h_v8_l2_r0p5_c22_l 0.5
+Lh_v8_l2_r0p5_c22_L h_v8_l2_r0p5_c22_l h_v8_l2_r0p5_c22_f 2u
+Rh_v8_l2_r0p5_c22_F1 h_v8_l2_r0p5_c22_f h_v8_l2_r0p5_c22_a 0.11
+Vh_v8_l2_r0p5_c22_D1S h_v8_l2_r0p5_c22_a h_v8_l2_r0p5_c22_d1a 0
+Dh_v8_l2_r0p5_c22_D1 h_v8_l2_r0p5_c22_d1a h_v8_l2_r0p5_c22_vin ESP_SS34
+Vh_v8_l2_r0p5_c22_D3S h_v8_l2_r0p5_c22_d3a 0 0
+Dh_v8_l2_r0p5_c22_D3 h_v8_l2_r0p5_c22_d3a h_v8_l2_r0p5_c22_vin ESP_SMBJ10A_HIGH
+Rh_v8_l2_r0p5_c22_LOAD h_v8_l2_r0p5_c22_vin 0 10k
+Rh_v8_l2_r0p5_c22_ESR h_v8_l2_r0p5_c22_vin h_v8_l2_r0p5_c22_cx 5m
+Ch_v8_l2_r0p5_c22 h_v8_l2_r0p5_c22_cx 0 22u
+
+* h_v8_l5_r0p1_c22: 8 V step, L=5 uH, Rs=0.1 ohm, C=22 uF, D3=HIGH
+Vh_v8_l5_r0p1_c22 h_v8_l5_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rh_v8_l5_r0p1_c22_RS h_v8_l5_r0p1_c22_src h_v8_l5_r0p1_c22_l 0.1
+Lh_v8_l5_r0p1_c22_L h_v8_l5_r0p1_c22_l h_v8_l5_r0p1_c22_f 5u
+Rh_v8_l5_r0p1_c22_F1 h_v8_l5_r0p1_c22_f h_v8_l5_r0p1_c22_a 0.11
+Vh_v8_l5_r0p1_c22_D1S h_v8_l5_r0p1_c22_a h_v8_l5_r0p1_c22_d1a 0
+Dh_v8_l5_r0p1_c22_D1 h_v8_l5_r0p1_c22_d1a h_v8_l5_r0p1_c22_vin ESP_SS34
+Vh_v8_l5_r0p1_c22_D3S h_v8_l5_r0p1_c22_d3a 0 0
+Dh_v8_l5_r0p1_c22_D3 h_v8_l5_r0p1_c22_d3a h_v8_l5_r0p1_c22_vin ESP_SMBJ10A_HIGH
+Rh_v8_l5_r0p1_c22_LOAD h_v8_l5_r0p1_c22_vin 0 10k
+Rh_v8_l5_r0p1_c22_ESR h_v8_l5_r0p1_c22_vin h_v8_l5_r0p1_c22_cx 5m
+Ch_v8_l5_r0p1_c22 h_v8_l5_r0p1_c22_cx 0 22u
+
+* h_v8_l5_r0p5_c22: 8 V step, L=5 uH, Rs=0.5 ohm, C=22 uF, D3=HIGH
+Vh_v8_l5_r0p5_c22 h_v8_l5_r0p5_c22_src 0 PWL(0 0 2u 8)
+Rh_v8_l5_r0p5_c22_RS h_v8_l5_r0p5_c22_src h_v8_l5_r0p5_c22_l 0.5
+Lh_v8_l5_r0p5_c22_L h_v8_l5_r0p5_c22_l h_v8_l5_r0p5_c22_f 5u
+Rh_v8_l5_r0p5_c22_F1 h_v8_l5_r0p5_c22_f h_v8_l5_r0p5_c22_a 0.11
+Vh_v8_l5_r0p5_c22_D1S h_v8_l5_r0p5_c22_a h_v8_l5_r0p5_c22_d1a 0
+Dh_v8_l5_r0p5_c22_D1 h_v8_l5_r0p5_c22_d1a h_v8_l5_r0p5_c22_vin ESP_SS34
+Vh_v8_l5_r0p5_c22_D3S h_v8_l5_r0p5_c22_d3a 0 0
+Dh_v8_l5_r0p5_c22_D3 h_v8_l5_r0p5_c22_d3a h_v8_l5_r0p5_c22_vin ESP_SMBJ10A_HIGH
+Rh_v8_l5_r0p5_c22_LOAD h_v8_l5_r0p5_c22_vin 0 10k
+Rh_v8_l5_r0p5_c22_ESR h_v8_l5_r0p5_c22_vin h_v8_l5_r0p5_c22_cx 5m
+Ch_v8_l5_r0p5_c22 h_v8_l5_r0p5_c22_cx 0 22u
+
+* h_v9_l0p5_r0p1_c22: 9 V step, L=0.5 uH, Rs=0.1 ohm, C=22 uF, D3=HIGH
+Vh_v9_l0p5_r0p1_c22 h_v9_l0p5_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rh_v9_l0p5_r0p1_c22_RS h_v9_l0p5_r0p1_c22_src h_v9_l0p5_r0p1_c22_l 0.1
+Lh_v9_l0p5_r0p1_c22_L h_v9_l0p5_r0p1_c22_l h_v9_l0p5_r0p1_c22_f 0.5u
+Rh_v9_l0p5_r0p1_c22_F1 h_v9_l0p5_r0p1_c22_f h_v9_l0p5_r0p1_c22_a 0.11
+Vh_v9_l0p5_r0p1_c22_D1S h_v9_l0p5_r0p1_c22_a h_v9_l0p5_r0p1_c22_d1a 0
+Dh_v9_l0p5_r0p1_c22_D1 h_v9_l0p5_r0p1_c22_d1a h_v9_l0p5_r0p1_c22_vin ESP_SS34
+Vh_v9_l0p5_r0p1_c22_D3S h_v9_l0p5_r0p1_c22_d3a 0 0
+Dh_v9_l0p5_r0p1_c22_D3 h_v9_l0p5_r0p1_c22_d3a h_v9_l0p5_r0p1_c22_vin ESP_SMBJ10A_HIGH
+Rh_v9_l0p5_r0p1_c22_LOAD h_v9_l0p5_r0p1_c22_vin 0 10k
+Rh_v9_l0p5_r0p1_c22_ESR h_v9_l0p5_r0p1_c22_vin h_v9_l0p5_r0p1_c22_cx 5m
+Ch_v9_l0p5_r0p1_c22 h_v9_l0p5_r0p1_c22_cx 0 22u
+
+* h_v9_l0p5_r0p5_c22: 9 V step, L=0.5 uH, Rs=0.5 ohm, C=22 uF, D3=HIGH
+Vh_v9_l0p5_r0p5_c22 h_v9_l0p5_r0p5_c22_src 0 PWL(0 0 2u 9)
+Rh_v9_l0p5_r0p5_c22_RS h_v9_l0p5_r0p5_c22_src h_v9_l0p5_r0p5_c22_l 0.5
+Lh_v9_l0p5_r0p5_c22_L h_v9_l0p5_r0p5_c22_l h_v9_l0p5_r0p5_c22_f 0.5u
+Rh_v9_l0p5_r0p5_c22_F1 h_v9_l0p5_r0p5_c22_f h_v9_l0p5_r0p5_c22_a 0.11
+Vh_v9_l0p5_r0p5_c22_D1S h_v9_l0p5_r0p5_c22_a h_v9_l0p5_r0p5_c22_d1a 0
+Dh_v9_l0p5_r0p5_c22_D1 h_v9_l0p5_r0p5_c22_d1a h_v9_l0p5_r0p5_c22_vin ESP_SS34
+Vh_v9_l0p5_r0p5_c22_D3S h_v9_l0p5_r0p5_c22_d3a 0 0
+Dh_v9_l0p5_r0p5_c22_D3 h_v9_l0p5_r0p5_c22_d3a h_v9_l0p5_r0p5_c22_vin ESP_SMBJ10A_HIGH
+Rh_v9_l0p5_r0p5_c22_LOAD h_v9_l0p5_r0p5_c22_vin 0 10k
+Rh_v9_l0p5_r0p5_c22_ESR h_v9_l0p5_r0p5_c22_vin h_v9_l0p5_r0p5_c22_cx 5m
+Ch_v9_l0p5_r0p5_c22 h_v9_l0p5_r0p5_c22_cx 0 22u
+
+* h_v9_l2_r0p1_c22: 9 V step, L=2 uH, Rs=0.1 ohm, C=22 uF, D3=HIGH
+Vh_v9_l2_r0p1_c22 h_v9_l2_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rh_v9_l2_r0p1_c22_RS h_v9_l2_r0p1_c22_src h_v9_l2_r0p1_c22_l 0.1
+Lh_v9_l2_r0p1_c22_L h_v9_l2_r0p1_c22_l h_v9_l2_r0p1_c22_f 2u
+Rh_v9_l2_r0p1_c22_F1 h_v9_l2_r0p1_c22_f h_v9_l2_r0p1_c22_a 0.11
+Vh_v9_l2_r0p1_c22_D1S h_v9_l2_r0p1_c22_a h_v9_l2_r0p1_c22_d1a 0
+Dh_v9_l2_r0p1_c22_D1 h_v9_l2_r0p1_c22_d1a h_v9_l2_r0p1_c22_vin ESP_SS34
+Vh_v9_l2_r0p1_c22_D3S h_v9_l2_r0p1_c22_d3a 0 0
+Dh_v9_l2_r0p1_c22_D3 h_v9_l2_r0p1_c22_d3a h_v9_l2_r0p1_c22_vin ESP_SMBJ10A_HIGH
+Rh_v9_l2_r0p1_c22_LOAD h_v9_l2_r0p1_c22_vin 0 10k
+Rh_v9_l2_r0p1_c22_ESR h_v9_l2_r0p1_c22_vin h_v9_l2_r0p1_c22_cx 5m
+Ch_v9_l2_r0p1_c22 h_v9_l2_r0p1_c22_cx 0 22u
+
+* h_v9_l2_r0p5_c22: 9 V step, L=2 uH, Rs=0.5 ohm, C=22 uF, D3=HIGH
+Vh_v9_l2_r0p5_c22 h_v9_l2_r0p5_c22_src 0 PWL(0 0 2u 9)
+Rh_v9_l2_r0p5_c22_RS h_v9_l2_r0p5_c22_src h_v9_l2_r0p5_c22_l 0.5
+Lh_v9_l2_r0p5_c22_L h_v9_l2_r0p5_c22_l h_v9_l2_r0p5_c22_f 2u
+Rh_v9_l2_r0p5_c22_F1 h_v9_l2_r0p5_c22_f h_v9_l2_r0p5_c22_a 0.11
+Vh_v9_l2_r0p5_c22_D1S h_v9_l2_r0p5_c22_a h_v9_l2_r0p5_c22_d1a 0
+Dh_v9_l2_r0p5_c22_D1 h_v9_l2_r0p5_c22_d1a h_v9_l2_r0p5_c22_vin ESP_SS34
+Vh_v9_l2_r0p5_c22_D3S h_v9_l2_r0p5_c22_d3a 0 0
+Dh_v9_l2_r0p5_c22_D3 h_v9_l2_r0p5_c22_d3a h_v9_l2_r0p5_c22_vin ESP_SMBJ10A_HIGH
+Rh_v9_l2_r0p5_c22_LOAD h_v9_l2_r0p5_c22_vin 0 10k
+Rh_v9_l2_r0p5_c22_ESR h_v9_l2_r0p5_c22_vin h_v9_l2_r0p5_c22_cx 5m
+Ch_v9_l2_r0p5_c22 h_v9_l2_r0p5_c22_cx 0 22u
+
+* h_v9_l5_r0p1_c22: 9 V step, L=5 uH, Rs=0.1 ohm, C=22 uF, D3=HIGH
+Vh_v9_l5_r0p1_c22 h_v9_l5_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rh_v9_l5_r0p1_c22_RS h_v9_l5_r0p1_c22_src h_v9_l5_r0p1_c22_l 0.1
+Lh_v9_l5_r0p1_c22_L h_v9_l5_r0p1_c22_l h_v9_l5_r0p1_c22_f 5u
+Rh_v9_l5_r0p1_c22_F1 h_v9_l5_r0p1_c22_f h_v9_l5_r0p1_c22_a 0.11
+Vh_v9_l5_r0p1_c22_D1S h_v9_l5_r0p1_c22_a h_v9_l5_r0p1_c22_d1a 0
+Dh_v9_l5_r0p1_c22_D1 h_v9_l5_r0p1_c22_d1a h_v9_l5_r0p1_c22_vin ESP_SS34
+Vh_v9_l5_r0p1_c22_D3S h_v9_l5_r0p1_c22_d3a 0 0
+Dh_v9_l5_r0p1_c22_D3 h_v9_l5_r0p1_c22_d3a h_v9_l5_r0p1_c22_vin ESP_SMBJ10A_HIGH
+Rh_v9_l5_r0p1_c22_LOAD h_v9_l5_r0p1_c22_vin 0 10k
+Rh_v9_l5_r0p1_c22_ESR h_v9_l5_r0p1_c22_vin h_v9_l5_r0p1_c22_cx 5m
+Ch_v9_l5_r0p1_c22 h_v9_l5_r0p1_c22_cx 0 22u
+
+* h_v9_l5_r0p5_c22: 9 V step, L=5 uH, Rs=0.5 ohm, C=22 uF, D3=HIGH
+Vh_v9_l5_r0p5_c22 h_v9_l5_r0p5_c22_src 0 PWL(0 0 2u 9)
+Rh_v9_l5_r0p5_c22_RS h_v9_l5_r0p5_c22_src h_v9_l5_r0p5_c22_l 0.5
+Lh_v9_l5_r0p5_c22_L h_v9_l5_r0p5_c22_l h_v9_l5_r0p5_c22_f 5u
+Rh_v9_l5_r0p5_c22_F1 h_v9_l5_r0p5_c22_f h_v9_l5_r0p5_c22_a 0.11
+Vh_v9_l5_r0p5_c22_D1S h_v9_l5_r0p5_c22_a h_v9_l5_r0p5_c22_d1a 0
+Dh_v9_l5_r0p5_c22_D1 h_v9_l5_r0p5_c22_d1a h_v9_l5_r0p5_c22_vin ESP_SS34
+Vh_v9_l5_r0p5_c22_D3S h_v9_l5_r0p5_c22_d3a 0 0
+Dh_v9_l5_r0p5_c22_D3 h_v9_l5_r0p5_c22_d3a h_v9_l5_r0p5_c22_vin ESP_SMBJ10A_HIGH
+Rh_v9_l5_r0p5_c22_LOAD h_v9_l5_r0p5_c22_vin 0 10k
+Rh_v9_l5_r0p5_c22_ESR h_v9_l5_r0p5_c22_vin h_v9_l5_r0p5_c22_cx 5m
+Ch_v9_l5_r0p5_c22 h_v9_l5_r0p5_c22_cx 0 22u
+
+* l_v8_l0p5_r0p1_c22: 8 V step, L=0.5 uH, Rs=0.1 ohm, C=22 uF, D3=LOW
+Vl_v8_l0p5_r0p1_c22 l_v8_l0p5_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rl_v8_l0p5_r0p1_c22_RS l_v8_l0p5_r0p1_c22_src l_v8_l0p5_r0p1_c22_l 0.1
+Ll_v8_l0p5_r0p1_c22_L l_v8_l0p5_r0p1_c22_l l_v8_l0p5_r0p1_c22_f 0.5u
+Rl_v8_l0p5_r0p1_c22_F1 l_v8_l0p5_r0p1_c22_f l_v8_l0p5_r0p1_c22_a 0.11
+Vl_v8_l0p5_r0p1_c22_D1S l_v8_l0p5_r0p1_c22_a l_v8_l0p5_r0p1_c22_d1a 0
+Dl_v8_l0p5_r0p1_c22_D1 l_v8_l0p5_r0p1_c22_d1a l_v8_l0p5_r0p1_c22_vin ESP_SS34
+Vl_v8_l0p5_r0p1_c22_D3S l_v8_l0p5_r0p1_c22_d3a 0 0
+Dl_v8_l0p5_r0p1_c22_D3 l_v8_l0p5_r0p1_c22_d3a l_v8_l0p5_r0p1_c22_vin ESP_SMBJ10A
+Rl_v8_l0p5_r0p1_c22_LOAD l_v8_l0p5_r0p1_c22_vin 0 10k
+Rl_v8_l0p5_r0p1_c22_ESR l_v8_l0p5_r0p1_c22_vin l_v8_l0p5_r0p1_c22_cx 5m
+Cl_v8_l0p5_r0p1_c22 l_v8_l0p5_r0p1_c22_cx 0 22u
+
+* l_v8_l0p5_r0p5_c22: 8 V step, L=0.5 uH, Rs=0.5 ohm, C=22 uF, D3=LOW
+Vl_v8_l0p5_r0p5_c22 l_v8_l0p5_r0p5_c22_src 0 PWL(0 0 2u 8)
+Rl_v8_l0p5_r0p5_c22_RS l_v8_l0p5_r0p5_c22_src l_v8_l0p5_r0p5_c22_l 0.5
+Ll_v8_l0p5_r0p5_c22_L l_v8_l0p5_r0p5_c22_l l_v8_l0p5_r0p5_c22_f 0.5u
+Rl_v8_l0p5_r0p5_c22_F1 l_v8_l0p5_r0p5_c22_f l_v8_l0p5_r0p5_c22_a 0.11
+Vl_v8_l0p5_r0p5_c22_D1S l_v8_l0p5_r0p5_c22_a l_v8_l0p5_r0p5_c22_d1a 0
+Dl_v8_l0p5_r0p5_c22_D1 l_v8_l0p5_r0p5_c22_d1a l_v8_l0p5_r0p5_c22_vin ESP_SS34
+Vl_v8_l0p5_r0p5_c22_D3S l_v8_l0p5_r0p5_c22_d3a 0 0
+Dl_v8_l0p5_r0p5_c22_D3 l_v8_l0p5_r0p5_c22_d3a l_v8_l0p5_r0p5_c22_vin ESP_SMBJ10A
+Rl_v8_l0p5_r0p5_c22_LOAD l_v8_l0p5_r0p5_c22_vin 0 10k
+Rl_v8_l0p5_r0p5_c22_ESR l_v8_l0p5_r0p5_c22_vin l_v8_l0p5_r0p5_c22_cx 5m
+Cl_v8_l0p5_r0p5_c22 l_v8_l0p5_r0p5_c22_cx 0 22u
+
+* l_v8_l2_r0p1_c22: 8 V step, L=2 uH, Rs=0.1 ohm, C=22 uF, D3=LOW
+Vl_v8_l2_r0p1_c22 l_v8_l2_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rl_v8_l2_r0p1_c22_RS l_v8_l2_r0p1_c22_src l_v8_l2_r0p1_c22_l 0.1
+Ll_v8_l2_r0p1_c22_L l_v8_l2_r0p1_c22_l l_v8_l2_r0p1_c22_f 2u
+Rl_v8_l2_r0p1_c22_F1 l_v8_l2_r0p1_c22_f l_v8_l2_r0p1_c22_a 0.11
+Vl_v8_l2_r0p1_c22_D1S l_v8_l2_r0p1_c22_a l_v8_l2_r0p1_c22_d1a 0
+Dl_v8_l2_r0p1_c22_D1 l_v8_l2_r0p1_c22_d1a l_v8_l2_r0p1_c22_vin ESP_SS34
+Vl_v8_l2_r0p1_c22_D3S l_v8_l2_r0p1_c22_d3a 0 0
+Dl_v8_l2_r0p1_c22_D3 l_v8_l2_r0p1_c22_d3a l_v8_l2_r0p1_c22_vin ESP_SMBJ10A
+Rl_v8_l2_r0p1_c22_LOAD l_v8_l2_r0p1_c22_vin 0 10k
+Rl_v8_l2_r0p1_c22_ESR l_v8_l2_r0p1_c22_vin l_v8_l2_r0p1_c22_cx 5m
+Cl_v8_l2_r0p1_c22 l_v8_l2_r0p1_c22_cx 0 22u
+
+* l_v8_l2_r0p5_c22: 8 V step, L=2 uH, Rs=0.5 ohm, C=22 uF, D3=LOW
+Vl_v8_l2_r0p5_c22 l_v8_l2_r0p5_c22_src 0 PWL(0 0 2u 8)
+Rl_v8_l2_r0p5_c22_RS l_v8_l2_r0p5_c22_src l_v8_l2_r0p5_c22_l 0.5
+Ll_v8_l2_r0p5_c22_L l_v8_l2_r0p5_c22_l l_v8_l2_r0p5_c22_f 2u
+Rl_v8_l2_r0p5_c22_F1 l_v8_l2_r0p5_c22_f l_v8_l2_r0p5_c22_a 0.11
+Vl_v8_l2_r0p5_c22_D1S l_v8_l2_r0p5_c22_a l_v8_l2_r0p5_c22_d1a 0
+Dl_v8_l2_r0p5_c22_D1 l_v8_l2_r0p5_c22_d1a l_v8_l2_r0p5_c22_vin ESP_SS34
+Vl_v8_l2_r0p5_c22_D3S l_v8_l2_r0p5_c22_d3a 0 0
+Dl_v8_l2_r0p5_c22_D3 l_v8_l2_r0p5_c22_d3a l_v8_l2_r0p5_c22_vin ESP_SMBJ10A
+Rl_v8_l2_r0p5_c22_LOAD l_v8_l2_r0p5_c22_vin 0 10k
+Rl_v8_l2_r0p5_c22_ESR l_v8_l2_r0p5_c22_vin l_v8_l2_r0p5_c22_cx 5m
+Cl_v8_l2_r0p5_c22 l_v8_l2_r0p5_c22_cx 0 22u
+
+* l_v8_l5_r0p1_c22: 8 V step, L=5 uH, Rs=0.1 ohm, C=22 uF, D3=LOW
+Vl_v8_l5_r0p1_c22 l_v8_l5_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rl_v8_l5_r0p1_c22_RS l_v8_l5_r0p1_c22_src l_v8_l5_r0p1_c22_l 0.1
+Ll_v8_l5_r0p1_c22_L l_v8_l5_r0p1_c22_l l_v8_l5_r0p1_c22_f 5u
+Rl_v8_l5_r0p1_c22_F1 l_v8_l5_r0p1_c22_f l_v8_l5_r0p1_c22_a 0.11
+Vl_v8_l5_r0p1_c22_D1S l_v8_l5_r0p1_c22_a l_v8_l5_r0p1_c22_d1a 0
+Dl_v8_l5_r0p1_c22_D1 l_v8_l5_r0p1_c22_d1a l_v8_l5_r0p1_c22_vin ESP_SS34
+Vl_v8_l5_r0p1_c22_D3S l_v8_l5_r0p1_c22_d3a 0 0
+Dl_v8_l5_r0p1_c22_D3 l_v8_l5_r0p1_c22_d3a l_v8_l5_r0p1_c22_vin ESP_SMBJ10A
+Rl_v8_l5_r0p1_c22_LOAD l_v8_l5_r0p1_c22_vin 0 10k
+Rl_v8_l5_r0p1_c22_ESR l_v8_l5_r0p1_c22_vin l_v8_l5_r0p1_c22_cx 5m
+Cl_v8_l5_r0p1_c22 l_v8_l5_r0p1_c22_cx 0 22u
+
+* l_v8_l5_r0p5_c22: 8 V step, L=5 uH, Rs=0.5 ohm, C=22 uF, D3=LOW
+Vl_v8_l5_r0p5_c22 l_v8_l5_r0p5_c22_src 0 PWL(0 0 2u 8)
+Rl_v8_l5_r0p5_c22_RS l_v8_l5_r0p5_c22_src l_v8_l5_r0p5_c22_l 0.5
+Ll_v8_l5_r0p5_c22_L l_v8_l5_r0p5_c22_l l_v8_l5_r0p5_c22_f 5u
+Rl_v8_l5_r0p5_c22_F1 l_v8_l5_r0p5_c22_f l_v8_l5_r0p5_c22_a 0.11
+Vl_v8_l5_r0p5_c22_D1S l_v8_l5_r0p5_c22_a l_v8_l5_r0p5_c22_d1a 0
+Dl_v8_l5_r0p5_c22_D1 l_v8_l5_r0p5_c22_d1a l_v8_l5_r0p5_c22_vin ESP_SS34
+Vl_v8_l5_r0p5_c22_D3S l_v8_l5_r0p5_c22_d3a 0 0
+Dl_v8_l5_r0p5_c22_D3 l_v8_l5_r0p5_c22_d3a l_v8_l5_r0p5_c22_vin ESP_SMBJ10A
+Rl_v8_l5_r0p5_c22_LOAD l_v8_l5_r0p5_c22_vin 0 10k
+Rl_v8_l5_r0p5_c22_ESR l_v8_l5_r0p5_c22_vin l_v8_l5_r0p5_c22_cx 5m
+Cl_v8_l5_r0p5_c22 l_v8_l5_r0p5_c22_cx 0 22u
+
+* l_v9_l0p5_r0p1_c22: 9 V step, L=0.5 uH, Rs=0.1 ohm, C=22 uF, D3=LOW
+Vl_v9_l0p5_r0p1_c22 l_v9_l0p5_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rl_v9_l0p5_r0p1_c22_RS l_v9_l0p5_r0p1_c22_src l_v9_l0p5_r0p1_c22_l 0.1
+Ll_v9_l0p5_r0p1_c22_L l_v9_l0p5_r0p1_c22_l l_v9_l0p5_r0p1_c22_f 0.5u
+Rl_v9_l0p5_r0p1_c22_F1 l_v9_l0p5_r0p1_c22_f l_v9_l0p5_r0p1_c22_a 0.11
+Vl_v9_l0p5_r0p1_c22_D1S l_v9_l0p5_r0p1_c22_a l_v9_l0p5_r0p1_c22_d1a 0
+Dl_v9_l0p5_r0p1_c22_D1 l_v9_l0p5_r0p1_c22_d1a l_v9_l0p5_r0p1_c22_vin ESP_SS34
+Vl_v9_l0p5_r0p1_c22_D3S l_v9_l0p5_r0p1_c22_d3a 0 0
+Dl_v9_l0p5_r0p1_c22_D3 l_v9_l0p5_r0p1_c22_d3a l_v9_l0p5_r0p1_c22_vin ESP_SMBJ10A
+Rl_v9_l0p5_r0p1_c22_LOAD l_v9_l0p5_r0p1_c22_vin 0 10k
+Rl_v9_l0p5_r0p1_c22_ESR l_v9_l0p5_r0p1_c22_vin l_v9_l0p5_r0p1_c22_cx 5m
+Cl_v9_l0p5_r0p1_c22 l_v9_l0p5_r0p1_c22_cx 0 22u
+
+* l_v9_l0p5_r0p5_c22: 9 V step, L=0.5 uH, Rs=0.5 ohm, C=22 uF, D3=LOW
+Vl_v9_l0p5_r0p5_c22 l_v9_l0p5_r0p5_c22_src 0 PWL(0 0 2u 9)
+Rl_v9_l0p5_r0p5_c22_RS l_v9_l0p5_r0p5_c22_src l_v9_l0p5_r0p5_c22_l 0.5
+Ll_v9_l0p5_r0p5_c22_L l_v9_l0p5_r0p5_c22_l l_v9_l0p5_r0p5_c22_f 0.5u
+Rl_v9_l0p5_r0p5_c22_F1 l_v9_l0p5_r0p5_c22_f l_v9_l0p5_r0p5_c22_a 0.11
+Vl_v9_l0p5_r0p5_c22_D1S l_v9_l0p5_r0p5_c22_a l_v9_l0p5_r0p5_c22_d1a 0
+Dl_v9_l0p5_r0p5_c22_D1 l_v9_l0p5_r0p5_c22_d1a l_v9_l0p5_r0p5_c22_vin ESP_SS34
+Vl_v9_l0p5_r0p5_c22_D3S l_v9_l0p5_r0p5_c22_d3a 0 0
+Dl_v9_l0p5_r0p5_c22_D3 l_v9_l0p5_r0p5_c22_d3a l_v9_l0p5_r0p5_c22_vin ESP_SMBJ10A
+Rl_v9_l0p5_r0p5_c22_LOAD l_v9_l0p5_r0p5_c22_vin 0 10k
+Rl_v9_l0p5_r0p5_c22_ESR l_v9_l0p5_r0p5_c22_vin l_v9_l0p5_r0p5_c22_cx 5m
+Cl_v9_l0p5_r0p5_c22 l_v9_l0p5_r0p5_c22_cx 0 22u
+
+* l_v9_l2_r0p1_c22: 9 V step, L=2 uH, Rs=0.1 ohm, C=22 uF, D3=LOW
+Vl_v9_l2_r0p1_c22 l_v9_l2_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rl_v9_l2_r0p1_c22_RS l_v9_l2_r0p1_c22_src l_v9_l2_r0p1_c22_l 0.1
+Ll_v9_l2_r0p1_c22_L l_v9_l2_r0p1_c22_l l_v9_l2_r0p1_c22_f 2u
+Rl_v9_l2_r0p1_c22_F1 l_v9_l2_r0p1_c22_f l_v9_l2_r0p1_c22_a 0.11
+Vl_v9_l2_r0p1_c22_D1S l_v9_l2_r0p1_c22_a l_v9_l2_r0p1_c22_d1a 0
+Dl_v9_l2_r0p1_c22_D1 l_v9_l2_r0p1_c22_d1a l_v9_l2_r0p1_c22_vin ESP_SS34
+Vl_v9_l2_r0p1_c22_D3S l_v9_l2_r0p1_c22_d3a 0 0
+Dl_v9_l2_r0p1_c22_D3 l_v9_l2_r0p1_c22_d3a l_v9_l2_r0p1_c22_vin ESP_SMBJ10A
+Rl_v9_l2_r0p1_c22_LOAD l_v9_l2_r0p1_c22_vin 0 10k
+Rl_v9_l2_r0p1_c22_ESR l_v9_l2_r0p1_c22_vin l_v9_l2_r0p1_c22_cx 5m
+Cl_v9_l2_r0p1_c22 l_v9_l2_r0p1_c22_cx 0 22u
+
+* l_v9_l2_r0p5_c22: 9 V step, L=2 uH, Rs=0.5 ohm, C=22 uF, D3=LOW
+Vl_v9_l2_r0p5_c22 l_v9_l2_r0p5_c22_src 0 PWL(0 0 2u 9)
+Rl_v9_l2_r0p5_c22_RS l_v9_l2_r0p5_c22_src l_v9_l2_r0p5_c22_l 0.5
+Ll_v9_l2_r0p5_c22_L l_v9_l2_r0p5_c22_l l_v9_l2_r0p5_c22_f 2u
+Rl_v9_l2_r0p5_c22_F1 l_v9_l2_r0p5_c22_f l_v9_l2_r0p5_c22_a 0.11
+Vl_v9_l2_r0p5_c22_D1S l_v9_l2_r0p5_c22_a l_v9_l2_r0p5_c22_d1a 0
+Dl_v9_l2_r0p5_c22_D1 l_v9_l2_r0p5_c22_d1a l_v9_l2_r0p5_c22_vin ESP_SS34
+Vl_v9_l2_r0p5_c22_D3S l_v9_l2_r0p5_c22_d3a 0 0
+Dl_v9_l2_r0p5_c22_D3 l_v9_l2_r0p5_c22_d3a l_v9_l2_r0p5_c22_vin ESP_SMBJ10A
+Rl_v9_l2_r0p5_c22_LOAD l_v9_l2_r0p5_c22_vin 0 10k
+Rl_v9_l2_r0p5_c22_ESR l_v9_l2_r0p5_c22_vin l_v9_l2_r0p5_c22_cx 5m
+Cl_v9_l2_r0p5_c22 l_v9_l2_r0p5_c22_cx 0 22u
+
+* l_v9_l5_r0p1_c22: 9 V step, L=5 uH, Rs=0.1 ohm, C=22 uF, D3=LOW
+Vl_v9_l5_r0p1_c22 l_v9_l5_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rl_v9_l5_r0p1_c22_RS l_v9_l5_r0p1_c22_src l_v9_l5_r0p1_c22_l 0.1
+Ll_v9_l5_r0p1_c22_L l_v9_l5_r0p1_c22_l l_v9_l5_r0p1_c22_f 5u
+Rl_v9_l5_r0p1_c22_F1 l_v9_l5_r0p1_c22_f l_v9_l5_r0p1_c22_a 0.11
+Vl_v9_l5_r0p1_c22_D1S l_v9_l5_r0p1_c22_a l_v9_l5_r0p1_c22_d1a 0
+Dl_v9_l5_r0p1_c22_D1 l_v9_l5_r0p1_c22_d1a l_v9_l5_r0p1_c22_vin ESP_SS34
+Vl_v9_l5_r0p1_c22_D3S l_v9_l5_r0p1_c22_d3a 0 0
+Dl_v9_l5_r0p1_c22_D3 l_v9_l5_r0p1_c22_d3a l_v9_l5_r0p1_c22_vin ESP_SMBJ10A
+Rl_v9_l5_r0p1_c22_LOAD l_v9_l5_r0p1_c22_vin 0 10k
+Rl_v9_l5_r0p1_c22_ESR l_v9_l5_r0p1_c22_vin l_v9_l5_r0p1_c22_cx 5m
+Cl_v9_l5_r0p1_c22 l_v9_l5_r0p1_c22_cx 0 22u
+
+* l_v9_l5_r0p5_c22: 9 V step, L=5 uH, Rs=0.5 ohm, C=22 uF, D3=LOW
+Vl_v9_l5_r0p5_c22 l_v9_l5_r0p5_c22_src 0 PWL(0 0 2u 9)
+Rl_v9_l5_r0p5_c22_RS l_v9_l5_r0p5_c22_src l_v9_l5_r0p5_c22_l 0.5
+Ll_v9_l5_r0p5_c22_L l_v9_l5_r0p5_c22_l l_v9_l5_r0p5_c22_f 5u
+Rl_v9_l5_r0p5_c22_F1 l_v9_l5_r0p5_c22_f l_v9_l5_r0p5_c22_a 0.11
+Vl_v9_l5_r0p5_c22_D1S l_v9_l5_r0p5_c22_a l_v9_l5_r0p5_c22_d1a 0
+Dl_v9_l5_r0p5_c22_D1 l_v9_l5_r0p5_c22_d1a l_v9_l5_r0p5_c22_vin ESP_SS34
+Vl_v9_l5_r0p5_c22_D3S l_v9_l5_r0p5_c22_d3a 0 0
+Dl_v9_l5_r0p5_c22_D3 l_v9_l5_r0p5_c22_d3a l_v9_l5_r0p5_c22_vin ESP_SMBJ10A
+Rl_v9_l5_r0p5_c22_LOAD l_v9_l5_r0p5_c22_vin 0 10k
+Rl_v9_l5_r0p5_c22_ESR l_v9_l5_r0p5_c22_vin l_v9_l5_r0p5_c22_cx 5m
+Cl_v9_l5_r0p5_c22 l_v9_l5_r0p5_c22_cx 0 22u
+
+* h_v8_l5_r0p1_c43p2: 8 V step, L=5 uH, Rs=0.1 ohm, C=43.2 uF, D3=HIGH
+Vh_v8_l5_r0p1_c43p2 h_v8_l5_r0p1_c43p2_src 0 PWL(0 0 2u 8)
+Rh_v8_l5_r0p1_c43p2_RS h_v8_l5_r0p1_c43p2_src h_v8_l5_r0p1_c43p2_l 0.1
+Lh_v8_l5_r0p1_c43p2_L h_v8_l5_r0p1_c43p2_l h_v8_l5_r0p1_c43p2_f 5u
+Rh_v8_l5_r0p1_c43p2_F1 h_v8_l5_r0p1_c43p2_f h_v8_l5_r0p1_c43p2_a 0.11
+Vh_v8_l5_r0p1_c43p2_D1S h_v8_l5_r0p1_c43p2_a h_v8_l5_r0p1_c43p2_d1a 0
+Dh_v8_l5_r0p1_c43p2_D1 h_v8_l5_r0p1_c43p2_d1a h_v8_l5_r0p1_c43p2_vin ESP_SS34
+Vh_v8_l5_r0p1_c43p2_D3S h_v8_l5_r0p1_c43p2_d3a 0 0
+Dh_v8_l5_r0p1_c43p2_D3 h_v8_l5_r0p1_c43p2_d3a h_v8_l5_r0p1_c43p2_vin ESP_SMBJ10A_HIGH
+Rh_v8_l5_r0p1_c43p2_LOAD h_v8_l5_r0p1_c43p2_vin 0 10k
+Rh_v8_l5_r0p1_c43p2_ESR h_v8_l5_r0p1_c43p2_vin h_v8_l5_r0p1_c43p2_cx 5m
+Ch_v8_l5_r0p1_c43p2 h_v8_l5_r0p1_c43p2_cx 0 43.2u
+
+* l_v8_l5_r0p1_c43p2: 8 V step, L=5 uH, Rs=0.1 ohm, C=43.2 uF, D3=LOW
+Vl_v8_l5_r0p1_c43p2 l_v8_l5_r0p1_c43p2_src 0 PWL(0 0 2u 8)
+Rl_v8_l5_r0p1_c43p2_RS l_v8_l5_r0p1_c43p2_src l_v8_l5_r0p1_c43p2_l 0.1
+Ll_v8_l5_r0p1_c43p2_L l_v8_l5_r0p1_c43p2_l l_v8_l5_r0p1_c43p2_f 5u
+Rl_v8_l5_r0p1_c43p2_F1 l_v8_l5_r0p1_c43p2_f l_v8_l5_r0p1_c43p2_a 0.11
+Vl_v8_l5_r0p1_c43p2_D1S l_v8_l5_r0p1_c43p2_a l_v8_l5_r0p1_c43p2_d1a 0
+Dl_v8_l5_r0p1_c43p2_D1 l_v8_l5_r0p1_c43p2_d1a l_v8_l5_r0p1_c43p2_vin ESP_SS34
+Vl_v8_l5_r0p1_c43p2_D3S l_v8_l5_r0p1_c43p2_d3a 0 0
+Dl_v8_l5_r0p1_c43p2_D3 l_v8_l5_r0p1_c43p2_d3a l_v8_l5_r0p1_c43p2_vin ESP_SMBJ10A
+Rl_v8_l5_r0p1_c43p2_LOAD l_v8_l5_r0p1_c43p2_vin 0 10k
+Rl_v8_l5_r0p1_c43p2_ESR l_v8_l5_r0p1_c43p2_vin l_v8_l5_r0p1_c43p2_cx 5m
+Cl_v8_l5_r0p1_c43p2 l_v8_l5_r0p1_c43p2_cx 0 43.2u
+
+* h_v8_l5_r0p1_c26: 8 V step, L=5 uH, Rs=0.1 ohm, C=26 uF, D3=HIGH
+Vh_v8_l5_r0p1_c26 h_v8_l5_r0p1_c26_src 0 PWL(0 0 2u 8)
+Rh_v8_l5_r0p1_c26_RS h_v8_l5_r0p1_c26_src h_v8_l5_r0p1_c26_l 0.1
+Lh_v8_l5_r0p1_c26_L h_v8_l5_r0p1_c26_l h_v8_l5_r0p1_c26_f 5u
+Rh_v8_l5_r0p1_c26_F1 h_v8_l5_r0p1_c26_f h_v8_l5_r0p1_c26_a 0.11
+Vh_v8_l5_r0p1_c26_D1S h_v8_l5_r0p1_c26_a h_v8_l5_r0p1_c26_d1a 0
+Dh_v8_l5_r0p1_c26_D1 h_v8_l5_r0p1_c26_d1a h_v8_l5_r0p1_c26_vin ESP_SS34
+Vh_v8_l5_r0p1_c26_D3S h_v8_l5_r0p1_c26_d3a 0 0
+Dh_v8_l5_r0p1_c26_D3 h_v8_l5_r0p1_c26_d3a h_v8_l5_r0p1_c26_vin ESP_SMBJ10A_HIGH
+Rh_v8_l5_r0p1_c26_LOAD h_v8_l5_r0p1_c26_vin 0 10k
+Rh_v8_l5_r0p1_c26_ESR h_v8_l5_r0p1_c26_vin h_v8_l5_r0p1_c26_cx 5m
+Ch_v8_l5_r0p1_c26 h_v8_l5_r0p1_c26_cx 0 26u
+
+* l_v8_l5_r0p1_c26: 8 V step, L=5 uH, Rs=0.1 ohm, C=26 uF, D3=LOW
+Vl_v8_l5_r0p1_c26 l_v8_l5_r0p1_c26_src 0 PWL(0 0 2u 8)
+Rl_v8_l5_r0p1_c26_RS l_v8_l5_r0p1_c26_src l_v8_l5_r0p1_c26_l 0.1
+Ll_v8_l5_r0p1_c26_L l_v8_l5_r0p1_c26_l l_v8_l5_r0p1_c26_f 5u
+Rl_v8_l5_r0p1_c26_F1 l_v8_l5_r0p1_c26_f l_v8_l5_r0p1_c26_a 0.11
+Vl_v8_l5_r0p1_c26_D1S l_v8_l5_r0p1_c26_a l_v8_l5_r0p1_c26_d1a 0
+Dl_v8_l5_r0p1_c26_D1 l_v8_l5_r0p1_c26_d1a l_v8_l5_r0p1_c26_vin ESP_SS34
+Vl_v8_l5_r0p1_c26_D3S l_v8_l5_r0p1_c26_d3a 0 0
+Dl_v8_l5_r0p1_c26_D3 l_v8_l5_r0p1_c26_d3a l_v8_l5_r0p1_c26_vin ESP_SMBJ10A
+Rl_v8_l5_r0p1_c26_LOAD l_v8_l5_r0p1_c26_vin 0 10k
+Rl_v8_l5_r0p1_c26_ESR l_v8_l5_r0p1_c26_vin l_v8_l5_r0p1_c26_cx 5m
+Cl_v8_l5_r0p1_c26 l_v8_l5_r0p1_c26_cx 0 26u
+
+* h_v9_l5_r0p1_c43p2: 9 V step, L=5 uH, Rs=0.1 ohm, C=43.2 uF, D3=HIGH
+Vh_v9_l5_r0p1_c43p2 h_v9_l5_r0p1_c43p2_src 0 PWL(0 0 2u 9)
+Rh_v9_l5_r0p1_c43p2_RS h_v9_l5_r0p1_c43p2_src h_v9_l5_r0p1_c43p2_l 0.1
+Lh_v9_l5_r0p1_c43p2_L h_v9_l5_r0p1_c43p2_l h_v9_l5_r0p1_c43p2_f 5u
+Rh_v9_l5_r0p1_c43p2_F1 h_v9_l5_r0p1_c43p2_f h_v9_l5_r0p1_c43p2_a 0.11
+Vh_v9_l5_r0p1_c43p2_D1S h_v9_l5_r0p1_c43p2_a h_v9_l5_r0p1_c43p2_d1a 0
+Dh_v9_l5_r0p1_c43p2_D1 h_v9_l5_r0p1_c43p2_d1a h_v9_l5_r0p1_c43p2_vin ESP_SS34
+Vh_v9_l5_r0p1_c43p2_D3S h_v9_l5_r0p1_c43p2_d3a 0 0
+Dh_v9_l5_r0p1_c43p2_D3 h_v9_l5_r0p1_c43p2_d3a h_v9_l5_r0p1_c43p2_vin ESP_SMBJ10A_HIGH
+Rh_v9_l5_r0p1_c43p2_LOAD h_v9_l5_r0p1_c43p2_vin 0 10k
+Rh_v9_l5_r0p1_c43p2_ESR h_v9_l5_r0p1_c43p2_vin h_v9_l5_r0p1_c43p2_cx 5m
+Ch_v9_l5_r0p1_c43p2 h_v9_l5_r0p1_c43p2_cx 0 43.2u
+
+* l_v9_l5_r0p1_c43p2: 9 V step, L=5 uH, Rs=0.1 ohm, C=43.2 uF, D3=LOW
+Vl_v9_l5_r0p1_c43p2 l_v9_l5_r0p1_c43p2_src 0 PWL(0 0 2u 9)
+Rl_v9_l5_r0p1_c43p2_RS l_v9_l5_r0p1_c43p2_src l_v9_l5_r0p1_c43p2_l 0.1
+Ll_v9_l5_r0p1_c43p2_L l_v9_l5_r0p1_c43p2_l l_v9_l5_r0p1_c43p2_f 5u
+Rl_v9_l5_r0p1_c43p2_F1 l_v9_l5_r0p1_c43p2_f l_v9_l5_r0p1_c43p2_a 0.11
+Vl_v9_l5_r0p1_c43p2_D1S l_v9_l5_r0p1_c43p2_a l_v9_l5_r0p1_c43p2_d1a 0
+Dl_v9_l5_r0p1_c43p2_D1 l_v9_l5_r0p1_c43p2_d1a l_v9_l5_r0p1_c43p2_vin ESP_SS34
+Vl_v9_l5_r0p1_c43p2_D3S l_v9_l5_r0p1_c43p2_d3a 0 0
+Dl_v9_l5_r0p1_c43p2_D3 l_v9_l5_r0p1_c43p2_d3a l_v9_l5_r0p1_c43p2_vin ESP_SMBJ10A
+Rl_v9_l5_r0p1_c43p2_LOAD l_v9_l5_r0p1_c43p2_vin 0 10k
+Rl_v9_l5_r0p1_c43p2_ESR l_v9_l5_r0p1_c43p2_vin l_v9_l5_r0p1_c43p2_cx 5m
+Cl_v9_l5_r0p1_c43p2 l_v9_l5_r0p1_c43p2_cx 0 43.2u
+
+* h_v9_l5_r0p1_c26: 9 V step, L=5 uH, Rs=0.1 ohm, C=26 uF, D3=HIGH
+Vh_v9_l5_r0p1_c26 h_v9_l5_r0p1_c26_src 0 PWL(0 0 2u 9)
+Rh_v9_l5_r0p1_c26_RS h_v9_l5_r0p1_c26_src h_v9_l5_r0p1_c26_l 0.1
+Lh_v9_l5_r0p1_c26_L h_v9_l5_r0p1_c26_l h_v9_l5_r0p1_c26_f 5u
+Rh_v9_l5_r0p1_c26_F1 h_v9_l5_r0p1_c26_f h_v9_l5_r0p1_c26_a 0.11
+Vh_v9_l5_r0p1_c26_D1S h_v9_l5_r0p1_c26_a h_v9_l5_r0p1_c26_d1a 0
+Dh_v9_l5_r0p1_c26_D1 h_v9_l5_r0p1_c26_d1a h_v9_l5_r0p1_c26_vin ESP_SS34
+Vh_v9_l5_r0p1_c26_D3S h_v9_l5_r0p1_c26_d3a 0 0
+Dh_v9_l5_r0p1_c26_D3 h_v9_l5_r0p1_c26_d3a h_v9_l5_r0p1_c26_vin ESP_SMBJ10A_HIGH
+Rh_v9_l5_r0p1_c26_LOAD h_v9_l5_r0p1_c26_vin 0 10k
+Rh_v9_l5_r0p1_c26_ESR h_v9_l5_r0p1_c26_vin h_v9_l5_r0p1_c26_cx 5m
+Ch_v9_l5_r0p1_c26 h_v9_l5_r0p1_c26_cx 0 26u
+
+* l_v9_l5_r0p1_c26: 9 V step, L=5 uH, Rs=0.1 ohm, C=26 uF, D3=LOW
+Vl_v9_l5_r0p1_c26 l_v9_l5_r0p1_c26_src 0 PWL(0 0 2u 9)
+Rl_v9_l5_r0p1_c26_RS l_v9_l5_r0p1_c26_src l_v9_l5_r0p1_c26_l 0.1
+Ll_v9_l5_r0p1_c26_L l_v9_l5_r0p1_c26_l l_v9_l5_r0p1_c26_f 5u
+Rl_v9_l5_r0p1_c26_F1 l_v9_l5_r0p1_c26_f l_v9_l5_r0p1_c26_a 0.11
+Vl_v9_l5_r0p1_c26_D1S l_v9_l5_r0p1_c26_a l_v9_l5_r0p1_c26_d1a 0
+Dl_v9_l5_r0p1_c26_D1 l_v9_l5_r0p1_c26_d1a l_v9_l5_r0p1_c26_vin ESP_SS34
+Vl_v9_l5_r0p1_c26_D3S l_v9_l5_r0p1_c26_d3a 0 0
+Dl_v9_l5_r0p1_c26_D3 l_v9_l5_r0p1_c26_d3a l_v9_l5_r0p1_c26_vin ESP_SMBJ10A
+Rl_v9_l5_r0p1_c26_LOAD l_v9_l5_r0p1_c26_vin 0 10k
+Rl_v9_l5_r0p1_c26_ESR l_v9_l5_r0p1_c26_vin l_v9_l5_r0p1_c26_cx 5m
+Cl_v9_l5_r0p1_c26 l_v9_l5_r0p1_c26_cx 0 26u
+
+* n_v8_l0p5_r0p1_c22: 8 V step, L=0.5 uH, Rs=0.1 ohm, C=22 uF, D3=NONE
+Vn_v8_l0p5_r0p1_c22 n_v8_l0p5_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rn_v8_l0p5_r0p1_c22_RS n_v8_l0p5_r0p1_c22_src n_v8_l0p5_r0p1_c22_l 0.1
+Ln_v8_l0p5_r0p1_c22_L n_v8_l0p5_r0p1_c22_l n_v8_l0p5_r0p1_c22_f 0.5u
+Rn_v8_l0p5_r0p1_c22_F1 n_v8_l0p5_r0p1_c22_f n_v8_l0p5_r0p1_c22_a 0.11
+Vn_v8_l0p5_r0p1_c22_D1S n_v8_l0p5_r0p1_c22_a n_v8_l0p5_r0p1_c22_d1a 0
+Dn_v8_l0p5_r0p1_c22_D1 n_v8_l0p5_r0p1_c22_d1a n_v8_l0p5_r0p1_c22_vin ESP_SS34
+Rn_v8_l0p5_r0p1_c22_LOAD n_v8_l0p5_r0p1_c22_vin 0 10k
+Rn_v8_l0p5_r0p1_c22_ESR n_v8_l0p5_r0p1_c22_vin n_v8_l0p5_r0p1_c22_cx 5m
+Cn_v8_l0p5_r0p1_c22 n_v8_l0p5_r0p1_c22_cx 0 22u
+
+* n_v8_l0p5_r0p1_c43p2: 8 V step, L=0.5 uH, Rs=0.1 ohm, C=43.2 uF, D3=NONE
+Vn_v8_l0p5_r0p1_c43p2 n_v8_l0p5_r0p1_c43p2_src 0 PWL(0 0 2u 8)
+Rn_v8_l0p5_r0p1_c43p2_RS n_v8_l0p5_r0p1_c43p2_src n_v8_l0p5_r0p1_c43p2_l 0.1
+Ln_v8_l0p5_r0p1_c43p2_L n_v8_l0p5_r0p1_c43p2_l n_v8_l0p5_r0p1_c43p2_f 0.5u
+Rn_v8_l0p5_r0p1_c43p2_F1 n_v8_l0p5_r0p1_c43p2_f n_v8_l0p5_r0p1_c43p2_a 0.11
+Vn_v8_l0p5_r0p1_c43p2_D1S n_v8_l0p5_r0p1_c43p2_a n_v8_l0p5_r0p1_c43p2_d1a 0
+Dn_v8_l0p5_r0p1_c43p2_D1 n_v8_l0p5_r0p1_c43p2_d1a n_v8_l0p5_r0p1_c43p2_vin ESP_SS34
+Rn_v8_l0p5_r0p1_c43p2_LOAD n_v8_l0p5_r0p1_c43p2_vin 0 10k
+Rn_v8_l0p5_r0p1_c43p2_ESR n_v8_l0p5_r0p1_c43p2_vin n_v8_l0p5_r0p1_c43p2_cx 5m
+Cn_v8_l0p5_r0p1_c43p2 n_v8_l0p5_r0p1_c43p2_cx 0 43.2u
+
+* n_v8_l2_r0p1_c22: 8 V step, L=2 uH, Rs=0.1 ohm, C=22 uF, D3=NONE
+Vn_v8_l2_r0p1_c22 n_v8_l2_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rn_v8_l2_r0p1_c22_RS n_v8_l2_r0p1_c22_src n_v8_l2_r0p1_c22_l 0.1
+Ln_v8_l2_r0p1_c22_L n_v8_l2_r0p1_c22_l n_v8_l2_r0p1_c22_f 2u
+Rn_v8_l2_r0p1_c22_F1 n_v8_l2_r0p1_c22_f n_v8_l2_r0p1_c22_a 0.11
+Vn_v8_l2_r0p1_c22_D1S n_v8_l2_r0p1_c22_a n_v8_l2_r0p1_c22_d1a 0
+Dn_v8_l2_r0p1_c22_D1 n_v8_l2_r0p1_c22_d1a n_v8_l2_r0p1_c22_vin ESP_SS34
+Rn_v8_l2_r0p1_c22_LOAD n_v8_l2_r0p1_c22_vin 0 10k
+Rn_v8_l2_r0p1_c22_ESR n_v8_l2_r0p1_c22_vin n_v8_l2_r0p1_c22_cx 5m
+Cn_v8_l2_r0p1_c22 n_v8_l2_r0p1_c22_cx 0 22u
+
+* n_v8_l2_r0p1_c43p2: 8 V step, L=2 uH, Rs=0.1 ohm, C=43.2 uF, D3=NONE
+Vn_v8_l2_r0p1_c43p2 n_v8_l2_r0p1_c43p2_src 0 PWL(0 0 2u 8)
+Rn_v8_l2_r0p1_c43p2_RS n_v8_l2_r0p1_c43p2_src n_v8_l2_r0p1_c43p2_l 0.1
+Ln_v8_l2_r0p1_c43p2_L n_v8_l2_r0p1_c43p2_l n_v8_l2_r0p1_c43p2_f 2u
+Rn_v8_l2_r0p1_c43p2_F1 n_v8_l2_r0p1_c43p2_f n_v8_l2_r0p1_c43p2_a 0.11
+Vn_v8_l2_r0p1_c43p2_D1S n_v8_l2_r0p1_c43p2_a n_v8_l2_r0p1_c43p2_d1a 0
+Dn_v8_l2_r0p1_c43p2_D1 n_v8_l2_r0p1_c43p2_d1a n_v8_l2_r0p1_c43p2_vin ESP_SS34
+Rn_v8_l2_r0p1_c43p2_LOAD n_v8_l2_r0p1_c43p2_vin 0 10k
+Rn_v8_l2_r0p1_c43p2_ESR n_v8_l2_r0p1_c43p2_vin n_v8_l2_r0p1_c43p2_cx 5m
+Cn_v8_l2_r0p1_c43p2 n_v8_l2_r0p1_c43p2_cx 0 43.2u
+
+* n_v8_l5_r0p1_c22: 8 V step, L=5 uH, Rs=0.1 ohm, C=22 uF, D3=NONE
+Vn_v8_l5_r0p1_c22 n_v8_l5_r0p1_c22_src 0 PWL(0 0 2u 8)
+Rn_v8_l5_r0p1_c22_RS n_v8_l5_r0p1_c22_src n_v8_l5_r0p1_c22_l 0.1
+Ln_v8_l5_r0p1_c22_L n_v8_l5_r0p1_c22_l n_v8_l5_r0p1_c22_f 5u
+Rn_v8_l5_r0p1_c22_F1 n_v8_l5_r0p1_c22_f n_v8_l5_r0p1_c22_a 0.11
+Vn_v8_l5_r0p1_c22_D1S n_v8_l5_r0p1_c22_a n_v8_l5_r0p1_c22_d1a 0
+Dn_v8_l5_r0p1_c22_D1 n_v8_l5_r0p1_c22_d1a n_v8_l5_r0p1_c22_vin ESP_SS34
+Rn_v8_l5_r0p1_c22_LOAD n_v8_l5_r0p1_c22_vin 0 10k
+Rn_v8_l5_r0p1_c22_ESR n_v8_l5_r0p1_c22_vin n_v8_l5_r0p1_c22_cx 5m
+Cn_v8_l5_r0p1_c22 n_v8_l5_r0p1_c22_cx 0 22u
+
+* n_v8_l5_r0p1_c43p2: 8 V step, L=5 uH, Rs=0.1 ohm, C=43.2 uF, D3=NONE
+Vn_v8_l5_r0p1_c43p2 n_v8_l5_r0p1_c43p2_src 0 PWL(0 0 2u 8)
+Rn_v8_l5_r0p1_c43p2_RS n_v8_l5_r0p1_c43p2_src n_v8_l5_r0p1_c43p2_l 0.1
+Ln_v8_l5_r0p1_c43p2_L n_v8_l5_r0p1_c43p2_l n_v8_l5_r0p1_c43p2_f 5u
+Rn_v8_l5_r0p1_c43p2_F1 n_v8_l5_r0p1_c43p2_f n_v8_l5_r0p1_c43p2_a 0.11
+Vn_v8_l5_r0p1_c43p2_D1S n_v8_l5_r0p1_c43p2_a n_v8_l5_r0p1_c43p2_d1a 0
+Dn_v8_l5_r0p1_c43p2_D1 n_v8_l5_r0p1_c43p2_d1a n_v8_l5_r0p1_c43p2_vin ESP_SS34
+Rn_v8_l5_r0p1_c43p2_LOAD n_v8_l5_r0p1_c43p2_vin 0 10k
+Rn_v8_l5_r0p1_c43p2_ESR n_v8_l5_r0p1_c43p2_vin n_v8_l5_r0p1_c43p2_cx 5m
+Cn_v8_l5_r0p1_c43p2 n_v8_l5_r0p1_c43p2_cx 0 43.2u
+
+* n_v9_l0p5_r0p1_c22: 9 V step, L=0.5 uH, Rs=0.1 ohm, C=22 uF, D3=NONE
+Vn_v9_l0p5_r0p1_c22 n_v9_l0p5_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rn_v9_l0p5_r0p1_c22_RS n_v9_l0p5_r0p1_c22_src n_v9_l0p5_r0p1_c22_l 0.1
+Ln_v9_l0p5_r0p1_c22_L n_v9_l0p5_r0p1_c22_l n_v9_l0p5_r0p1_c22_f 0.5u
+Rn_v9_l0p5_r0p1_c22_F1 n_v9_l0p5_r0p1_c22_f n_v9_l0p5_r0p1_c22_a 0.11
+Vn_v9_l0p5_r0p1_c22_D1S n_v9_l0p5_r0p1_c22_a n_v9_l0p5_r0p1_c22_d1a 0
+Dn_v9_l0p5_r0p1_c22_D1 n_v9_l0p5_r0p1_c22_d1a n_v9_l0p5_r0p1_c22_vin ESP_SS34
+Rn_v9_l0p5_r0p1_c22_LOAD n_v9_l0p5_r0p1_c22_vin 0 10k
+Rn_v9_l0p5_r0p1_c22_ESR n_v9_l0p5_r0p1_c22_vin n_v9_l0p5_r0p1_c22_cx 5m
+Cn_v9_l0p5_r0p1_c22 n_v9_l0p5_r0p1_c22_cx 0 22u
+
+* n_v9_l0p5_r0p1_c43p2: 9 V step, L=0.5 uH, Rs=0.1 ohm, C=43.2 uF, D3=NONE
+Vn_v9_l0p5_r0p1_c43p2 n_v9_l0p5_r0p1_c43p2_src 0 PWL(0 0 2u 9)
+Rn_v9_l0p5_r0p1_c43p2_RS n_v9_l0p5_r0p1_c43p2_src n_v9_l0p5_r0p1_c43p2_l 0.1
+Ln_v9_l0p5_r0p1_c43p2_L n_v9_l0p5_r0p1_c43p2_l n_v9_l0p5_r0p1_c43p2_f 0.5u
+Rn_v9_l0p5_r0p1_c43p2_F1 n_v9_l0p5_r0p1_c43p2_f n_v9_l0p5_r0p1_c43p2_a 0.11
+Vn_v9_l0p5_r0p1_c43p2_D1S n_v9_l0p5_r0p1_c43p2_a n_v9_l0p5_r0p1_c43p2_d1a 0
+Dn_v9_l0p5_r0p1_c43p2_D1 n_v9_l0p5_r0p1_c43p2_d1a n_v9_l0p5_r0p1_c43p2_vin ESP_SS34
+Rn_v9_l0p5_r0p1_c43p2_LOAD n_v9_l0p5_r0p1_c43p2_vin 0 10k
+Rn_v9_l0p5_r0p1_c43p2_ESR n_v9_l0p5_r0p1_c43p2_vin n_v9_l0p5_r0p1_c43p2_cx 5m
+Cn_v9_l0p5_r0p1_c43p2 n_v9_l0p5_r0p1_c43p2_cx 0 43.2u
+
+* n_v9_l2_r0p1_c22: 9 V step, L=2 uH, Rs=0.1 ohm, C=22 uF, D3=NONE
+Vn_v9_l2_r0p1_c22 n_v9_l2_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rn_v9_l2_r0p1_c22_RS n_v9_l2_r0p1_c22_src n_v9_l2_r0p1_c22_l 0.1
+Ln_v9_l2_r0p1_c22_L n_v9_l2_r0p1_c22_l n_v9_l2_r0p1_c22_f 2u
+Rn_v9_l2_r0p1_c22_F1 n_v9_l2_r0p1_c22_f n_v9_l2_r0p1_c22_a 0.11
+Vn_v9_l2_r0p1_c22_D1S n_v9_l2_r0p1_c22_a n_v9_l2_r0p1_c22_d1a 0
+Dn_v9_l2_r0p1_c22_D1 n_v9_l2_r0p1_c22_d1a n_v9_l2_r0p1_c22_vin ESP_SS34
+Rn_v9_l2_r0p1_c22_LOAD n_v9_l2_r0p1_c22_vin 0 10k
+Rn_v9_l2_r0p1_c22_ESR n_v9_l2_r0p1_c22_vin n_v9_l2_r0p1_c22_cx 5m
+Cn_v9_l2_r0p1_c22 n_v9_l2_r0p1_c22_cx 0 22u
+
+* n_v9_l2_r0p1_c43p2: 9 V step, L=2 uH, Rs=0.1 ohm, C=43.2 uF, D3=NONE
+Vn_v9_l2_r0p1_c43p2 n_v9_l2_r0p1_c43p2_src 0 PWL(0 0 2u 9)
+Rn_v9_l2_r0p1_c43p2_RS n_v9_l2_r0p1_c43p2_src n_v9_l2_r0p1_c43p2_l 0.1
+Ln_v9_l2_r0p1_c43p2_L n_v9_l2_r0p1_c43p2_l n_v9_l2_r0p1_c43p2_f 2u
+Rn_v9_l2_r0p1_c43p2_F1 n_v9_l2_r0p1_c43p2_f n_v9_l2_r0p1_c43p2_a 0.11
+Vn_v9_l2_r0p1_c43p2_D1S n_v9_l2_r0p1_c43p2_a n_v9_l2_r0p1_c43p2_d1a 0
+Dn_v9_l2_r0p1_c43p2_D1 n_v9_l2_r0p1_c43p2_d1a n_v9_l2_r0p1_c43p2_vin ESP_SS34
+Rn_v9_l2_r0p1_c43p2_LOAD n_v9_l2_r0p1_c43p2_vin 0 10k
+Rn_v9_l2_r0p1_c43p2_ESR n_v9_l2_r0p1_c43p2_vin n_v9_l2_r0p1_c43p2_cx 5m
+Cn_v9_l2_r0p1_c43p2 n_v9_l2_r0p1_c43p2_cx 0 43.2u
+
+* n_v9_l5_r0p1_c22: 9 V step, L=5 uH, Rs=0.1 ohm, C=22 uF, D3=NONE
+Vn_v9_l5_r0p1_c22 n_v9_l5_r0p1_c22_src 0 PWL(0 0 2u 9)
+Rn_v9_l5_r0p1_c22_RS n_v9_l5_r0p1_c22_src n_v9_l5_r0p1_c22_l 0.1
+Ln_v9_l5_r0p1_c22_L n_v9_l5_r0p1_c22_l n_v9_l5_r0p1_c22_f 5u
+Rn_v9_l5_r0p1_c22_F1 n_v9_l5_r0p1_c22_f n_v9_l5_r0p1_c22_a 0.11
+Vn_v9_l5_r0p1_c22_D1S n_v9_l5_r0p1_c22_a n_v9_l5_r0p1_c22_d1a 0
+Dn_v9_l5_r0p1_c22_D1 n_v9_l5_r0p1_c22_d1a n_v9_l5_r0p1_c22_vin ESP_SS34
+Rn_v9_l5_r0p1_c22_LOAD n_v9_l5_r0p1_c22_vin 0 10k
+Rn_v9_l5_r0p1_c22_ESR n_v9_l5_r0p1_c22_vin n_v9_l5_r0p1_c22_cx 5m
+Cn_v9_l5_r0p1_c22 n_v9_l5_r0p1_c22_cx 0 22u
+
+* n_v9_l5_r0p1_c43p2: 9 V step, L=5 uH, Rs=0.1 ohm, C=43.2 uF, D3=NONE
+Vn_v9_l5_r0p1_c43p2 n_v9_l5_r0p1_c43p2_src 0 PWL(0 0 2u 9)
+Rn_v9_l5_r0p1_c43p2_RS n_v9_l5_r0p1_c43p2_src n_v9_l5_r0p1_c43p2_l 0.1
+Ln_v9_l5_r0p1_c43p2_L n_v9_l5_r0p1_c43p2_l n_v9_l5_r0p1_c43p2_f 5u
+Rn_v9_l5_r0p1_c43p2_F1 n_v9_l5_r0p1_c43p2_f n_v9_l5_r0p1_c43p2_a 0.11
+Vn_v9_l5_r0p1_c43p2_D1S n_v9_l5_r0p1_c43p2_a n_v9_l5_r0p1_c43p2_d1a 0
+Dn_v9_l5_r0p1_c43p2_D1 n_v9_l5_r0p1_c43p2_d1a n_v9_l5_r0p1_c43p2_vin ESP_SS34
+Rn_v9_l5_r0p1_c43p2_LOAD n_v9_l5_r0p1_c43p2_vin 0 10k
+Rn_v9_l5_r0p1_c43p2_ESR n_v9_l5_r0p1_c43p2_vin n_v9_l5_r0p1_c43p2_cx 5m
+Cn_v9_l5_r0p1_c43p2 n_v9_l5_r0p1_c43p2_cx 0 43.2u
+
+.tran 0.1u 1m 0 0.1u
+
+.meas tran h_v8_l0p5_r0p1_c22_vin_peak_v MAX v(h_v8_l0p5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p1_c22_d1_peak_a MAX i(Vh_v8_l0p5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p1_c22_d1_rev_v MAX par('v(h_v8_l0p5_r0p1_c22_vin)-v(h_v8_l0p5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p1_c22_d3_peak_a MAX i(Vh_v8_l0p5_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p1_c22_d3_energy_j INTEG par('v(h_v8_l0p5_r0p1_c22_vin)*i(Vh_v8_l0p5_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p5_c22_vin_peak_v MAX v(h_v8_l0p5_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p5_c22_d1_peak_a MAX i(Vh_v8_l0p5_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p5_c22_d1_rev_v MAX par('v(h_v8_l0p5_r0p5_c22_vin)-v(h_v8_l0p5_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p5_c22_d3_peak_a MAX i(Vh_v8_l0p5_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran h_v8_l0p5_r0p5_c22_d3_energy_j INTEG par('v(h_v8_l0p5_r0p5_c22_vin)*i(Vh_v8_l0p5_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v8_l2_r0p1_c22_vin_peak_v MAX v(h_v8_l2_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran h_v8_l2_r0p1_c22_d1_peak_a MAX i(Vh_v8_l2_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran h_v8_l2_r0p1_c22_d1_rev_v MAX par('v(h_v8_l2_r0p1_c22_vin)-v(h_v8_l2_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v8_l2_r0p1_c22_d3_peak_a MAX i(Vh_v8_l2_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran h_v8_l2_r0p1_c22_d3_energy_j INTEG par('v(h_v8_l2_r0p1_c22_vin)*i(Vh_v8_l2_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v8_l2_r0p5_c22_vin_peak_v MAX v(h_v8_l2_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran h_v8_l2_r0p5_c22_d1_peak_a MAX i(Vh_v8_l2_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran h_v8_l2_r0p5_c22_d1_rev_v MAX par('v(h_v8_l2_r0p5_c22_vin)-v(h_v8_l2_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v8_l2_r0p5_c22_d3_peak_a MAX i(Vh_v8_l2_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran h_v8_l2_r0p5_c22_d3_energy_j INTEG par('v(h_v8_l2_r0p5_c22_vin)*i(Vh_v8_l2_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c22_vin_peak_v MAX v(h_v8_l5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c22_d1_peak_a MAX i(Vh_v8_l5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c22_d1_rev_v MAX par('v(h_v8_l5_r0p1_c22_vin)-v(h_v8_l5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c22_d3_peak_a MAX i(Vh_v8_l5_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c22_d3_energy_j INTEG par('v(h_v8_l5_r0p1_c22_vin)*i(Vh_v8_l5_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v8_l5_r0p5_c22_vin_peak_v MAX v(h_v8_l5_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p5_c22_d1_peak_a MAX i(Vh_v8_l5_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p5_c22_d1_rev_v MAX par('v(h_v8_l5_r0p5_c22_vin)-v(h_v8_l5_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v8_l5_r0p5_c22_d3_peak_a MAX i(Vh_v8_l5_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p5_c22_d3_energy_j INTEG par('v(h_v8_l5_r0p5_c22_vin)*i(Vh_v8_l5_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p1_c22_vin_peak_v MAX v(h_v9_l0p5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p1_c22_d1_peak_a MAX i(Vh_v9_l0p5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p1_c22_d1_rev_v MAX par('v(h_v9_l0p5_r0p1_c22_vin)-v(h_v9_l0p5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p1_c22_d3_peak_a MAX i(Vh_v9_l0p5_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p1_c22_d3_energy_j INTEG par('v(h_v9_l0p5_r0p1_c22_vin)*i(Vh_v9_l0p5_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p5_c22_vin_peak_v MAX v(h_v9_l0p5_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p5_c22_d1_peak_a MAX i(Vh_v9_l0p5_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p5_c22_d1_rev_v MAX par('v(h_v9_l0p5_r0p5_c22_vin)-v(h_v9_l0p5_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p5_c22_d3_peak_a MAX i(Vh_v9_l0p5_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran h_v9_l0p5_r0p5_c22_d3_energy_j INTEG par('v(h_v9_l0p5_r0p5_c22_vin)*i(Vh_v9_l0p5_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v9_l2_r0p1_c22_vin_peak_v MAX v(h_v9_l2_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran h_v9_l2_r0p1_c22_d1_peak_a MAX i(Vh_v9_l2_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran h_v9_l2_r0p1_c22_d1_rev_v MAX par('v(h_v9_l2_r0p1_c22_vin)-v(h_v9_l2_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v9_l2_r0p1_c22_d3_peak_a MAX i(Vh_v9_l2_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran h_v9_l2_r0p1_c22_d3_energy_j INTEG par('v(h_v9_l2_r0p1_c22_vin)*i(Vh_v9_l2_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v9_l2_r0p5_c22_vin_peak_v MAX v(h_v9_l2_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran h_v9_l2_r0p5_c22_d1_peak_a MAX i(Vh_v9_l2_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran h_v9_l2_r0p5_c22_d1_rev_v MAX par('v(h_v9_l2_r0p5_c22_vin)-v(h_v9_l2_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v9_l2_r0p5_c22_d3_peak_a MAX i(Vh_v9_l2_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran h_v9_l2_r0p5_c22_d3_energy_j INTEG par('v(h_v9_l2_r0p5_c22_vin)*i(Vh_v9_l2_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c22_vin_peak_v MAX v(h_v9_l5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c22_d1_peak_a MAX i(Vh_v9_l5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c22_d1_rev_v MAX par('v(h_v9_l5_r0p1_c22_vin)-v(h_v9_l5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c22_d3_peak_a MAX i(Vh_v9_l5_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c22_d3_energy_j INTEG par('v(h_v9_l5_r0p1_c22_vin)*i(Vh_v9_l5_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v9_l5_r0p5_c22_vin_peak_v MAX v(h_v9_l5_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p5_c22_d1_peak_a MAX i(Vh_v9_l5_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p5_c22_d1_rev_v MAX par('v(h_v9_l5_r0p5_c22_vin)-v(h_v9_l5_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran h_v9_l5_r0p5_c22_d3_peak_a MAX i(Vh_v9_l5_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p5_c22_d3_energy_j INTEG par('v(h_v9_l5_r0p5_c22_vin)*i(Vh_v9_l5_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p1_c22_vin_peak_v MAX v(l_v8_l0p5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p1_c22_d1_peak_a MAX i(Vl_v8_l0p5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p1_c22_d1_rev_v MAX par('v(l_v8_l0p5_r0p1_c22_vin)-v(l_v8_l0p5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p1_c22_d3_peak_a MAX i(Vl_v8_l0p5_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p1_c22_d3_energy_j INTEG par('v(l_v8_l0p5_r0p1_c22_vin)*i(Vl_v8_l0p5_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p5_c22_vin_peak_v MAX v(l_v8_l0p5_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p5_c22_d1_peak_a MAX i(Vl_v8_l0p5_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p5_c22_d1_rev_v MAX par('v(l_v8_l0p5_r0p5_c22_vin)-v(l_v8_l0p5_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p5_c22_d3_peak_a MAX i(Vl_v8_l0p5_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran l_v8_l0p5_r0p5_c22_d3_energy_j INTEG par('v(l_v8_l0p5_r0p5_c22_vin)*i(Vl_v8_l0p5_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v8_l2_r0p1_c22_vin_peak_v MAX v(l_v8_l2_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran l_v8_l2_r0p1_c22_d1_peak_a MAX i(Vl_v8_l2_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran l_v8_l2_r0p1_c22_d1_rev_v MAX par('v(l_v8_l2_r0p1_c22_vin)-v(l_v8_l2_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v8_l2_r0p1_c22_d3_peak_a MAX i(Vl_v8_l2_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran l_v8_l2_r0p1_c22_d3_energy_j INTEG par('v(l_v8_l2_r0p1_c22_vin)*i(Vl_v8_l2_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v8_l2_r0p5_c22_vin_peak_v MAX v(l_v8_l2_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran l_v8_l2_r0p5_c22_d1_peak_a MAX i(Vl_v8_l2_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran l_v8_l2_r0p5_c22_d1_rev_v MAX par('v(l_v8_l2_r0p5_c22_vin)-v(l_v8_l2_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v8_l2_r0p5_c22_d3_peak_a MAX i(Vl_v8_l2_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran l_v8_l2_r0p5_c22_d3_energy_j INTEG par('v(l_v8_l2_r0p5_c22_vin)*i(Vl_v8_l2_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c22_vin_peak_v MAX v(l_v8_l5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c22_d1_peak_a MAX i(Vl_v8_l5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c22_d1_rev_v MAX par('v(l_v8_l5_r0p1_c22_vin)-v(l_v8_l5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c22_d3_peak_a MAX i(Vl_v8_l5_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c22_d3_energy_j INTEG par('v(l_v8_l5_r0p1_c22_vin)*i(Vl_v8_l5_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v8_l5_r0p5_c22_vin_peak_v MAX v(l_v8_l5_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p5_c22_d1_peak_a MAX i(Vl_v8_l5_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p5_c22_d1_rev_v MAX par('v(l_v8_l5_r0p5_c22_vin)-v(l_v8_l5_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v8_l5_r0p5_c22_d3_peak_a MAX i(Vl_v8_l5_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p5_c22_d3_energy_j INTEG par('v(l_v8_l5_r0p5_c22_vin)*i(Vl_v8_l5_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p1_c22_vin_peak_v MAX v(l_v9_l0p5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p1_c22_d1_peak_a MAX i(Vl_v9_l0p5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p1_c22_d1_rev_v MAX par('v(l_v9_l0p5_r0p1_c22_vin)-v(l_v9_l0p5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p1_c22_d3_peak_a MAX i(Vl_v9_l0p5_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p1_c22_d3_energy_j INTEG par('v(l_v9_l0p5_r0p1_c22_vin)*i(Vl_v9_l0p5_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p5_c22_vin_peak_v MAX v(l_v9_l0p5_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p5_c22_d1_peak_a MAX i(Vl_v9_l0p5_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p5_c22_d1_rev_v MAX par('v(l_v9_l0p5_r0p5_c22_vin)-v(l_v9_l0p5_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p5_c22_d3_peak_a MAX i(Vl_v9_l0p5_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran l_v9_l0p5_r0p5_c22_d3_energy_j INTEG par('v(l_v9_l0p5_r0p5_c22_vin)*i(Vl_v9_l0p5_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v9_l2_r0p1_c22_vin_peak_v MAX v(l_v9_l2_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran l_v9_l2_r0p1_c22_d1_peak_a MAX i(Vl_v9_l2_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran l_v9_l2_r0p1_c22_d1_rev_v MAX par('v(l_v9_l2_r0p1_c22_vin)-v(l_v9_l2_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v9_l2_r0p1_c22_d3_peak_a MAX i(Vl_v9_l2_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran l_v9_l2_r0p1_c22_d3_energy_j INTEG par('v(l_v9_l2_r0p1_c22_vin)*i(Vl_v9_l2_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v9_l2_r0p5_c22_vin_peak_v MAX v(l_v9_l2_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran l_v9_l2_r0p5_c22_d1_peak_a MAX i(Vl_v9_l2_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran l_v9_l2_r0p5_c22_d1_rev_v MAX par('v(l_v9_l2_r0p5_c22_vin)-v(l_v9_l2_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v9_l2_r0p5_c22_d3_peak_a MAX i(Vl_v9_l2_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran l_v9_l2_r0p5_c22_d3_energy_j INTEG par('v(l_v9_l2_r0p5_c22_vin)*i(Vl_v9_l2_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c22_vin_peak_v MAX v(l_v9_l5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c22_d1_peak_a MAX i(Vl_v9_l5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c22_d1_rev_v MAX par('v(l_v9_l5_r0p1_c22_vin)-v(l_v9_l5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c22_d3_peak_a MAX i(Vl_v9_l5_r0p1_c22_D3S) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c22_d3_energy_j INTEG par('v(l_v9_l5_r0p1_c22_vin)*i(Vl_v9_l5_r0p1_c22_D3S)') FROM=0 TO=1m
+.meas tran l_v9_l5_r0p5_c22_vin_peak_v MAX v(l_v9_l5_r0p5_c22_vin) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p5_c22_d1_peak_a MAX i(Vl_v9_l5_r0p5_c22_D1S) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p5_c22_d1_rev_v MAX par('v(l_v9_l5_r0p5_c22_vin)-v(l_v9_l5_r0p5_c22_d1a)') FROM=0 TO=1m
+.meas tran l_v9_l5_r0p5_c22_d3_peak_a MAX i(Vl_v9_l5_r0p5_c22_D3S) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p5_c22_d3_energy_j INTEG par('v(l_v9_l5_r0p5_c22_vin)*i(Vl_v9_l5_r0p5_c22_D3S)') FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c43p2_vin_peak_v MAX v(h_v8_l5_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c43p2_d1_peak_a MAX i(Vh_v8_l5_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c43p2_d1_rev_v MAX par('v(h_v8_l5_r0p1_c43p2_vin)-v(h_v8_l5_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c43p2_d3_peak_a MAX i(Vh_v8_l5_r0p1_c43p2_D3S) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c43p2_d3_energy_j INTEG par('v(h_v8_l5_r0p1_c43p2_vin)*i(Vh_v8_l5_r0p1_c43p2_D3S)') FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c43p2_vin_peak_v MAX v(l_v8_l5_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c43p2_d1_peak_a MAX i(Vl_v8_l5_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c43p2_d1_rev_v MAX par('v(l_v8_l5_r0p1_c43p2_vin)-v(l_v8_l5_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c43p2_d3_peak_a MAX i(Vl_v8_l5_r0p1_c43p2_D3S) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c43p2_d3_energy_j INTEG par('v(l_v8_l5_r0p1_c43p2_vin)*i(Vl_v8_l5_r0p1_c43p2_D3S)') FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c26_vin_peak_v MAX v(h_v8_l5_r0p1_c26_vin) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c26_d1_peak_a MAX i(Vh_v8_l5_r0p1_c26_D1S) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c26_d1_rev_v MAX par('v(h_v8_l5_r0p1_c26_vin)-v(h_v8_l5_r0p1_c26_d1a)') FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c26_d3_peak_a MAX i(Vh_v8_l5_r0p1_c26_D3S) FROM=0 TO=1m
+.meas tran h_v8_l5_r0p1_c26_d3_energy_j INTEG par('v(h_v8_l5_r0p1_c26_vin)*i(Vh_v8_l5_r0p1_c26_D3S)') FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c26_vin_peak_v MAX v(l_v8_l5_r0p1_c26_vin) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c26_d1_peak_a MAX i(Vl_v8_l5_r0p1_c26_D1S) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c26_d1_rev_v MAX par('v(l_v8_l5_r0p1_c26_vin)-v(l_v8_l5_r0p1_c26_d1a)') FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c26_d3_peak_a MAX i(Vl_v8_l5_r0p1_c26_D3S) FROM=0 TO=1m
+.meas tran l_v8_l5_r0p1_c26_d3_energy_j INTEG par('v(l_v8_l5_r0p1_c26_vin)*i(Vl_v8_l5_r0p1_c26_D3S)') FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c43p2_vin_peak_v MAX v(h_v9_l5_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c43p2_d1_peak_a MAX i(Vh_v9_l5_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c43p2_d1_rev_v MAX par('v(h_v9_l5_r0p1_c43p2_vin)-v(h_v9_l5_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c43p2_d3_peak_a MAX i(Vh_v9_l5_r0p1_c43p2_D3S) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c43p2_d3_energy_j INTEG par('v(h_v9_l5_r0p1_c43p2_vin)*i(Vh_v9_l5_r0p1_c43p2_D3S)') FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c43p2_vin_peak_v MAX v(l_v9_l5_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c43p2_d1_peak_a MAX i(Vl_v9_l5_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c43p2_d1_rev_v MAX par('v(l_v9_l5_r0p1_c43p2_vin)-v(l_v9_l5_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c43p2_d3_peak_a MAX i(Vl_v9_l5_r0p1_c43p2_D3S) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c43p2_d3_energy_j INTEG par('v(l_v9_l5_r0p1_c43p2_vin)*i(Vl_v9_l5_r0p1_c43p2_D3S)') FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c26_vin_peak_v MAX v(h_v9_l5_r0p1_c26_vin) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c26_d1_peak_a MAX i(Vh_v9_l5_r0p1_c26_D1S) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c26_d1_rev_v MAX par('v(h_v9_l5_r0p1_c26_vin)-v(h_v9_l5_r0p1_c26_d1a)') FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c26_d3_peak_a MAX i(Vh_v9_l5_r0p1_c26_D3S) FROM=0 TO=1m
+.meas tran h_v9_l5_r0p1_c26_d3_energy_j INTEG par('v(h_v9_l5_r0p1_c26_vin)*i(Vh_v9_l5_r0p1_c26_D3S)') FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c26_vin_peak_v MAX v(l_v9_l5_r0p1_c26_vin) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c26_d1_peak_a MAX i(Vl_v9_l5_r0p1_c26_D1S) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c26_d1_rev_v MAX par('v(l_v9_l5_r0p1_c26_vin)-v(l_v9_l5_r0p1_c26_d1a)') FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c26_d3_peak_a MAX i(Vl_v9_l5_r0p1_c26_D3S) FROM=0 TO=1m
+.meas tran l_v9_l5_r0p1_c26_d3_energy_j INTEG par('v(l_v9_l5_r0p1_c26_vin)*i(Vl_v9_l5_r0p1_c26_D3S)') FROM=0 TO=1m
+.meas tran n_v8_l0p5_r0p1_c22_vin_peak_v MAX v(n_v8_l0p5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran n_v8_l0p5_r0p1_c22_d1_peak_a MAX i(Vn_v8_l0p5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran n_v8_l0p5_r0p1_c22_d1_rev_v MAX par('v(n_v8_l0p5_r0p1_c22_vin)-v(n_v8_l0p5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran n_v8_l0p5_r0p1_c43p2_vin_peak_v MAX v(n_v8_l0p5_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran n_v8_l0p5_r0p1_c43p2_d1_peak_a MAX i(Vn_v8_l0p5_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran n_v8_l0p5_r0p1_c43p2_d1_rev_v MAX par('v(n_v8_l0p5_r0p1_c43p2_vin)-v(n_v8_l0p5_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran n_v8_l2_r0p1_c22_vin_peak_v MAX v(n_v8_l2_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran n_v8_l2_r0p1_c22_d1_peak_a MAX i(Vn_v8_l2_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran n_v8_l2_r0p1_c22_d1_rev_v MAX par('v(n_v8_l2_r0p1_c22_vin)-v(n_v8_l2_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran n_v8_l2_r0p1_c43p2_vin_peak_v MAX v(n_v8_l2_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran n_v8_l2_r0p1_c43p2_d1_peak_a MAX i(Vn_v8_l2_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran n_v8_l2_r0p1_c43p2_d1_rev_v MAX par('v(n_v8_l2_r0p1_c43p2_vin)-v(n_v8_l2_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran n_v8_l5_r0p1_c22_vin_peak_v MAX v(n_v8_l5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran n_v8_l5_r0p1_c22_d1_peak_a MAX i(Vn_v8_l5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran n_v8_l5_r0p1_c22_d1_rev_v MAX par('v(n_v8_l5_r0p1_c22_vin)-v(n_v8_l5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran n_v8_l5_r0p1_c43p2_vin_peak_v MAX v(n_v8_l5_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran n_v8_l5_r0p1_c43p2_d1_peak_a MAX i(Vn_v8_l5_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran n_v8_l5_r0p1_c43p2_d1_rev_v MAX par('v(n_v8_l5_r0p1_c43p2_vin)-v(n_v8_l5_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran n_v9_l0p5_r0p1_c22_vin_peak_v MAX v(n_v9_l0p5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran n_v9_l0p5_r0p1_c22_d1_peak_a MAX i(Vn_v9_l0p5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran n_v9_l0p5_r0p1_c22_d1_rev_v MAX par('v(n_v9_l0p5_r0p1_c22_vin)-v(n_v9_l0p5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran n_v9_l0p5_r0p1_c43p2_vin_peak_v MAX v(n_v9_l0p5_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran n_v9_l0p5_r0p1_c43p2_d1_peak_a MAX i(Vn_v9_l0p5_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran n_v9_l0p5_r0p1_c43p2_d1_rev_v MAX par('v(n_v9_l0p5_r0p1_c43p2_vin)-v(n_v9_l0p5_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran n_v9_l2_r0p1_c22_vin_peak_v MAX v(n_v9_l2_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran n_v9_l2_r0p1_c22_d1_peak_a MAX i(Vn_v9_l2_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran n_v9_l2_r0p1_c22_d1_rev_v MAX par('v(n_v9_l2_r0p1_c22_vin)-v(n_v9_l2_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran n_v9_l2_r0p1_c43p2_vin_peak_v MAX v(n_v9_l2_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran n_v9_l2_r0p1_c43p2_d1_peak_a MAX i(Vn_v9_l2_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran n_v9_l2_r0p1_c43p2_d1_rev_v MAX par('v(n_v9_l2_r0p1_c43p2_vin)-v(n_v9_l2_r0p1_c43p2_d1a)') FROM=0 TO=1m
+.meas tran n_v9_l5_r0p1_c22_vin_peak_v MAX v(n_v9_l5_r0p1_c22_vin) FROM=0 TO=1m
+.meas tran n_v9_l5_r0p1_c22_d1_peak_a MAX i(Vn_v9_l5_r0p1_c22_D1S) FROM=0 TO=1m
+.meas tran n_v9_l5_r0p1_c22_d1_rev_v MAX par('v(n_v9_l5_r0p1_c22_vin)-v(n_v9_l5_r0p1_c22_d1a)') FROM=0 TO=1m
+.meas tran n_v9_l5_r0p1_c43p2_vin_peak_v MAX v(n_v9_l5_r0p1_c43p2_vin) FROM=0 TO=1m
+.meas tran n_v9_l5_r0p1_c43p2_d1_peak_a MAX i(Vn_v9_l5_r0p1_c43p2_D1S) FROM=0 TO=1m
+.meas tran n_v9_l5_r0p1_c43p2_d1_rev_v MAX par('v(n_v9_l5_r0p1_c43p2_vin)-v(n_v9_l5_r0p1_c43p2_d1a)') FROM=0 TO=1m
+
+.end

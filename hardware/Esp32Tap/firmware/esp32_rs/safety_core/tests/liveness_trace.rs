@@ -15,12 +15,13 @@ use safety_core::liveness::{PulseBudget, MAX_TICK_GAP_US, PERMIT_US, PRECHARGE_E
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-const END_US: u32 = 500_000;
+const END_US: u32 = 800_000;
 const LOOP_PERIOD_US: u32 = 5_000;
 /// The loop pass lands just after a tick, so no two events share a timestamp.
 const LOOP_PHASE_US: u32 = 100;
 const ENTRY_US: u32 = 10_000;
 const STOP_US: u32 = 300_000;
+const FLASH_START_US: u32 = 150_000;
 const HIGH_V: &str = "3.3";
 
 /// What the safety loop does on one pass.
@@ -160,6 +161,32 @@ fn generate() -> String {
     assert!(slow.precharged_at.is_some(), "the firmware does call this precharged");
     let in_deck: Vec<(u32, bool)> = slow.pin.iter().copied().filter(|&(time, _)| time < END_US).collect();
     pwl(&mut out, "PIN_SLOW", "pin_slow", &in_deck);
+
+    // FLASH: while a workout is running the firmware saves progress to flash
+    // every 30 s. ESP-IDF suspends every task for the length of a flash
+    // operation ("all other tasks are suspended", SPI flash concurrency
+    // guide), so both the safety loop and the pulse timer stop, then carry
+    // on. 45 ms is a typical 4 KB sector erase; 400 ms is the datasheet worst
+    // case the firmware's own comments budget for. The durations are those
+    // assumptions, not measurements.
+    for (name, stall_us) in [("45", 45_000u32), ("100", 100_000), ("400", 400_000)] {
+        let stalled = |t: u32| (FLASH_START_US..FLASH_START_US + stall_us).contains(&t);
+        let ticks: Vec<u32> = steady_ticks().into_iter().filter(|&t| !stalled(t)).collect();
+        let flash = simulate(&ticks, END_US, |now| {
+            if now < ENTRY_US {
+                Pass::Cancel
+            } else if stalled(now) {
+                Pass::Hung
+            } else {
+                Pass::Renew
+            }
+        });
+        // The pin rests low through the stall and pulsing resumes after it.
+        let resumed = flash.pin.iter().find(|&&(time, _)| time >= FLASH_START_US + stall_us).expect("pulses resume");
+        assert!(resumed.0 - (FLASH_START_US + stall_us) <= LOOP_PERIOD_US + PULSE_HALF_PERIOD_US, "{}", resumed.0);
+        pwl(&mut out, &format!("PIN_FLASH{name}"), &format!("pin_flash{name}"), &flash.pin);
+    }
+    pwl(&mut out, "MARK_FLASH", "mark_flash", &[(FLASH_START_US, true)]);
     out
 }
 

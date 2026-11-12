@@ -22,7 +22,7 @@ Rev E is internally coherent under the checked repository models:
 - exact 2 A emitted-copper trace-union analysis with independent GND-via
   envelope;
 - exact schematic/PCB/BOM/CPL/fabrication parity;
-- nine repeated dual-engine behavioral simulation decks.
+- twelve repeated dual-engine behavioral simulation decks.
 
 This closes repository-detectable consistency defects. It does not close
 vendor, firmware, or physical safety work.
@@ -61,8 +61,9 @@ toggles IO8 at 1 kHz only while the supervised serial engine keeps renewing a
 permission that expires 20 ms after the last renewal; it is not LEDC/RMT/PWM.
 Nothing has run on a board, and QEMU cannot observe the charge pump.
 
-R33 (1 MΩ, `TREAD_OK` to `UV_SENSE`) adds about 0.45 V of undervoltage
-hysteresis; nominal UV is about 6.31 V falling and 6.85 V rising (calculated).
+R33 (1 MΩ, `TREAD_OK` to `UV_SENSE`) adds about 0.5 V of undervoltage
+hysteresis; nominal UV is about 5.9 V falling and 6.4 V rising (calculated and
+simulated; an earlier 6.31/6.85 V figure in this report was wrong).
 D5-D7 are 5 V standoff Nexperia PESD5V0S1BA,115 parts because the serial line
 voltage has never been measured. SW1/SW2 pad numbering was corrected to rows
 (the old numbering would have shorted EN and IO0 to GND); not yet proven on

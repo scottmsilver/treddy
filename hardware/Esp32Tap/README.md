@@ -47,9 +47,9 @@ a certified functional-safety controller.
   no cable.
 - D5-D7 are Nexperia PESD5V0S1BA,115 (LCSC C19224), 5 V standoff, because the
   treadmill serial line voltage has never been measured.
-- R33 (1 MΩ, `TREAD_OK` to `UV_SENSE`) adds about 0.45 V of undervoltage
-  hysteresis. Nominal UV is about 6.31 V falling and 6.85 V rising
-  (calculated).
+- R33 (1 MΩ, `TREAD_OK` to `UV_SENSE`) adds about 0.5 V of undervoltage
+  hysteresis. Nominal UV is about 5.9 V falling and 6.4 V rising
+  (calculated and simulated).
 - SW1/SW2 (Alps SKRPACE010) pad numbering was corrected to rows (pad 1 = both
   top lands, pad 2 = both bottom lands). The old column numbering would have
   shorted EN and IO0 to GND through the switch body. Not yet proven on
@@ -107,7 +107,7 @@ make -C hardware/Esp32Tap check
 git diff --check
 ```
 
-The simulation runner executes nine decks three times on host ngspice 42 and
+The simulation runner executes twelve decks three times on host ngspice 42 and
 pinned Docker ngspice 39. Passing proves only the declared models and artifact
 parity. The Q3 liveness switch is simulated as a behavioral charge pump; the
 times it reports are model outputs, not measurements.

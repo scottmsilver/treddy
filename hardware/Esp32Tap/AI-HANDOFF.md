@@ -117,7 +117,7 @@ Gerbers.
   D+ A/B = 55.8729617233/54.8729617233 mm. Per-side D+/D− skew is
   0.0799168981 mm (gate 0.5 mm). Signals stay on F.Cu with zero signal vias; controlled
   sections use 0.2906 mm copper and 0.2000 mm edge gap.
-- The simulation gate has **nine decks**. Each runs three times on host
+- The simulation gate has **twelve decks**. Each runs three times on host
   ngspice 42 and pinned offline Docker ngspice 39. `harness_supply_drop`
   models the removed Micro-Fit pigtail harness and is historical only. The
   VIN decks use 26 uF effective capacitance (22 uF worst corner), from C1 22 +
@@ -173,7 +173,7 @@ make -C hardware/Esp32Tap check
 git diff --check
 ```
 
-The nine simulations run with:
+The twelve simulations run with:
 
 ```bash
 python3 hardware/Esp32Tap/sim/run_simulations.py \

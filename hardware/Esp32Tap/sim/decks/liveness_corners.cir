@@ -1,0 +1,381 @@
+Esp32Tap Rev E liveness switch worst-case corners (Q3, D8, C22, C23, R34, R35 over tolerance, temperature, supply)
+* ASSUMPTIONS:
+* Every number below that is not quoted from a data sheet is an assumption
+* of this deck. Corner values were found by an extreme-point search (every
+* combination of the low/high end of f, duty, R34, R35, C22 and C23 with the
+* diode, driver and threshold fixed for the temperature), and the combination
+* that was worst for the question is the one written here.
+*
+* Supply and pin: 3.0...3.6 V. The weak-driver corner is VDD=3.0 V with the
+* pin high at VDD-0.4 = 2.6 V and low at 0.4 V. The strong corner is 3.6 V
+* rail to rail. A pin that does not reach the rails shrinks the pump swing from
+* 3.0 V to 2.2 V.
+* Capacitors (assumed totals, not measured; Samsung curves could not be fetched):
+*   C22 100 nF X7R 50 V 0603: +/-10 % tolerance, +/-15 % X7R temperature, -5 %
+*   DC bias at 3.3 V, -3 % ageing -> 70.5 nF low (0.9*0.85*0.95*0.97), 126.5 nF
+*   high (1.1*1.15, no bias or ageing credit).
+*   C23 1 uF X5R 50 V 0603 (CL10A105KB8NNNC class): +/-10 %, +/-15 % X5R temperature,
+*   -25 % DC bias at 2.5 V (0603 1 uF at 50 V rating is bias-sensitive; assumed),
+*   -3 % ageing -> 0.557 uF low in steady state (0.9*0.85*0.75*0.97), 1.265 uF high
+*   (1.1*1.15). From rest the gate sits near 0 V, so the D corners use 0.742 uF
+*   (the same without the bias term). During pickup and release the bias loss
+*   varies with the gate voltage; the high value assumes none, which bounds release.
+* R34, R35 +/-1 %. Pulse frequency 950...1050 Hz, duty 40...60 %, 1 us edges.
+* Q3 AO3400A (Alpha and Omega, Rev 3.1): Vgs(th) 0.65...1.45 V at 25 C, 250 uA;
+* Ciss 630 pF typ; Igss 100 nA max at 12 V. Q3 gate parasitics are in every
+* pump as a 630 pF capacitor and a 26 Mohm resistor (100 nA at 2.6 V, pessimistic
+* because Igss is rated at 12 V). Threshold temperature coefficient: -3 mV/C
+* (assumption; data sheet Fig 2 shows the 125 C curve about 0.2 V left of 25 C,
+* about -2 mV/C). So the highest threshold is 1.585 V at -20 C, 1.45 V at 25 C,
+* 1.315 V at 70 C; the lowest is 0.515 V at 70 C and 0.65 V at 25 C.
+* Q3 model: ESP_Q3 conducts fully only from VT+0.5 V and the coil loop shows
+* 21 mA the moment the gate passes VT. A real AO3400A needs roughly VT+0.2 V
+* for 21 mA (data sheet Fig 2), so crossing VT here is optimistic for turn-on
+* and conservative for release; the 0.5 V margin below is the model's own
+* full-on point and is the requirement used for the steady gate.
+* D8 BAT54S (Nexperia data sheet unreachable: HTTP 403 for this client). The
+* Diodes Incorporated BAT54/A/C/S data sheet DS11005 Rev 35-2, same device
+* class, supplies the points; the typical Vf values were read by eye from its
+* Fig 1 and are approximate: Vf at 0.1 mA / 1 mA: -20 C 0.31/0.37 V (between its
+* -40 C and 0 C curves), 25 C 0.22/0.31 V, 70 C 0.15/0.21 V. Table limits at
+* 25 C: Vf <= 0.24 V at 0.1 mA, <= 0.32 V at 1 mA, <= 0.40 V at 10 mA;
+* IR <= 2.0 uA at VR=25 V. Fig 2 typical reverse current at about 3 V:
+* 0.06 uA at 25 C, 2.1 uA at 75 C, about 0.005 uA at -20 C (extrapolated).
+* Weak diodes add 20 mV to the typical Vf, strong diodes subtract 20 mV
+* (part-to-part spread; assumption). Diode Is and N are fitted to hit the two
+* Vf points with Rs=4 ohm; N absorbs the junction temperature because the
+* simulator stays at 27 C. Reverse leakage is a separate smooth current
+* source, because an ideal diode's saturation current cannot carry it.
+* Reverse leakage at hot: 2.5 uA is the typical figure rounded up. The
+* HOTX corner uses 15 uA = 2.0 uA (25 C max, 25 V) * 0.3 (3 V against 25 V,
+* Fig 2) * 25 (25 -> 70 C on the typical curve, 35 at 75 C), a bound that
+* assumes a part at its maximum leakage at temperature.
+* Coil: K1 237 ohm, 0.5 H, 5.0 V, Q1 saturated; D4 clamp as relay_drive_release.
+* Pickup and release are measured as the gate crossing the stated Q3 threshold.
+* Requirements (limits come from these, not from the results):
+*   A steady gate >= highest threshold + 0.5 V at the same temperature.
+*   B pickup (first edge to highest threshold) <= 15 ms, half the 30 ms firmware
+*     precharge; failing the 30 ms precharge itself is worse.
+*   C release: no limit of its own; existing test bound 0.2 s on the nominal figure.
+*   D one stray edge or a pin that steps and stays: peak <= lowest threshold
+*     (hot, 0.515 V) - 0.1 V = 0.415 V.
+* Where a corner fails a requirement its assertion is a bracket around what
+* the model gives, labelled FAILS in assertions.json and sim/README.md.
+* NON-CLAIMS:
+* Not measured. Simple models: a smooth-conductance Q3, fitted two-point
+* diodes, ideal capacitors with assumed derating, an ideal pin source. Relay
+* contact motion, release time and bounce are not modeled. Stacked worst cases
+* are pessimistic by construction and may be far rarer than any one part; the
+* Monte Carlo in run_montecarlo.py shows how rare. Capacitor derating and
+* the Q3 temperature coefficient are assumptions; the Samsung curve and the
+* AO3400A Vth-versus-temperature curve were not obtained.
+
+.include models/behavioral.inc
+
+* Diode models, one per corner kind, with the reverse leakage on each junction.
+* COLD: -20 C, Vf typical+20 mV, leakage typical; Vf 0.33 V @0.1 mA, 0.39 V @1 mA; IL 0.003 uA
+.model D8_COLD D(Is=1.432e-10 N=0.9475 Rs=4 Cjo=10p)
+.subckt PUMPX_COLD pin gate params: R35=560 R34=100k C22=100n C23=1u IL=1u
+R35 pin pump_in {R35}
+C22 pump_in pump_ac {C22}
+D8A 0 pump_ac D8_COLD
+BLA 0 pump_ac I={-IL*0.5*(1+tanh((v(pump_ac)-v(0))/0.05))}
+D8B pump_ac gate D8_COLD
+BLB pump_ac gate I={-IL*0.5*(1+tanh((v(gate)-v(pump_ac))/0.05))}
+C23 gate 0 {C23}
+R34 gate 0 {R34}
+.ends
+
+* ROOM: 25 C, Vf typical+20 mV, leakage typical; Vf 0.24 V @0.1 mA, 0.33 V @1 mA; IL 0.07 uA
+.model D8_ROOM D(Is=1.686e-07 N=1.451 Rs=4 Cjo=10p)
+.subckt PUMPX_ROOM pin gate params: R35=560 R34=100k C22=100n C23=1u IL=1u
+R35 pin pump_in {R35}
+C22 pump_in pump_ac {C22}
+D8A 0 pump_ac D8_ROOM
+BLA 0 pump_ac I={-IL*0.5*(1+tanh((v(pump_ac)-v(0))/0.05))}
+D8B pump_ac gate D8_ROOM
+BLB pump_ac gate I={-IL*0.5*(1+tanh((v(gate)-v(pump_ac))/0.05))}
+C23 gate 0 {C23}
+R34 gate 0 {R34}
+.ends
+
+* HOTW: 70 C, Vf typical+20 mV, leakage typical; Vf 0.17 V @0.1 mA, 0.23 V @1 mA; IL 2.5 uA
+.model D8_HOTW D(Is=9.838e-08 N=0.9475 Rs=4 Cjo=10p)
+.subckt PUMPX_HOTW pin gate params: R35=560 R34=100k C22=100n C23=1u IL=1u
+R35 pin pump_in {R35}
+C22 pump_in pump_ac {C22}
+D8A 0 pump_ac D8_HOTW
+BLA 0 pump_ac I={-IL*0.5*(1+tanh((v(pump_ac)-v(0))/0.05))}
+D8B pump_ac gate D8_HOTW
+BLB pump_ac gate I={-IL*0.5*(1+tanh((v(gate)-v(pump_ac))/0.05))}
+C23 gate 0 {C23}
+R34 gate 0 {R34}
+.ends
+
+* HOTX: 70 C, Vf typical, leakage at datasheet max scaled; Vf 0.15 V @0.1 mA, 0.21 V @1 mA; IL 15 uA
+.model D8_HOTX D(Is=2.226e-07 N=0.9475 Rs=4 Cjo=10p)
+.subckt PUMPX_HOTX pin gate params: R35=560 R34=100k C22=100n C23=1u IL=1u
+R35 pin pump_in {R35}
+C22 pump_in pump_ac {C22}
+D8A 0 pump_ac D8_HOTX
+BLA 0 pump_ac I={-IL*0.5*(1+tanh((v(pump_ac)-v(0))/0.05))}
+D8B pump_ac gate D8_HOTX
+BLB pump_ac gate I={-IL*0.5*(1+tanh((v(gate)-v(pump_ac))/0.05))}
+C23 gate 0 {C23}
+R34 gate 0 {R34}
+.ends
+
+* HOTS: 70 C, Vf typical-20 mV, leakage typical; Vf 0.13 V @0.1 mA, 0.19 V @1 mA; IL 2.5 uA
+.model D8_HOTS D(Is=5.036e-07 N=0.9475 Rs=4 Cjo=10p)
+.subckt PUMPX_HOTS pin gate params: R35=560 R34=100k C22=100n C23=1u IL=1u
+R35 pin pump_in {R35}
+C22 pump_in pump_ac {C22}
+D8A 0 pump_ac D8_HOTS
+BLA 0 pump_ac I={-IL*0.5*(1+tanh((v(pump_ac)-v(0))/0.05))}
+D8B pump_ac gate D8_HOTS
+BLB pump_ac gate I={-IL*0.5*(1+tanh((v(gate)-v(pump_ac))/0.05))}
+C23 gate 0 {C23}
+R34 gate 0 {R34}
+.ends
+
+* HOTSLL: 70 C, Vf typical-20 mV, leakage at the 25 C typical (bounding, not self-consistent); Vf 0.13 V @0.1 mA, 0.19 V @1 mA; IL 0.07 uA
+.model D8_HOTSLL D(Is=5.036e-07 N=0.9475 Rs=4 Cjo=10p)
+.subckt PUMPX_HOTSLL pin gate params: R35=560 R34=100k C22=100n C23=1u IL=1u
+R35 pin pump_in {R35}
+C22 pump_in pump_ac {C22}
+D8A 0 pump_ac D8_HOTSLL
+BLA 0 pump_ac I={-IL*0.5*(1+tanh((v(pump_ac)-v(0))/0.05))}
+D8B pump_ac gate D8_HOTSLL
+BLB pump_ac gate I={-IL*0.5*(1+tanh((v(gate)-v(pump_ac))/0.05))}
+C23 gate 0 {C23}
+R34 gate 0 {R34}
+.ends
+
+V33 v33 0 3.3
+VENV env 0 PULSE(1 0 200m 1u 1u 10 20)
+
+* ===== A: minimum steady gate voltage (weakest pump), with the coil loop =====
+* --- a_cold: diode COLD, driver 0.4/2.6 V, f=950 Hz duty=0.4, R34=99000 R35=565.6 C22=70.5n C23=0.557u
+VSQ_a_cold sq_a_cold 0 PULSE(0.4 2.6 10m 1u 1u 0.000421053 0.00105263)
+BPIN_a_cold pin_a_cold 0 V=v(sq_a_cold)*v(env)+0.4*(1-v(env))
+XP_a_cold pin_a_cold g_a_cold PUMPX_COLD params: R35=565.6 R34=99000 C22=7.05e-08 C23=5.57e-07 IL=3e-09
+CGQ_a_cold g_a_cold 0 630p
+RGQ_a_cold g_a_cold 0 26meg
+V5_a_cold v5_a_cold 0 5
+L_a_cold v5_a_cold lr_a_cold 0.5
+R_a_cold lr_a_cold ls_a_cold 237
+VCOIL_a_cold ls_a_cold lc_a_cold 0
+XCLAMP_a_cold v5_a_cold lc_a_cold ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ1_a_cold lc_a_cold lq_a_cold v33 0 ESP_SWITCH
+XQ3_a_cold lq_a_cold g_a_cold ESP_Q3 params: VT=1.585
+
+* --- a_cold_rail: diode COLD, driver 0/3 V, f=950 Hz duty=0.4, R34=99000 R35=565.6 C22=70.5n C23=0.557u
+VSQ_a_cold_rail sq_a_cold_rail 0 PULSE(0 3 10m 1u 1u 0.000421053 0.00105263)
+BPIN_a_cold_rail pin_a_cold_rail 0 V=v(sq_a_cold_rail)*v(env)+0*(1-v(env))
+XP_a_cold_rail pin_a_cold_rail g_a_cold_rail PUMPX_COLD params: R35=565.6 R34=99000 C22=7.05e-08 C23=5.57e-07 IL=3e-09
+CGQ_a_cold_rail g_a_cold_rail 0 630p
+RGQ_a_cold_rail g_a_cold_rail 0 26meg
+V5_a_cold_rail v5_a_cold_rail 0 5
+L_a_cold_rail v5_a_cold_rail lr_a_cold_rail 0.5
+R_a_cold_rail lr_a_cold_rail ls_a_cold_rail 237
+VCOIL_a_cold_rail ls_a_cold_rail lc_a_cold_rail 0
+XCLAMP_a_cold_rail v5_a_cold_rail lc_a_cold_rail ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ1_a_cold_rail lc_a_cold_rail lq_a_cold_rail v33 0 ESP_SWITCH
+XQ3_a_cold_rail lq_a_cold_rail g_a_cold_rail ESP_Q3 params: VT=1.585
+
+* --- a_cold_nopar: diode COLD, driver 0.4/2.6 V, f=950 Hz duty=0.4, R34=99000 R35=565.6 C22=70.5n C23=0.557u
+VSQ_a_cold_nopar sq_a_cold_nopar 0 PULSE(0.4 2.6 10m 1u 1u 0.000421053 0.00105263)
+BPIN_a_cold_nopar pin_a_cold_nopar 0 V=v(sq_a_cold_nopar)*v(env)+0.4*(1-v(env))
+XP_a_cold_nopar pin_a_cold_nopar g_a_cold_nopar PUMPX_COLD params: R35=565.6 R34=99000 C22=7.05e-08 C23=5.57e-07 IL=3e-09
+
+* --- a_room: diode ROOM, driver 0.4/2.6 V, f=950 Hz duty=0.4, R34=99000 R35=565.6 C22=70.5n C23=0.557u
+VSQ_a_room sq_a_room 0 PULSE(0.4 2.6 10m 1u 1u 0.000421053 0.00105263)
+BPIN_a_room pin_a_room 0 V=v(sq_a_room)*v(env)+0.4*(1-v(env))
+XP_a_room pin_a_room g_a_room PUMPX_ROOM params: R35=565.6 R34=99000 C22=7.05e-08 C23=5.57e-07 IL=7e-08
+CGQ_a_room g_a_room 0 630p
+RGQ_a_room g_a_room 0 26meg
+V5_a_room v5_a_room 0 5
+L_a_room v5_a_room lr_a_room 0.5
+R_a_room lr_a_room ls_a_room 237
+VCOIL_a_room ls_a_room lc_a_room 0
+XCLAMP_a_room v5_a_room lc_a_room ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ1_a_room lc_a_room lq_a_room v33 0 ESP_SWITCH
+XQ3_a_room lq_a_room g_a_room ESP_Q3 params: VT=1.45
+
+* --- a_hot: diode HOTW, driver 0.4/2.6 V, f=950 Hz duty=0.4, R34=99000 R35=565.6 C22=70.5n C23=0.557u
+VSQ_a_hot sq_a_hot 0 PULSE(0.4 2.6 10m 1u 1u 0.000421053 0.00105263)
+BPIN_a_hot pin_a_hot 0 V=v(sq_a_hot)*v(env)+0.4*(1-v(env))
+XP_a_hot pin_a_hot g_a_hot PUMPX_HOTW params: R35=565.6 R34=99000 C22=7.05e-08 C23=5.57e-07 IL=2.5e-06
+CGQ_a_hot g_a_hot 0 630p
+RGQ_a_hot g_a_hot 0 26meg
+V5_a_hot v5_a_hot 0 5
+L_a_hot v5_a_hot lr_a_hot 0.5
+R_a_hot lr_a_hot ls_a_hot 237
+VCOIL_a_hot ls_a_hot lc_a_hot 0
+XCLAMP_a_hot v5_a_hot lc_a_hot ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ1_a_hot lc_a_hot lq_a_hot v33 0 ESP_SWITCH
+XQ3_a_hot lq_a_hot g_a_hot ESP_Q3 params: VT=1.315
+
+* --- a_hotx: diode HOTX, driver 0.4/2.6 V, f=950 Hz duty=0.4, R34=99000 R35=565.6 C22=70.5n C23=0.557u
+VSQ_a_hotx sq_a_hotx 0 PULSE(0.4 2.6 10m 1u 1u 0.000421053 0.00105263)
+BPIN_a_hotx pin_a_hotx 0 V=v(sq_a_hotx)*v(env)+0.4*(1-v(env))
+XP_a_hotx pin_a_hotx g_a_hotx PUMPX_HOTX params: R35=565.6 R34=99000 C22=7.05e-08 C23=5.57e-07 IL=1.5e-05
+CGQ_a_hotx g_a_hotx 0 630p
+RGQ_a_hotx g_a_hotx 0 26meg
+V5_a_hotx v5_a_hotx 0 5
+L_a_hotx v5_a_hotx lr_a_hotx 0.5
+R_a_hotx lr_a_hotx ls_a_hotx 237
+VCOIL_a_hotx ls_a_hotx lc_a_hotx 0
+XCLAMP_a_hotx v5_a_hotx lc_a_hotx ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ1_a_hotx lc_a_hotx lq_a_hotx v33 0 ESP_SWITCH
+XQ3_a_hotx lq_a_hotx g_a_hotx ESP_Q3 params: VT=1.315
+
+* ===== B: longest pickup (weak pump, large C23) to the highest threshold =====
+* --- b_room: diode ROOM, driver 0.4/2.6 V, f=950 Hz duty=0.6, R34=99000 R35=565.6 C22=70.5n C23=1.265u
+VSQ_b_room sq_b_room 0 PULSE(0.4 2.6 10m 1u 1u 0.000631579 0.00105263)
+BPIN_b_room pin_b_room 0 V=v(sq_b_room)*v(env)+0.4*(1-v(env))
+XP_b_room pin_b_room g_b_room PUMPX_ROOM params: R35=565.6 R34=99000 C22=7.05e-08 C23=1.265e-06 IL=7e-08
+CGQ_b_room g_b_room 0 630p
+RGQ_b_room g_b_room 0 26meg
+
+* --- b_hot: diode HOTW, driver 0.4/2.6 V, f=950 Hz duty=0.6, R34=99000 R35=565.6 C22=70.5n C23=1.265u
+VSQ_b_hot sq_b_hot 0 PULSE(0.4 2.6 10m 1u 1u 0.000631579 0.00105263)
+BPIN_b_hot pin_b_hot 0 V=v(sq_b_hot)*v(env)+0.4*(1-v(env))
+XP_b_hot pin_b_hot g_b_hot PUMPX_HOTW params: R35=565.6 R34=99000 C22=7.05e-08 C23=1.265e-06 IL=2.5e-06
+CGQ_b_hot g_b_hot 0 630p
+RGQ_b_hot g_b_hot 0 26meg
+
+* --- b_hotx: diode HOTX, driver 0.4/2.6 V, f=950 Hz duty=0.6, R34=99000 R35=565.6 C22=70.5n C23=1.265u
+VSQ_b_hotx sq_b_hotx 0 PULSE(0.4 2.6 10m 1u 1u 0.000631579 0.00105263)
+BPIN_b_hotx pin_b_hotx 0 V=v(sq_b_hotx)*v(env)+0.4*(1-v(env))
+XP_b_hotx pin_b_hotx g_b_hotx PUMPX_HOTX params: R35=565.6 R34=99000 C22=7.05e-08 C23=1.265e-06 IL=1.5e-05
+CGQ_b_hotx g_b_hotx 0 630p
+RGQ_b_hotx g_b_hotx 0 26meg
+
+* ===== C: longest release after the pulses stop (strong pump, large C23/R34) =====
+* --- c_low: diode HOTS, driver 0/3.6 V, f=1050 Hz duty=0.6, R34=101000 R35=554.4 C22=126.5n C23=1.265u
+VSQ_c_low sq_c_low 0 PULSE(0 3.6 10m 1u 1u 0.000571429 0.000952381)
+BPIN_c_low pin_c_low 0 V=v(sq_c_low)*v(env)+0*(1-v(env))
+XP_c_low pin_c_low g_c_low PUMPX_HOTS params: R35=554.4 R34=101000 C22=1.265e-07 C23=1.265e-06 IL=2.5e-06
+CGQ_c_low g_c_low 0 630p
+RGQ_c_low g_c_low 0 26meg
+
+* --- c_high: diode HOTS, driver 0/3.6 V, f=1050 Hz duty=0.4, R34=101000 R35=554.4 C22=126.5n C23=1.265u
+VSQ_c_high sq_c_high 0 PULSE(0 3.6 10m 1u 1u 0.000380952 0.000952381)
+BPIN_c_high pin_c_high 0 V=v(sq_c_high)*v(env)+3.6*(1-v(env))
+XP_c_high pin_c_high g_c_high PUMPX_HOTS params: R35=554.4 R34=101000 C22=1.265e-07 C23=1.265e-06 IL=2.5e-06
+CGQ_c_high g_c_high 0 630p
+RGQ_c_high g_c_high 0 26meg
+
+* --- c_ll_low: diode HOTSLL, driver 0/3.6 V, f=1050 Hz duty=0.6, R34=101000 R35=554.4 C22=126.5n C23=1.265u
+VSQ_c_ll_low sq_c_ll_low 0 PULSE(0 3.6 10m 1u 1u 0.000571429 0.000952381)
+BPIN_c_ll_low pin_c_ll_low 0 V=v(sq_c_ll_low)*v(env)+0*(1-v(env))
+XP_c_ll_low pin_c_ll_low g_c_ll_low PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=1.265e-06 IL=7e-08
+CGQ_c_ll_low g_c_ll_low 0 630p
+RGQ_c_ll_low g_c_ll_low 0 26meg
+V5_c_ll_low v5_c_ll_low 0 5
+L_c_ll_low v5_c_ll_low lr_c_ll_low 0.5
+R_c_ll_low lr_c_ll_low ls_c_ll_low 237
+VCOIL_c_ll_low ls_c_ll_low lc_c_ll_low 0
+XCLAMP_c_ll_low v5_c_ll_low lc_c_ll_low ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ1_c_ll_low lc_c_ll_low lq_c_ll_low v33 0 ESP_SWITCH
+XQ3_c_ll_low lq_c_ll_low g_c_ll_low ESP_Q3 params: VT=0.515
+
+* --- c_ll_high: diode HOTSLL, driver 0/3.6 V, f=1050 Hz duty=0.4, R34=101000 R35=554.4 C22=126.5n C23=1.265u
+VSQ_c_ll_high sq_c_ll_high 0 PULSE(0 3.6 10m 1u 1u 0.000380952 0.000952381)
+BPIN_c_ll_high pin_c_ll_high 0 V=v(sq_c_ll_high)*v(env)+3.6*(1-v(env))
+XP_c_ll_high pin_c_ll_high g_c_ll_high PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=1.265e-06 IL=7e-08
+CGQ_c_ll_high g_c_ll_high 0 630p
+RGQ_c_ll_high g_c_ll_high 0 26meg
+
+* ===== D: false turn-on: n consecutive edges at 1.05 kHz from rest, then the pin stays =====
+VE_d_e1 pin_d_e1 0 PWL(0 0 9.999m 0 0.01 0 0.010001 3.6)
+XP_d_e1 pin_d_e1 g_d_e1 PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=7.42e-07 IL=7e-08
+CGQ_d_e1 g_d_e1 0 630p
+RGQ_d_e1 g_d_e1 0 26meg
+
+VE_d_e2 pin_d_e2 0 PWL(0 0 9.999m 0 0.01 0 0.010001 3.6 0.0104762 3.6 0.0104772 0)
+XP_d_e2 pin_d_e2 g_d_e2 PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=7.42e-07 IL=7e-08
+CGQ_d_e2 g_d_e2 0 630p
+RGQ_d_e2 g_d_e2 0 26meg
+
+VE_d_e3 pin_d_e3 0 PWL(0 0 9.999m 0 0.01 0 0.010001 3.6 0.0104762 3.6 0.0104772 0 0.0109524 0 0.0109534 3.6)
+XP_d_e3 pin_d_e3 g_d_e3 PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=7.42e-07 IL=7e-08
+CGQ_d_e3 g_d_e3 0 630p
+RGQ_d_e3 g_d_e3 0 26meg
+
+VE_d_e4 pin_d_e4 0 PWL(0 0 9.999m 0 0.01 0 0.010001 3.6 0.0104762 3.6 0.0104772 0 0.0109524 0 0.0109534 3.6 0.0114286 3.6 0.0114296 0)
+XP_d_e4 pin_d_e4 g_d_e4 PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=7.42e-07 IL=7e-08
+CGQ_d_e4 g_d_e4 0 630p
+RGQ_d_e4 g_d_e4 0 26meg
+
+VE_d_e5 pin_d_e5 0 PWL(0 0 9.999m 0 0.01 0 0.010001 3.6 0.0104762 3.6 0.0104772 0 0.0109524 0 0.0109534 3.6 0.0114286 3.6 0.0114296 0 0.0119048 0 0.0119058 3.6)
+XP_d_e5 pin_d_e5 g_d_e5 PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=7.42e-07 IL=7e-08
+CGQ_d_e5 g_d_e5 0 630p
+RGQ_d_e5 g_d_e5 0 26meg
+
+VE_d_e6 pin_d_e6 0 PWL(0 0 9.999m 0 0.01 0 0.010001 3.6 0.0104762 3.6 0.0104772 0 0.0109524 0 0.0109534 3.6 0.0114286 3.6 0.0114296 0 0.0119048 0 0.0119058 3.6 0.012381 3.6 0.012382 0)
+XP_d_e6 pin_d_e6 g_d_e6 PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=7.42e-07 IL=7e-08
+CGQ_d_e6 g_d_e6 0 630p
+RGQ_d_e6 g_d_e6 0 26meg
+
+VE_d_e8 pin_d_e8 0 PWL(0 0 9.999m 0 0.01 0 0.010001 3.6 0.0104762 3.6 0.0104772 0 0.0109524 0 0.0109534 3.6 0.0114286 3.6 0.0114296 0 0.0119048 0 0.0119058 3.6 0.012381 3.6 0.012382 0 0.0128571 0 0.0128581 3.6 0.0133333 3.6 0.0133343 0)
+XP_d_e8 pin_d_e8 g_d_e8 PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=7.42e-07 IL=7e-08
+CGQ_d_e8 g_d_e8 0 630p
+RGQ_d_e8 g_d_e8 0 26meg
+
+VE_d_e10 pin_d_e10 0 PWL(0 0 9.999m 0 0.01 0 0.010001 3.6 0.0104762 3.6 0.0104772 0 0.0109524 0 0.0109534 3.6 0.0114286 3.6 0.0114296 0 0.0119048 0 0.0119058 3.6 0.012381 3.6 0.012382 0 0.0128571 0 0.0128581 3.6 0.0133333 3.6 0.0133343 0 0.0138095 0 0.0138105 3.6 0.0142857 3.6 0.0142867 0)
+XP_d_e10 pin_d_e10 g_d_e10 PUMPX_HOTSLL params: R35=554.4 R34=101000 C22=1.265e-07 C23=7.42e-07 IL=7e-08
+CGQ_d_e10 g_d_e10 0 630p
+RGQ_d_e10 g_d_e10 0 26meg
+
+* A pin that toggles once every 10 ms forever (a 50 Hz square wave).
+VE_d_per pin_d_per 0 PULSE(0 3.6 10m 1u 1u 10m 20m)
+XP_d_per pin_d_per g_d_per PUMPX_HOTSLL params: R35=554.4 R34=101k C22=126.5n C23=0.742u IL=0.07u
+CGQ_d_per g_d_per 0 630p
+RGQ_d_per g_d_per 0 26meg
+
+.tran 2u 470m 0 5u
+
+.meas tran a_cold_gate_min_v MIN v(g_a_cold) FROM=0.18 TO=0.2
+.meas tran a_cold_coil_current_a AVG i(VCOIL_a_cold) FROM=0.18 TO=0.2
+.meas tran a_room_gate_min_v MIN v(g_a_room) FROM=0.18 TO=0.2
+.meas tran a_room_coil_current_a AVG i(VCOIL_a_room) FROM=0.18 TO=0.2
+.meas tran a_hot_gate_min_v MIN v(g_a_hot) FROM=0.18 TO=0.2
+.meas tran a_hot_coil_current_a AVG i(VCOIL_a_hot) FROM=0.18 TO=0.2
+.meas tran a_hotx_gate_min_v MIN v(g_a_hotx) FROM=0.18 TO=0.2
+.meas tran a_hotx_coil_current_a AVG i(VCOIL_a_hotx) FROM=0.18 TO=0.2
+.meas tran a_cold_gate_peak_v MAX v(g_a_cold) FROM=0 TO=0.2
+.meas tran a_cold_rail_gate_min_v MIN v(g_a_cold_rail) FROM=0.18 TO=0.2
+.meas tran a_cold_rail_coil_current_a AVG i(VCOIL_a_cold_rail) FROM=0.18 TO=0.2
+.meas tran a_cold_nopar_gate_min_v MIN v(g_a_cold_nopar) FROM=0.18 TO=0.2
+.meas tran b_room_pickup_s TRIG v(sq_b_room) VAL=1.5 RISE=1 TARG v(g_b_room) VAL=1.45 RISE=1
+.meas tran b_room_gate_at_30ms_v FIND v(g_b_room) AT=0.04
+.meas tran b_hot_pickup_s TRIG v(sq_b_hot) VAL=1.5 RISE=1 TARG v(g_b_hot) VAL=1.315 RISE=1
+.meas tran b_hot_gate_at_30ms_v FIND v(g_b_hot) AT=0.04
+.meas tran b_hotx_pickup_s TRIG v(sq_b_hotx) VAL=1.5 RISE=1 TARG v(g_b_hotx) VAL=1.315 RISE=1
+.meas tran b_hotx_gate_at_30ms_v FIND v(g_b_hotx) AT=0.04
+.meas tran c_low_release_s TRIG v(env) VAL=0.5 TD=0.199 FALL=1 TARG v(g_c_low) VAL=0.515 TD=0.199 FALL=1
+.meas tran c_high_release_s TRIG v(env) VAL=0.5 TD=0.199 FALL=1 TARG v(g_c_high) VAL=0.515 TD=0.199 FALL=1
+.meas tran c_ll_low_release_s TRIG v(env) VAL=0.5 TD=0.199 FALL=1 TARG v(g_c_ll_low) VAL=0.515 TD=0.199 FALL=1
+.meas tran c_ll_high_release_s TRIG v(env) VAL=0.5 TD=0.199 FALL=1 TARG v(g_c_ll_high) VAL=0.515 TD=0.199 FALL=1
+.meas tran c_ll_low_coil_off_s TRIG v(env) VAL=0.5 TD=0.199 FALL=1 TARG i(VCOIL_c_ll_low) VAL=0.0021 TD=0.199 FALL=1
+.meas tran c_ll_low_coil_current_a AVG i(VCOIL_c_ll_low) FROM=0.18 TO=0.2
+.meas tran d_e1_peak_v MAX v(g_d_e1) FROM=0 TO=0.06
+.meas tran d_e2_peak_v MAX v(g_d_e2) FROM=0 TO=0.06
+.meas tran d_e3_peak_v MAX v(g_d_e3) FROM=0 TO=0.06
+.meas tran d_e4_peak_v MAX v(g_d_e4) FROM=0 TO=0.06
+.meas tran d_e5_peak_v MAX v(g_d_e5) FROM=0 TO=0.06
+.meas tran d_e6_peak_v MAX v(g_d_e6) FROM=0 TO=0.06
+.meas tran d_e8_peak_v MAX v(g_d_e8) FROM=0 TO=0.06
+.meas tran d_e10_peak_v MAX v(g_d_e10) FROM=0 TO=0.06
+.meas tran d_e1_final_v AVG v(g_d_e1) FROM=0.45 TO=0.46
+.meas tran a_cold_parasitic_delta_v PARAM='a_cold_nopar_gate_min_v-a_cold_gate_min_v'
+.meas tran c_low_hang_to_off_s PARAM='c_low_release_s+0.02'
+.meas tran c_high_hang_to_off_s PARAM='c_high_release_s+0.02'
+.meas tran c_ll_low_hang_to_off_s PARAM='c_ll_low_release_s+0.02'
+.meas tran c_ll_high_hang_to_off_s PARAM='c_ll_high_release_s+0.02'
+.meas tran d_e1_margin_to_vt_lo_v PARAM='0.515-d_e1_peak_v'
+.meas tran d_periodic_peak_v MAX v(g_d_per) FROM=0 TO=0.47
+
+.end

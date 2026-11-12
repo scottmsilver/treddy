@@ -13,7 +13,7 @@ advance. It does not authorize an order or payment.
 | USB route and antenna-band keepout | PASS | PCB semantic tests; inner/bottom layers forbid tracks, vias and fills, the front layer forbids fills and vias and allows the U1 pad fan-out stubs |
 | BOM/CPL/DNP/placement parity | PASS | exporter assembly audit |
 | Exact deterministic fabrication package | PASS | 13-member export and reproduction gate |
-| Dual-engine behavioral simulations | PASS within declared models | nine decks, three repeats, two ngspice majors; one deck (`harness_supply_drop`) is a retired historical model |
+| Dual-engine behavioral simulations | PASS within declared models | twelve decks, three repeats, two ngspice majors; one deck (`harness_supply_drop`) is a retired historical model |
 | Enclosure source/mesh/fit checks | PASS geometrically | pinned render and functional probes |
 | Host firmware safety contract | PASS as reference only | safety model and manifest-builder tests; does not implement `RELAY_PULSE` |
 | Recent exact-page part identity/stock | PASS at snapshot time | BOM-bound sanitized snapshot, refreshed 2026-11-12: all 46 distinct parts listed in stock; C585890 (the RJ45 jack, 2 per board) is the thinnest at 64 units |

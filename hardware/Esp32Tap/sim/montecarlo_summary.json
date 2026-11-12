@@ -1,0 +1,60 @@
+{
+  "distributions": "uniform across each tolerance band; diode leakage multiplier log-uniform 1..10 on the typical value; see decks/liveness_corners.cir",
+  "figures": {
+    "pickup_s": {
+      "count_missing": 0,
+      "max": 0.01753901,
+      "median": 0.005026546,
+      "min": 0.001231903,
+      "p01": 0.00196066,
+      "p99": 0.012954129
+    },
+    "release_s_worst_of_held_low_and_high": {
+      "count_missing": 0,
+      "max": 0.1767462,
+      "median": 0.07143643,
+      "min": 0.01470466,
+      "p01": 0.02479013,
+      "p99": 0.151516219
+    },
+    "single_edge_peak_v": {
+      "count_missing": 0,
+      "max": 0.4660814,
+      "median": 0.26115265,
+      "min": 0.1144498,
+      "p01": 0.140910648,
+      "p99": 0.444606636
+    },
+    "steady_gate_min_v": {
+      "count_missing": 0,
+      "max": 2.864972,
+      "median": 2.311092,
+      "min": 1.687785,
+      "p01": 1.8627989,
+      "p99": 2.71936913
+    }
+  },
+  "n": 300,
+  "requirement_violations": {
+    "A_steady_gate_below_fixed_2p085v_(1.585V_cold_max_threshold_+0.5V)": 60,
+    "A_steady_gate_below_that_draws_own_vt": 0,
+    "A_steady_gate_below_vt_plus_0p5v_of_that_draw": 4,
+    "B_pickup_over_15ms": 2,
+    "B_pickup_over_30ms_firmware_precharge": 0,
+    "C_release_over_0p2s": 0,
+    "C_release_plus_20ms_over_0p2s": 0,
+    "D_single_edge_peak_above_that_draws_vt": 0,
+    "D_single_edge_peak_within_0p1v_of_that_draws_vt": 0
+  },
+  "requirements": {
+    "A": "steady gate >= that draw's Q3 threshold + 0.5 V (model full-on point); also counted against the fixed 2.085 V",
+    "B": "pickup <= 15 ms (half the firmware's 30 ms precharge); 30 ms also counted",
+    "C": "no formal requirement; counted against the existing 0.2 s test bound, with and without the firmware's 20 ms",
+    "D": "single-edge peak <= that draw's Q3 threshold - 0.1 V; also counted against the threshold itself"
+  },
+  "seed": 20260712,
+  "temperature_range_c": [
+    -20.0,
+    70.0
+  ]
+}

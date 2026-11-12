@@ -1282,6 +1282,41 @@ NC = [
 
 DNP = {"C13", "C14"}
 
+# JLCPCB placement-file conventions (bom/CPL-positions.csv).
+#
+# Position: JLC overlays the placement file on the Gerbers, so a placement
+# must be in Gerber coordinates. The Gerbers are plotted with KiCad's absolute
+# origin, which makes that (x, -y) of the KiCad position. A file measured from
+# the board corner makes JLC's tool report every part "offset from the PCB".
+#
+# Rotation: JLC's part models do not all share KiCad's zero orientation, so
+# some parts need a fixed correction added to the KiCad angle (degrees,
+# counter-clockwise). These are per JLC part, keyed by LCSC number, and were
+# read off JLC's own placement preview on 2026-11-12: with them applied, JLC's
+# pin-1 marker sits on footprint pad 1 for every part listed, and without them
+# it does not. A part not listed needs no correction. Re-check the preview
+# after changing any part number here: the correction belongs to the part.
+JLC_ROTATION_OFFSET_DEG = {
+    "C191884": 270,  # U2 TPS54202DDCR, SOT-23-6
+    "C7519": 270,  # U3 USBLC6-2SC6, SOT-23-6
+    "C33002": 270,  # U4 TPS3700DDCR, SOT-23-6
+    "C352973": 270,  # U6 SN74LVC2G08DCTR, SSOP-8
+    "C47190": 270,  # K1 G6K-2F-Y-TR DC5
+    "C96028": 180,  # U5 TPS70950DBVR, SOT-23-5
+    "C7834": 180,  # U7 SN74LVC1G126DBVR, SOT-23-5
+    "C52801": 180,  # Q1 BC817-40, SOT-23
+    "C8545": 180,  # Q2 2N7002, SOT-23
+    "C20917": 180,  # Q3 AO3400A, SOT-23
+    "C47546": 180,  # D8 BAT54S, SOT-23
+}
+
+
+def jlc_cpl_placement(lcsc, x_mm, y_mm, rotation_deg):
+    """KiCad footprint position and angle -> JLC placement-file values."""
+    offset = JLC_ROTATION_OFFSET_DEG.get(lcsc, 0)
+    return x_mm, -y_mm, (rotation_deg + offset) % 360.0
+
+
 # KiCad-compatible symbol electrical types for every physical pad.  Most
 # discrete parts and connector contacts are passive; the overrides preserve
 # the active directions that matter to ERC and to the fail-safe architecture.

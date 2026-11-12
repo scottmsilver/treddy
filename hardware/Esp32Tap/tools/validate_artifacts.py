@@ -281,17 +281,21 @@ def validate_assembly(board: dict[str, Any]) -> None:
 
     with cpl_path.open(newline="", encoding="utf-8") as handle:
         cpl_rows = {row["Designator"]: row for row in csv.DictReader(handle)}
-    min_x = board["outline"]["min"][0]
-    max_y = board["outline"]["max"][1]
     for reference in expected:
         footprint = board["footprints"][reference]
         row = cpl_rows[reference]
         x = float(row["Mid X"].removesuffix("mm"))
         y = float(row["Mid Y"].removesuffix("mm"))
-        require(near(x, footprint["at"][0] - min_x, 0.01), f"{reference} CPL X differs")
-        require(near(y, max_y - footprint["at"][1], 0.01), f"{reference} CPL Y differs")
+        want_x, want_y, want_rotation = design.jlc_cpl_placement(
+            design.COMPONENTS[reference][3],
+            footprint["at"][0],
+            footprint["at"][1],
+            footprint["rotation_deg"],
+        )
+        require(near(x, want_x, 0.01), f"{reference} CPL X differs")
+        require(near(y, want_y, 0.01), f"{reference} CPL Y differs")
         require(
-            near(float(row["Rotation"]), footprint["rotation_deg"], 0.01),
+            near((float(row["Rotation"]) - want_rotation + 180.0) % 360.0 - 180.0, 0.0, 0.01),
             f"{reference} CPL rotation differs",
         )
         require(row["Layer"] == "Top", f"{reference} CPL layer is not Top")

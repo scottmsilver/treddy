@@ -183,9 +183,9 @@ Every physical connection is listed as `reference.pad (pin-name)`.
 * **Treadmill permission:** U4 monitors protected VIN and its open-drain
   outputs form TREAD_OK. U6 requires TREAD_OK for both RELAY_GATE and
   TX_GATE, so firmware commands alone cannot enable either path.
-  R33 (1M, TREAD_OK to UV_SENSE) adds about 0.45 V of VIN-referred undervoltage
-  hysteresis (calculated, not measured); nominal UV is about 6.31 V falling and
-  about 6.85 V rising.
+  R33 (1M, TREAD_OK to UV_SENSE) adds about 0.5 V of VIN-referred undervoltage
+  hysteresis (calculated and simulated, not measured); nominal UV is about 5.9 V falling and
+  about 6.4 V rising.
 * **TREAD_OK/IO6 isolation:** R32 is a series resistor between TREAD_OK and TREAD_OK_MCU (U1 IO6 only), so a misconfigured push-pull GPIO cannot force the interlock high or contend with U4's open-drain output; U4/U6/R21/R22/TP7 stay directly on TREAD_OK (review finding B2).
 * **Relay control:** U5 enables the +5V_RLY coil supply and Q1 enables
   the low side. These are series hardware controls driven by RELAY_GATE;

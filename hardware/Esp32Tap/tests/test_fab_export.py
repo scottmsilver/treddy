@@ -1341,8 +1341,8 @@ def _assembly_fixture() -> dict[str, Any]:
                 "Designator": "U1",
                 "Val": "PART-A",
                 "Package": "Footprint_A",
-                "Mid X": "10.000mm",
-                "Mid Y": "35.000mm",
+                "Mid X": "110.000mm",
+                "Mid Y": "-120.000mm",
                 "Rotation": "-90",
                 "Layer": "Top",
             }
@@ -1354,6 +1354,21 @@ def test_assembly_parity_accepts_only_populated_exact_mappings(
     fab_tool: SimpleNamespace,
 ) -> None:
     fab_tool.validate_assembly_records(**_assembly_fixture())
+
+
+def test_assembly_parity_requires_the_jlc_rotation_offset_of_the_part(
+    fab_tool: SimpleNamespace,
+) -> None:
+    fixture = _assembly_fixture()
+    row = fixture["cpl_rows"][0]
+    lcsc = fixture["components"][row["Designator"]][3]
+    offsets = {lcsc: 180}
+
+    with pytest.raises(fab_tool.FabExportError, match="Rotation differs"):
+        fab_tool.validate_assembly_records(**fixture, rotation_offsets=offsets)
+
+    row["Rotation"] = str((int(row["Rotation"]) + 180) % 360)
+    fab_tool.validate_assembly_records(**fixture, rotation_offsets=offsets)
 
 
 @pytest.mark.parametrize(
@@ -1404,7 +1419,7 @@ def test_assembly_parity_fails_closed(
     elif mutation == "missing-board-ref":
         fixture["board"]["footprints"].pop("U1")
     elif mutation == "wrong-cpl-position":
-        fixture["cpl_rows"][0]["Mid X"] = "10.100mm"
+        fixture["cpl_rows"][0]["Mid X"] = "110.100mm"
     elif mutation == "wrong-cpl-rotation":
         fixture["cpl_rows"][0]["Rotation"] = "0"
     elif mutation == "fractional-board-rotation":

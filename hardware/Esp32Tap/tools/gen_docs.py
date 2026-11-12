@@ -103,9 +103,9 @@ def render_netlist() -> str:
             "* **Treadmill permission:** U4 monitors protected VIN and its " "open-drain",
             "  outputs form TREAD_OK. U6 requires TREAD_OK for both " "RELAY_GATE and",
             "  TX_GATE, so firmware commands alone cannot enable either " "path.",
-            "  R33 (1M, TREAD_OK to UV_SENSE) adds about 0.45 V of VIN-referred " "undervoltage",
-            "  hysteresis (calculated, not measured); nominal UV is about 6.31 V " "falling and",
-            "  about 6.85 V rising.",
+            "  R33 (1M, TREAD_OK to UV_SENSE) adds about 0.5 V of VIN-referred " "undervoltage",
+            "  hysteresis (calculated and simulated, not measured); nominal UV is about 5.9 V " "falling and",
+            "  about 6.4 V rising.",
             "* **TREAD_OK/IO6 isolation:** R32 is a series resistor between "
             "TREAD_OK and TREAD_OK_MCU (U1 IO6 only), so a misconfigured "
             "push-pull GPIO cannot force the interlock high or contend "
@@ -262,8 +262,6 @@ def load_cpl_context(root: Path) -> tuple[Any, list[Any]]:
 def render_cpl(pcbnew: Any, footprints: list[Any]) -> str:
     """Render the CPL from a preflighted board without writing it."""
     output = io.StringIO(newline="")
-    auxiliary_origin_x = 100.0
-    auxiliary_origin_y = 155.0
     writer = csv.writer(output, lineterminator="\n")
     writer.writerow(
         [
@@ -288,9 +286,12 @@ def render_cpl(pcbnew: Any, footprints: list[Any]) -> str:
         ):
             continue
         position = footprint.GetPosition()
-        x_position = pcbnew.ToMM(position.x) - auxiliary_origin_x
-        y_position = auxiliary_origin_y - pcbnew.ToMM(position.y)
-        rotation = footprint.GetOrientationDegrees() % 360.0
+        x_position, y_position, rotation = design.jlc_cpl_placement(
+            component[3],
+            pcbnew.ToMM(position.x),
+            pcbnew.ToMM(position.y),
+            footprint.GetOrientationDegrees(),
+        )
         writer.writerow(
             [
                 reference,

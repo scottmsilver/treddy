@@ -67,8 +67,56 @@ Plating, ENIG, minimum via 0.2 mm (0.3/0.35 mm), Standard PCBA top side, and
 Edge Rails/Fiducials Added by JLCPCB (the tool reported 95 x 70 mm with rails).
 Bare-board total USD 83.98 for 5: base 8.00, via covering 17.37, via plating
 3.39, ENIG 17.40, 0.2 mm via 17.37, 4-wire Kelvin test 16.98, material 3.47.
-The BOM/CPL step requires a login and was not done. Nothing was added to a
-cart. Re-check the price in the tool at the time of any real order.
+Nothing was added to a cart. Re-check the price in the tool at the time of
+any real order.
+
+The assembly steps were then run signed in, with `bom/BOM.csv` and the
+corrected `bom/CPL-positions.csv`:
+
+- JLC confirmed 82 of 82 BOM lines. It left J1, J2 (C585890) and U1
+  (C2913198) as "No Part Selected" on every upload even though the BOM names
+  them; selecting each by its LCSC number in JLC's part search fixes it. The
+  cause on JLC's side is unknown.
+- Standard PCBA for 5 boards: USD 186.17 (setup 25.75, stencil 8.27,
+  components 76.50, feeder loading for Extended parts 71.30, SMT assembly
+  3.84, packaging 0.51). No hand-soldering or manual-assembly charge.
+- Total for 5 assembled boards before shipping and tax: **USD 270.15**
+  (83.98 board + 186.17 assembly), about USD 54 per board.
+- JLC's price for the RJ45 jack at this quantity is USD 1.53 each, not the
+  0.35 in `design.py`; the BOM cost column is a catalog estimate, the quote
+  is the price.
+
+Two defects in the placement file were found in JLC's preview and fixed at
+the source (`design.jlc_cpl_placement`):
+
+- **Coordinates.** The file was measured from the board corner while the
+  Gerbers use KiCad's absolute origin, so JLC drew every part off the board
+  and offered to "automatically align" them. Placements are now in Gerber
+  coordinates (x, -y) and JLC shows no offset warning.
+- **Rotations.** JLC's models for 11 parts are turned 90 or 180 degrees from
+  KiCad's zero (K1, U2-U7, Q1-Q3, D8). `design.JLC_ROTATION_OFFSET_DEG`
+  carries a per-part correction. With it, JLC's pin-1 marker sits on pad 1
+  for K1, U1-U7, Q1-Q3, D8, J1 and J2, and JLC's cathode mark is on pad 1 of
+  D1 and D3 (checked by `tools/jlc_rotation_check.py`); LED1, LED2 and J3
+  were checked by eye in the same preview.
+
+This is JLC's preview, which JLC itself labels "for reference only". It is
+not their production DFM result and not a built board.
+
+### Repeating the quote
+
+`tools/jlc_quote.py` drives the same pages unattended and stops at the price.
+It cannot save to the cart, order or pay. It needs a Python with `camoufox`
+and a signed-in browser profile (`jlc_quote.py login`, once, by hand; the
+tool never handles the password).
+
+```bash
+<camoufox python> tools/jlc_quote.py quote --out /tmp/jlc   # quote.json, quote.png, tile*.png
+python3 tools/jlc_rotation_check.py /tmp/jlc                 # pin-1 verdict per part
+```
+
+Run both after any change to the BOM, a part number, a footprint or a
+placement, and whenever `JLC_ROTATION_OFFSET_DEG` is touched.
 
 ## Order options to select (upload procedure)
 
@@ -102,11 +150,12 @@ authorization to order. Do not pay on the strength of any preview.
    is not a vendor result; a built board still has to confirm supply polarity
    and the pin-3/pin-6 taps.
 6. **Check every rotation in the preview.** `bom/CPL-positions.csv` carries
-   raw KiCad angles with no JLC correction table. Compare pin 1 / polarity /
-   orientation of each of these in JLC's placement preview against
-   `kicad/Esp32Tap.kicad_pcb`: D1, D3, D8, LED1, LED2, Q1, Q2, Q3, U1-U7, K1,
-   J1-J3, SW1, SW2. Any mismatch stops the review and returns to
-   source/regeneration; do not edit the CPL by hand. bd `precor-9_3x-f5y`.
+   KiCad angles plus the per-part corrections in
+   `design.JLC_ROTATION_OFFSET_DEG`, verified against JLC's preview on
+   2026-11-12 (see above). Re-run `tools/jlc_rotation_check.py` on a fresh
+   quote before ordering, and look at LED1, LED2, J3, SW1 and SW2 yourself:
+   JLC draws no machine-readable mark for those. Any mismatch returns to
+   `design.py` and regeneration; do not edit the CPL by hand.
 7. **Stack and impedance.** Select the 4-layer `JLC04161H-7628` stack with
    controlled impedance for USB; confirm 20 µm Class 2 hole copper.
 

@@ -1,7 +1,7 @@
 # Esp32Tap Rev E behavioral simulations
 
-These nine ngspice decks are behavioral regression evidence for the Rev E
-circuits. Eight model Rev E parts. The ninth, `harness_supply_drop`, models a
+These twelve ngspice decks are behavioral regression evidence for the Rev E
+circuits. Eleven model Rev E parts. The twelfth, `harness_supply_drop`, models a
 Micro-Fit pigtail harness that Rev E no longer has; it is kept as historical
 regression evidence only and supports no Rev E claim. None of the decks is a
 product certification, and none replaces production-hardware measurements.
@@ -45,7 +45,10 @@ Fresh runs on 2026-11-11 produced the same declared values on ngspice 42 and
 | `tread_permission` | UV rising corners = 6.224–6.600 V; OV rising corners = 10.300–10.928 V; supervisor startup = 448.9 µs; an intentionally early +3V3 rail waits 364.0 µs; loaded U5 reaches 95% in 1.501 ms; OV disable including the 18 µs propagation corner = 36.1 µs; modeled C16/U5 disable tail to 0.5 V = 2.55 ms |
 | `safety_truth_table` | all 16 `(+3V3, TREAD_OK, RELAY_CMD, TX_ENABLE)` rows match `RELAY_GATE = rail AND TREAD_OK AND RELAY_CMD` and `TX_GATE = rail AND TREAD_OK AND TX_ENABLE`; both default LOW. A second 16-row table over `(+3V3, TREAD_OK, RELAY_CMD, PULSE_ALIVE)` gives K1 drive HIGH only in the all-ones row. Fault cases: U6 `RELAY_GATE` stuck high with no pulses, and Q1 shorted with no pulses, both leave K1 drive LOW; Q1 shorted with `RELAY_GATE` low also leaves it LOW. `PULSE_ALIVE` is a behavioral boolean in this deck |
 | `relay_drive_release` | 18.79–23.90 mA nominal-corner coil current; approved R9=560 Ω with conservative 2.3 V drive / 1.2 V VBE and resistor tolerances leaves 1.82 mA base current, 4.20 V across the worst-resistance coil, and forced β = 8.83; SMAJ decay to 2 mA = 0.184/0.864/1.628 ms for 0.1/0.5/1 H; Q1 peak = 12.27 V. Q3 liveness switch (simulated charge pump, 1 kHz square wave): gate 2.63 V steady; coil pickup 4.6 ms (0.65 V Q3 threshold) to 9.6 ms (1.45 V); release after the pulses stop held low 60 ms (1.45 V) to 140 ms (0.65 V), 156 ms if held high; one stray 3.3 V edge moves the gate 0.281 V peak, below the 0.65 V minimum threshold; a pin stepped high and held leaves 6.5 mV after 440 ms; a pin held low leaves the gate at 0; Q1 shorted with no pulses leaves 5 nA coil current |
-| `liveness_firmware_trace` | The pin waveform comes from the firmware's real pulse-permission code, not an ideal source. Entry: the firmware waits 30.1 ms before commanding K1, by when the gate is at 2.51 V (worst Q3 threshold 1.45 V); coil pickup current 2.5 ms after the command. Safety loop hung while the timer keeps running: coil released 80 ms (1.45 V threshold) to 161 ms (0.65 V) after the last loop pass. Permission withdrawn: 60 to 141 ms. Timer held off 9 ms in every 100 ms: gate never below 2.42 V, coil holds. One tick every 10 ms, which the firmware still counts as unbroken: gate peaks at 1.10 V, below the worst threshold |
+| `liveness_firmware_trace` | The pin waveform comes from the firmware's real pulse-permission code, not an ideal source. Entry: the firmware waits 30.1 ms before commanding K1, by when the gate is at 2.51 V (worst Q3 threshold 1.45 V); coil pickup current 2.5 ms after the command. Safety loop hung while the timer keeps running: coil released 80 ms (1.45 V threshold) to 161 ms (0.65 V) after the last loop pass. Permission withdrawn: 60 to 141 ms. Timer held off 9 ms in every 100 ms: gate never below 2.42 V, coil holds. Loop and timer both stalled as during a flash erase: 45 ms leaves 1.74 V and the coil holds; 100 ms leaves 1.06 V and a 1.45 V-threshold Q3 drops the coil; 400 ms leaves 0.07 V and every part drops. One tick every 10 ms, which the firmware still counts as unbroken: gate peaks at 1.10 V, below the worst threshold |
+| `hotplug_ringing` | 44 flat branches plug an ideal 8 V or assumed-9 V step through 0.5/2/5 uH loop inductance and 0.1/0.5 ohm source+cable resistance into F1 (0.11 ohm), D1 and 22/26/43.2 uF of 5 mohm-ESR ceramic, with D3 at 11.1 V breakdown, 12.3 V breakdown, or absent. Worst peak VIN = 12.134 V (9 V, 5 uH, 0.1 ohm, 22 uF; D3 absent and D3 12.3 V give the same value to 4 mV because the ring stays below D3's breakdown); 8 V worst = 10.729 V. D3 only conducts in the 11.1 V-breakdown copy: 1.82 A peak, 0.27 mJ at 9 V / 5 uH / 22 uF, clamping that branch to 11.769 V. Worst D1 forward peak = 25.55 A (9 V, 0.5 uH, 43.2 uF); worst D1 reverse = 7.91 V |
+| `board_sequencing` | One connected chain (8 V source, F1/D1/D3, averaged buck, U4 window with R33 fed back through the real divider, TREAD_OK net, U6 AND, U5, Q1/Q3 with the RELAY_PULSE pump, K1 coil with D4) run through 18 scenario copies. Pins held high before power: coil current while TREAD_OK is low = 0 (< 1 µA limit) and the coil starts 4.8 ms after TREAD_OK rises. Normal run: pickup 3.12 ms after RELAY_CMD, release 0.98 ms after it falls, collector peak 11.98 V. 1 V/100 ms ramp with 102 mV ripple: with R33 exactly one TREAD_OK rise (at 6.37 V) and one fall (at 5.91 V) and one coil on/off; without R33 about 4 TREAD_OK transitions (about 11 with a 0.5 mV comparator band), though the coil still switches once. Brownouts while emulating: 6.5 V for 10 and 100 ms does not trip (VIN min 6.21 V); 6.0, 5.0 and 3.0 V for 10 ms and 3.0 V for 100 ms trip, TREAD_OK low 1.02 ms and coil below 2 mA 2.0 ms after the dip starts, and **the coil re-energizes by itself 3.6 ms (6 V, 10 ms) to 6.1 ms (3 V, 100 ms) after VIN returns**; a 3 V / 1 ms dip with 22 µF only dips the coil to 7.3 mA. 12 V step: VIN peak 11.38 V, coil below 2 mA 1.04 ms after the step. Power removed: coil below 2 mA 1.97 ms (20 µs cut) or 12.3 ms (50 ms collapse) after VIN starts to fall, no RELAY_GATE rise and no coil current above 0.1 mA after release. MCU hang with RELAY_CMD high: coil released by Q3 alone in 59.6 / 139.7 / 155.1 ms (1.45 V / 0.65 V held low / 0.65 V held high), RELAY_GATE still 3.27 V |
+| `liveness_corners` | Worst-case corners of the Q3 liveness charge pump (explicit stacked tolerances, not measured). A steady gate: -20 C with 3.0 V and a 2.6 V/0.4 V pin = 1.446 V, below the 1.585 V cold maximum threshold, so the model coil carries 5 nA (**FAILS**); rail-to-rail 3.0 V = 2.129 V (0.544 V margin, passes); 25 C 1.641 V, 70 C 1.693 V, 70 C at maximum diode leakage 1.609 V, margins 0.19/0.38/0.29 V against a 0.5 V requirement (**FAIL**; the model coil is still 21.1 mA). B pickup to the highest threshold: 34.9 ms at 25 C (**FAILS** the 30 ms firmware precharge), 24.4 ms at 70 C, 27.5 ms at 70 C with maximum leakage, never at -20 C. C release after the pulses stop (strong pump, large C23/R34, 0.515 V threshold): 184 ms held low, 204 ms held high (**over the 0.2 s bound**), 221/244 ms if the diode leakage is the 25 C typical; plus the firmware 20 ms: 204-264 ms from MCU hang to coil off. D one stray edge: 0.508 V against a 0.515 V lowest threshold (7 mV margin, **FAILS** the 0.1 V margin); 3 consecutive 1.05 kHz edges (0.917 V) cross it, 2 do not; a pin toggling every 10 ms reaches 1.51 V. Q3 gate leakage and capacitance move the cold gate by 0.8 mV. 300-draw Monte Carlo (`run_montecarlo.py`, seed 20260712): steady gate 1.69-2.86 V, pickup 1.2-17.5 ms, release 15-177 ms, single-edge peak 0.11-0.47 V |
 | `vbus_present` | active-low `VBUS_PRESENT_N` is 1.65 mV with VBUS and 3.3 V absent; true slow hot-plug corner reaches LOW in 4.083 µs; worst unplug-to-HIGH = 1.912 ms, strictly below 3 ms; modeled dead-rail/GPIO injection = 0 |
 | `buck_averaged` | VIN capacitance modeled as 26 uF (22 uF worst corner); 90% startup = 4.634 ms; 450 mA step minimum = 3.233 V; worst modeled VIN = 6.865 V; worst source peak = 0.465 A; input/load energies = 12.93/5.38 mJ |
 | `uart_taps` | 10–90% rise = 1.110 µs versus a 104.167 µs bit; one/two-tap unpowered injection = 0.286/0.572 mA |
@@ -84,6 +87,24 @@ that test fails if the committed trace no longer matches the code. So the
 firmware's rules (30 ms precharge, 20 ms permission, cancel on forced Proxy)
 are checked against the circuit they were written for. Tick and loop times are
 still chosen by the generator, not measured on a chip.
+
+The three "coil holds" minima in this deck are the minimum of a pulsed
+waveform over hundreds of milliseconds, and the two ngspice versions differ by
+about 0.6 % in that ripple, so those three measures carry a 1 % cross-engine
+tolerance. Their pass limit (above 20.5 mA) is unchanged.
+
+Known problem it found (bd `precor-9_3x-dh2`): **a flash erase can open the relay
+mid-workout.** ESP-IDF suspends every task for the length of a flash
+operation, so the safety loop and the pulse timer both stop; the firmware
+checkpoints progress to flash every 30 s while a session runs. The Q3 gate
+holds for only about 100 ms. With nominal parts and RELAY_CMD held high: a
+45 ms stall (assumed typical 4 KB sector erase) takes the gate to 1.74 V and
+the coil holds even with a 1.45 V-threshold Q3; a 100 ms stall takes it to
+1.06 V and that coil drops; a 400 ms stall (the worst case the firmware's own
+comments budget for) takes it to 0.07 V and every part drops. It fails toward
+the console owning the belt, so it is an interrupted workout, not an unsafe
+relay. QEMU does not stall tasks on flash, so no firmware gate can see this.
+The real erase time of the module's flash is unmeasured.
 
 Known gap it found: the precharge check counts edges, not rate. If the timer
 ran 20 times slow for 600 ms (one tick every 10 ms) the firmware would report
@@ -141,8 +162,32 @@ energized relay, so it is an availability gap rather than a safety one.
   Rev E has no such harness, so the deck's values describe no Rev E hardware.
 - The Q3 liveness-switch decks use the Nexperia BAT54 family forward-voltage
   anchor (about 0.26 V at 0.1 mA and 0.32 V at 1 mA) and the AO3400A 0.65-1.45
-  V gate-threshold range. Gate charge, capacitor tolerance, and leakage are
-  not modeled.
+  V gate-threshold range. Those two decks leave gate charge, capacitor
+  tolerance, and leakage out; `liveness_corners` adds them.
+- `hotplug_ringing` takes its absolute-maximum comparison values from the TI datasheets for the parts on VIN: [TPS54202](https://www.ti.com/lit/ds/symlink/tps54202.pdf) section 5.1, VIN -0.3 to 30 V; [TPS3700](https://www.ti.com/lit/ds/symlink/tps3700.pdf) section 6.1, VDD -0.3 to 20 V; [TPS709](https://www.ti.com/lit/ds/symlink/tps709.pdf) section 6.1, VIN -0.3 to 32 V. The 25 V rating of C1/C2/C3 is the rated voltage written in the BOM (NETLIST.md), not read from the capacitor vendor datasheet. Loop inductance (0.5/2/5 uH, about 1 uH per metre of loop), source+cable resistance (0.1/0.5 ohm), the 9 V upper source and the 10 kohm pre-start load are assumptions, not datasheet or measured values. F1 uses the 0.11 ohm cold value, D3 the existing 11.1/12.3 V models, and VIN capacitance the 22/26/43.2 uF values above with an assumed 5 mohm ESR.
+- `board_sequencing` source basis. The subcircuit is built from `tools/design.py` nets and values (where the task brief and the netlist disagree, the netlist wins: RELAY_GATE, not TREAD_OK, enables U5) and reuses `PUMP`, `ESP_Q3`, `ESP_AND_GATE`, `ESP_BIDI_TVS` and the TREAD_OK/U5 delay structure of the earlier decks. The buck UVLO (4.2/3.9 V), the U5 dropout (0.3 V) and EN threshold (1.2 V), the comparator hysteresis (400/393.5 mV nominal) and the Q1 transistor parameters are assumptions, not data-sheet values. It uses `.options reltol=0.01` to run all 18 copies in about 7 s; a default-tolerance trial moved timing results by under 0.1 percent. It is a behavioral model: nothing here is measured, relay contact motion is not modeled (coil current below 2 mA is the only release criterion), and the self re-energizing after a brownout is a model result that depends on the MCU pins staying asserted, which firmware must handle.
+- `liveness_corners` stacks tolerances on the Q3 liveness pump. Inputs: the
+  [AO3400A data sheet](https://www.aosmd.com/res/data_sheets/AO3400A.pdf)
+  (Vgs(th) 0.65-1.45 V at 250 uA, Ciss 630 pF, Igss 100 nA max; Fig 2 puts the
+  125 C transfer curve about 0.2 V left of the 25 C one) and the BAT54 family.
+  The Nexperia BAT54 data sheet could not be fetched (HTTP 403), so the diode
+  points come from the
+  [Diodes Incorporated BAT54/A/C/S data sheet](https://www.diodes.com/assets/Datasheets/ds11005.pdf)
+  (DS11005 Rev 35-2): Vf at most 0.24 V at 0.1 mA, 0.32 V at 1 mA and 0.40 V at
+  10 mA, IR at most 2 uA at 25 V, 25 C, with typical Vf and IR against
+  temperature read by eye from its Figs 1 and 2 (Vf at 0.1/1 mA: 0.31/0.37 V at
+  -20 C, 0.22/0.31 V at 25 C, 0.15/0.21 V at 70 C; IR at 3 V about 0.06 uA at
+  25 C and 2.1 uA at 75 C). The
+  [onsemi BAT54L data sheet](https://www.onsemi.com/pdf/datasheet/bat54lt1-d.pdf)
+  agrees at 25 C (0.22/0.29 V typical Vf, 0.2 uA typical IR at 25 V). Capacitor
+  derating (C22 70.5-126.5 nF, C23 0.557-1.265 uF), the -3 mV/C Q3 threshold
+  coefficient, and the 20 mV Vf spread are assumptions; the Samsung curves for
+  CL10A105KB8NNNC were not obtained. Four requirements fail in the stacked
+  corners; see `liveness_corners` in `assertions.json`.
+- `run_montecarlo.py` (300 draws, fixed seed, host ngspice only) writes
+  `montecarlo_summary.json`. It is supplementary: it is not part of the
+  dual-engine gate, and uniform draws across each tolerance band are an
+  assumption, not a measured distribution.
 
 ## Explicitly unsupported
 

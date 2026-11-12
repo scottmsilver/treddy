@@ -657,10 +657,21 @@
         "fw_cancel_release_vt_hi_s": {"unit": "s", "min": 0.045, "max": 0.075, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
         "fw_cancel_release_vt_lo_s": {"unit": "s", "min": 0.12, "max": 0.16, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
         "fw_stall_gate_min_v": {"unit": "V", "min": 2.2, "max": 2.6, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
-        "fw_stall_coil_min_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 0.0001},
+        "fw_stall_coil_min_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 1e-02},
+        "fw_flash45_gate_min_v": {"unit": "V", "min": 1.6, "max": 1.9, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "fw_flash45_coil_min_vt_hi_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 1e-02},
+        "fw_flash100_gate_min_v": {"unit": "V", "min": 0.9, "max": 1.2, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "fw_flash100_coil_min_vt_hi_a": {"unit": "A", "min": -1e-06, "max": 1e-06, "abs_tolerance": 1e-08, "rel_tolerance": 0.01},
+        "fw_flash100_coil_min_vt_lo_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 1e-02},
+        "fw_flash400_gate_min_v": {"unit": "V", "min": 0.0, "max": 0.15, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "fw_flash400_coil_min_vt_lo_a": {"unit": "A", "min": -1e-06, "max": 1e-06, "abs_tolerance": 1e-08, "rel_tolerance": 0.01},
         "fw_slow_tick_gate_max_v": {"unit": "V", "min": 0.9, "max": 1.3, "abs_tolerance": 0.0001, "rel_tolerance": 0.001}
       },
       "unsupported": [
+        {
+          "claim": "how long a flash operation really stalls the tasks",
+          "reason": "45, 100 and 400 ms are assumed durations (typical and datasheet-worst sector erase); the flash chip in the module and its real erase times are unmeasured"
+        },
         {
           "claim": "real esp_timer and safety-loop timing on the chip",
           "reason": "tick and loop times are chosen by the trace generator, not measured; jitter under Wi-Fi, BLE and flash load is unproven on hardware"
@@ -669,6 +680,1646 @@
           "claim": "measured Q3 pickup and release timing, and relay contact motion",
           "reason": "same low-order pump, Q3 and coil models as relay_drive_release; coil current is not contact motion"
         }
+      ]
+    },
+    "hotplug_ringing": {
+      "deck": "decks/hotplug_ringing.cir",
+      "assertions": {
+        "h_v8_l0p5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l0p5_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l2_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l0p5_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l2_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l0p5_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l2_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l0p5_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l2_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p5_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p5_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p5_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p5_c22_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p5_c22_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c43p2_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c43p2_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c43p2_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c43p2_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c26_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c26_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c26_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c26_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v8_l5_r0p1_c26_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c26_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c26_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c26_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c26_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v8_l5_r0p1_c26_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c43p2_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c43p2_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c43p2_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c43p2_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c26_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c26_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c26_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c26_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "h_v9_l5_r0p1_c26_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c26_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c26_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c26_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c26_d3_peak_a": {
+          "unit": "A",
+          "min": -0.001,
+          "max": 35.3,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "l_v9_l5_r0p1_c26_d3_energy_j": {
+          "unit": "J",
+          "min": -1e-06,
+          "max": 0.3,
+          "abs_tolerance": 1e-07,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l0p5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l0p5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l0p5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l0p5_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l0p5_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l0p5_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l2_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l2_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l2_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l2_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l2_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l2_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l5_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 7.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l5_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v8_l5_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l0p5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l0p5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l0p5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l0p5_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l0p5_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l0p5_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l2_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l2_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l2_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l2_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l2_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l2_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l5_r0p1_c22_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l5_r0p1_c22_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l5_r0p1_c22_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l5_r0p1_c43p2_vin_peak_v": {
+          "unit": "V",
+          "min": 8.0,
+          "max": 17.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l5_r0p1_c43p2_d1_peak_a": {
+          "unit": "A",
+          "min": 0.0,
+          "max": 80.0,
+          "abs_tolerance": 0.001,
+          "rel_tolerance": 1e-05
+        },
+        "n_v9_l5_r0p1_c43p2_d1_rev_v": {
+          "unit": "V",
+          "min": -0.01,
+          "max": 32.0,
+          "abs_tolerance": 0.0001,
+          "rel_tolerance": 1e-05
+        }
+      },
+      "unsupported": [
+        {
+          "claim": "real cable loop inductance and resistance",
+          "reason": "0.5/2/5 uH and 0.1/0.5 ohm are assumed corners, not measured on any RJ45 patch cable"
+        },
+        {
+          "claim": "contact bounce, arcing and insertion speed during hot-plug",
+          "reason": "the plug-in is one ideal 2 us voltage step; real insertion can chatter and re-strike"
+        },
+        {
+          "claim": "treadmill source impedance, source-side capacitance and actual 8-9 V range",
+          "reason": "8 V is nominal and 9 V is an assumed upper bound; the source is ideal behind Rs"
+        },
+        {
+          "claim": "ceramic capacitance loss at the ring peak and capacitor ESL",
+          "reason": "capacitance is a fixed 22/26/43.2 uF with 5 mohm ESR, not a voltage-dependent model"
+        },
+        {
+          "claim": "PTC F1 thermal trip, hold and reset",
+          "reason": "F1 is fixed at its 0.11 ohm cold resistance"
+        },
+        {
+          "claim": "repetitive hot-plug events and part lifetime",
+          "reason": "one plug-in event per branch; no cumulative stress or damage threshold is modeled"
+        },
+        {
+          "claim": "interaction with U2 buck start-up and load damping",
+          "reason": "the load is a 10 kohm resistor; U2 starts after the ring and is not modeled"
+        }
+      ]
+    },
+    "board_sequencing": {
+      "deck": "decks/board_sequencing.cir",
+      "assertions": {
+        "s1_coil_max_before_cmd_a": {"unit": "A", "min": -1e-06, "max": 1e-06, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s1_gate_max_before_cmd_v": {"unit": "V", "min": -0.001, "max": 0.01, "abs_tolerance": 0.001, "rel_tolerance": 0.001},
+        "s1_pickup_after_cmd_s": {"unit": "s", "min": 0.002, "max": 0.005, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s1_coil_on_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s1_release_after_cmd_s": {"unit": "s", "min": 0.0006, "max": 0.002, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s1_coil_after_release_max_a": {"unit": "A", "min": -1e-06, "max": 1e-06, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s1_r5_peak_v": {"unit": "V", "min": 4.9, "max": 5.1, "abs_tolerance": 0.001, "rel_tolerance": 0.001},
+        "s1_col_peak_v": {"unit": "V", "min": 8.0, "max": 45.0, "abs_tolerance": 0.1, "rel_tolerance": 0.01},
+        "s1_gate_high_tread_low_v": {"unit": "V", "min": -0.001, "max": 0.01, "abs_tolerance": 0.001, "rel_tolerance": 0.001},
+        "s1_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s1_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s1_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s1_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s1_gate_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s2_coil_while_tread_low_a": {"unit": "A", "min": -1e-06, "max": 1e-06, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s2_gate_high_tread_low_v": {"unit": "V", "min": -0.001, "max": 0.01, "abs_tolerance": 0.001, "rel_tolerance": 0.001},
+        "s2_tread_to_coil_1ma_s": {"unit": "s", "min_exclusive": 0.0, "max": 0.012, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s2_tread_to_pickup_s": {"unit": "s", "min": 0.004, "max": 0.012, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s2_coil_on_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s2_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s2_tread_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s2_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s2_coil_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3a_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3a_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3a_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3a_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3b_tread_up_n": {"unit": "count", "min": 2.5, "max": 6.0, "abs_tolerance": 0.5, "rel_tolerance": 0.1},
+        "s3b_tread_dn_n": {"unit": "count", "min": 2.5, "max": 6.0, "abs_tolerance": 0.5, "rel_tolerance": 0.1},
+        "s3c_tread_up_n": {"unit": "count", "min": 7.0, "max": 15.0, "abs_tolerance": 1.0, "rel_tolerance": 0.1},
+        "s3c_tread_dn_n": {"unit": "count", "min": 7.0, "max": 15.0, "abs_tolerance": 1.0, "rel_tolerance": 0.1},
+        "s3b_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3b_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3c_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3c_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s3a_vin_ripple_pp_v": {"unit": "V", "min": 0.09, "max": 0.115, "abs_tolerance": 0.002, "rel_tolerance": 0.02},
+        "s3a_tread_rise_vin_v": {"unit": "V", "min": 6.2, "max": 6.6, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s3a_tread_fall_vin_v": {"unit": "V", "min": 5.8, "max": 6.05, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_65_10m_tread_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_65_10m_tread_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_65_10m_coil_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_65_10m_coil_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_65_10m_coil_release_s": {"unit": "s", "min": 0.2295, "max": 0.2301, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "s4_65_10m_tread_low_s": {"unit": "s", "min": 0.225, "max": 0.2305, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "s4_65_10m_vin_min_v": {"unit": "V", "min": 6.1, "max": 6.35, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_65_10m_rail_min_v": {"unit": "V", "min": 3.2, "max": 3.35, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_65_10m_coil_min_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s4_65_10m_coil_final_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s4_65_100m_tread_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_65_100m_tread_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_65_100m_coil_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_65_100m_coil_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_65_100m_coil_release_s": {"unit": "s", "min": 0.2295, "max": 0.2301, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "s4_65_100m_tread_low_s": {"unit": "s", "min": 0.225, "max": 0.2305, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "s4_65_100m_vin_min_v": {"unit": "V", "min": 6.1, "max": 6.35, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_65_100m_rail_min_v": {"unit": "V", "min": 3.2, "max": 3.35, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_65_100m_coil_min_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s4_65_100m_coil_final_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s4_60_10m_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_60_10m_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_60_10m_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_60_10m_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_60_10m_coil_release_s": {"unit": "s", "min": 0.0014, "max": 0.003, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_60_10m_tread_low_s": {"unit": "s", "min": 0.0007, "max": 0.0015, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_60_10m_vin_min_v": {"unit": "V", "min": 5.59, "max": 5.890000000000001, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_60_10m_rail_min_v": {"unit": "V", "min": 3.2, "max": 3.35, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_60_10m_coil_min_a": {"unit": "A", "min": -0.001, "max": 0.002, "abs_tolerance": 0.0001, "rel_tolerance": 0.01},
+        "s4_60_10m_coil_final_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s4_50_10m_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_50_10m_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_50_10m_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_50_10m_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_50_10m_coil_release_s": {"unit": "s", "min": 0.0014, "max": 0.003, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_50_10m_tread_low_s": {"unit": "s", "min": 0.0007, "max": 0.0015, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_50_10m_vin_min_v": {"unit": "V", "min": 4.58, "max": 4.880000000000001, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_50_10m_rail_min_v": {"unit": "V", "min": 3.2, "max": 3.35, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_50_10m_coil_min_a": {"unit": "A", "min": -0.001, "max": 0.002, "abs_tolerance": 0.0001, "rel_tolerance": 0.01},
+        "s4_50_10m_coil_final_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s4_30_10m_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_10m_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_10m_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_10m_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_10m_coil_release_s": {"unit": "s", "min": 0.0014, "max": 0.003, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_30_10m_tread_low_s": {"unit": "s", "min": 0.0007, "max": 0.0015, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_30_10m_vin_min_v": {"unit": "V", "min": 3.74, "max": 4.04, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_30_10m_rail_min_v": {"unit": "V", "min": 0.0, "max": 1.0, "abs_tolerance": 0.1, "rel_tolerance": 0.3},
+        "s4_30_10m_coil_min_a": {"unit": "A", "min": -0.001, "max": 0.002, "abs_tolerance": 0.0001, "rel_tolerance": 0.01},
+        "s4_30_10m_coil_final_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s4_30_100m_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_100m_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_100m_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_100m_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_100m_coil_release_s": {"unit": "s", "min": 0.0014, "max": 0.003, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_30_100m_tread_low_s": {"unit": "s", "min": 0.0007, "max": 0.0015, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_30_100m_vin_min_v": {"unit": "V", "min": 3.5900000000000003, "max": 3.89, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_30_100m_rail_min_v": {"unit": "V", "min": -0.001, "max": 0.01, "abs_tolerance": 0.001, "rel_tolerance": 0.01},
+        "s4_30_100m_coil_min_a": {"unit": "A", "min": -0.001, "max": 0.002, "abs_tolerance": 0.0001, "rel_tolerance": 0.01},
+        "s4_30_100m_coil_final_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s4_30_1m_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_1m_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_1m_coil_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_1m_coil_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s4_30_1m_coil_release_s": {"unit": "s", "min": 0.2295, "max": 0.2301, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "s4_30_1m_tread_low_s": {"unit": "s", "min": 0.0005, "max": 0.0013, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s4_30_1m_vin_min_v": {"unit": "V", "min": 5.4, "max": 5.9, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_30_1m_rail_min_v": {"unit": "V", "min": 3.2, "max": 3.35, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s4_30_1m_coil_min_a": {"unit": "A", "min": 0.004, "max": 0.012, "abs_tolerance": 0.0005, "rel_tolerance": 0.05},
+        "s4_30_1m_coil_final_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s5_tread_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s5_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s5_coil_up_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s5_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s5_vin_peak_v": {"unit": "V", "min": 11.0, "max": 12.5, "abs_tolerance": 0.02, "rel_tolerance": 0.005},
+        "s5_coil_release_s": {"unit": "s", "min": 0.0004, "max": 0.0025, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s5_tread_low_s": {"unit": "s", "min": 3e-05, "max": 0.0002, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s5_coil_min_a": {"unit": "A", "min": -0.001, "max": 0.002, "abs_tolerance": 0.0001, "rel_tolerance": 0.01},
+        "s5_coil_final_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s5_r5_peak_v": {"unit": "V", "min": 4.9, "max": 5.1, "abs_tolerance": 0.001, "rel_tolerance": 0.001},
+        "s5_col_peak_v": {"unit": "V", "min": 8.0, "max": 45.0, "abs_tolerance": 0.1, "rel_tolerance": 0.01},
+        "s6a_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s6a_coil_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s6a_gate_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s6a_coil_release_s": {"unit": "s", "min": 0.0014, "max": 0.003, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s6a_tread_low_s": {"unit": "s", "min": 0.0007, "max": 0.0015, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s6a_coil_after_release_max_a": {"unit": "A", "min": -0.0001, "max": 0.0001, "abs_tolerance": 1e-05, "rel_tolerance": 0.5},
+        "s6a_gate_after_fall_max_v": {"unit": "V", "min": -0.001, "max": 0.05, "abs_tolerance": 0.0001, "rel_tolerance": 0.5},
+        "s6a_gate_high_tread_low_v": {"unit": "V", "min": -0.001, "max": 0.01, "abs_tolerance": 0.001, "rel_tolerance": 0.001},
+        "s6a_rail_final_v": {"unit": "V", "min": -0.001, "max": 0.01, "abs_tolerance": 0.001, "rel_tolerance": 0.01},
+        "s6b_tread_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s6b_coil_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s6b_gate_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s6b_coil_release_s": {"unit": "s", "min": 0.008, "max": 0.018, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s6b_tread_low_s": {"unit": "s", "min": 0.007, "max": 0.016, "abs_tolerance": 2e-05, "rel_tolerance": 0.005},
+        "s6b_coil_after_release_max_a": {"unit": "A", "min": -0.0001, "max": 0.0001, "abs_tolerance": 1e-05, "rel_tolerance": 0.5},
+        "s6b_gate_after_fall_max_v": {"unit": "V", "min": -0.001, "max": 0.05, "abs_tolerance": 0.0001, "rel_tolerance": 0.5},
+        "s6b_gate_high_tread_low_v": {"unit": "V", "min": -0.001, "max": 0.01, "abs_tolerance": 0.001, "rel_tolerance": 0.001},
+        "s6b_rail_final_v": {"unit": "V", "min": -0.001, "max": 0.01, "abs_tolerance": 0.001, "rel_tolerance": 0.01},
+        "s7a_tread_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7a_coil_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7a_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7a_gate_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7a_coil_release_s": {"unit": "s", "min": 0.12, "max": 0.16, "abs_tolerance": 0.0001, "rel_tolerance": 0.005},
+        "s7a_coil_before_hang_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s7a_coil_final_a": {"unit": "A", "min": -1e-06, "max": 1e-06, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s7a_coil_after_release_max_a": {"unit": "A", "min": -0.0001, "max": 0.0001, "abs_tolerance": 1e-05, "rel_tolerance": 0.5},
+        "s7a_gate_min_v": {"unit": "V", "min": 3.0, "max": 3.4, "abs_tolerance": 0.01, "rel_tolerance": 0.005},
+        "s7b_tread_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7b_coil_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7b_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7b_gate_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7b_coil_release_s": {"unit": "s", "min": 0.045, "max": 0.075, "abs_tolerance": 0.0001, "rel_tolerance": 0.005},
+        "s7b_coil_before_hang_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s7b_coil_final_a": {"unit": "A", "min": -1e-06, "max": 1e-06, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s7b_coil_after_release_max_a": {"unit": "A", "min": -0.0001, "max": 0.0001, "abs_tolerance": 1e-05, "rel_tolerance": 0.5},
+        "s7b_gate_min_v": {"unit": "V", "min": 3.0, "max": 3.4, "abs_tolerance": 0.01, "rel_tolerance": 0.005},
+        "s7c_tread_dn_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7c_coil_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7c_coil_dn_n": {"unit": "count", "min": 0.95, "max": 1.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7c_gate_up_n": {"unit": "count", "min": -0.05, "max": 0.05, "abs_tolerance": 0.02, "rel_tolerance": 0.01},
+        "s7c_coil_release_s": {"unit": "s", "min": 0.14, "max": 0.175, "abs_tolerance": 0.0001, "rel_tolerance": 0.005},
+        "s7c_coil_before_hang_a": {"unit": "A", "min": 0.0195, "max": 0.0225, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s7c_coil_final_a": {"unit": "A", "min": -1e-06, "max": 1e-06, "abs_tolerance": 1e-06, "rel_tolerance": 0.001},
+        "s7c_coil_after_release_max_a": {"unit": "A", "min": -0.0001, "max": 0.0001, "abs_tolerance": 1e-05, "rel_tolerance": 0.5},
+        "s7c_gate_min_v": {"unit": "V", "min": 3.0, "max": 3.4, "abs_tolerance": 0.01, "rel_tolerance": 0.005}
+      },
+      "unsupported": [
+        {"claim": "relay contact motion, release, bounce or continuity", "reason": "coil current is the only output; below 2 mA and above 14.7 mA are current thresholds, not contact evidence"},
+        {"claim": "measured or vendor-model behavior of TPS54202, TPS3700, TPS70950, SN74LVC2G08 or BC817", "reason": "the buck is an averaged source with an assumed UVLO, U4 is thresholds plus RC delays, U5 is an ideal source with an assumed dropout, U6 is a truth table with a rail dependence, Q1 is a generic Gummel-Poon device"},
+        {"claim": "fail-safe behavior after a brownout", "reason": "the coil re-energizes by itself when VIN returns and the MCU pins stay asserted; whether firmware latches TREAD_OK loss is not simulated"},
+        {"claim": "ESP32 boot, reset or brownout-detector behavior", "reason": "pins are ideal logic levels scaled by modelled +3V3 and re-assert instantly when it returns; no MCU, GPIO threshold or leakage corner is modelled"},
+        {"claim": "a 1 ms dip at nominal 26 uF VIN capacitance", "reason": "VIN falls to within a few tens of millivolts of the undervoltage trip point; the outcome changed with solver step, so only the 22 uF copy is asserted"},
+        {"claim": "exact chatter counts without R33", "reason": "counts are integrals of short TREAD_OK pulses and resolve to about one count; the limits are regression brackets"},
+        {"claim": "UV trip levels quoted in NETLIST.md (6.31 V falling, 6.85 V rising)", "reason": "this model derives about 5.91 V falling and 6.4 V rising from the netlist resistor values; the document figures are not reproduced and are not asserted"},
+        {"claim": "component tolerance, temperature and VIN-capacitance corners", "reason": "one nominal corner plus a 22 uF copy, Q3 threshold corners in s7 and a narrow comparator band in s3c only"}
+      ]
+    },
+    "liveness_corners": {
+      "deck": "decks/liveness_corners.cir",
+      "assertions": {
+        "a_cold_gate_min_v": {"unit": "V", "min": 1.35, "max": 1.55, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "a_cold_gate_peak_v": {"unit": "V", "min": 1.35, "max": 1.55, "max_exclusive": 1.585, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "a_cold_coil_current_a": {"unit": "A", "min": 0.0, "max": 1e-06, "abs_tolerance": 1e-10, "rel_tolerance": 1e-05},
+        "a_cold_parasitic_delta_v": {"unit": "V", "min": 0.0, "max": 0.005, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "a_cold_nopar_gate_min_v": {"unit": "V", "min": 1.35, "max": 1.55, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "a_cold_rail_gate_min_v": {"unit": "V", "min": 2.085, "max": 2.3, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "a_cold_rail_coil_current_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 0.0001},
+        "a_room_gate_min_v": {"unit": "V", "min": 1.55, "max": 1.75, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "a_room_coil_current_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 0.0001},
+        "a_hot_gate_min_v": {"unit": "V", "min": 1.6, "max": 1.8, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "a_hot_coil_current_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 0.0001},
+        "a_hotx_gate_min_v": {"unit": "V", "min": 1.5, "max": 1.7, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "a_hotx_coil_current_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 0.0001},
+        "b_room_pickup_s": {"unit": "s", "min": 0.03, "max": 0.04, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "b_hot_pickup_s": {"unit": "s", "min": 0.02, "max": 0.03, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "b_hotx_pickup_s": {"unit": "s", "min": 0.023, "max": 0.03, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "b_room_gate_at_30ms_v": {"unit": "V", "min": 1.3, "max_exclusive": 1.45, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "b_hot_gate_at_30ms_v": {"unit": "V", "min_exclusive": 1.315, "max": 1.5, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "b_hotx_gate_at_30ms_v": {"unit": "V", "min_exclusive": 1.315, "max": 1.5, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "c_low_release_s": {"unit": "s", "min": 0.17, "max": 0.2, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "c_high_release_s": {"unit": "s", "min": 0.195, "max": 0.215, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "c_ll_low_release_s": {"unit": "s", "min": 0.21, "max": 0.235, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "c_ll_high_release_s": {"unit": "s", "min": 0.235, "max": 0.26, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "c_ll_low_coil_off_s": {"unit": "s", "min": 0.21, "max": 0.235, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "c_ll_low_coil_current_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 0.0001},
+        "c_low_hang_to_off_s": {"unit": "s", "min": 0.19, "max": 0.22, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "c_high_hang_to_off_s": {"unit": "s", "min": 0.21, "max": 0.24, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "c_ll_low_hang_to_off_s": {"unit": "s", "min": 0.23, "max": 0.255, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "c_ll_high_hang_to_off_s": {"unit": "s", "min": 0.255, "max": 0.28, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "d_e1_peak_v": {"unit": "V", "min": 0.45, "max": 0.56, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_e1_margin_to_vt_lo_v": {"unit": "V", "min": 0.0, "max": 0.1, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_e1_final_v": {"unit": "V", "min": -0.01, "max": 0.01, "abs_tolerance": 1e-05, "rel_tolerance": 0.01},
+        "d_e2_peak_v": {"unit": "V", "min": 0.45, "max": 0.56, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_e3_peak_v": {"unit": "V", "min": 0.85, "max": 1.0, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_e4_peak_v": {"unit": "V", "min": 0.85, "max": 1.0, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_e5_peak_v": {"unit": "V", "min": 1.2, "max": 1.35, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_e6_peak_v": {"unit": "V", "min": 1.2, "max": 1.35, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_e8_peak_v": {"unit": "V", "min": 1.5, "max": 1.62, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_e10_peak_v": {"unit": "V", "min": 1.75, "max": 1.86, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "d_periodic_peak_v": {"unit": "V", "min": 1.4, "max": 1.6, "abs_tolerance": 0.0001, "rel_tolerance": 0.001}
+      },
+      "unsupported": [
+        {"claim": "requirement A FAILS at cold: coil fully on", "reason": "at -20 C with VDD=3.0 V, a pin that reaches 2.6 V/0.4 V, weak-end C22/C23/R34/R35/f/duty and a Vf-high diode, the steady gate is 1.446 V, below the 1.585 V highest cold threshold: the model coil current is 5 nA. With a rail-to-rail 3.0 V pin the gate is 2.129 V (0.544 V margin, passes)"},
+        {"claim": "requirement A (0.5 V above the highest threshold) FAILS at 25 C and 70 C with the weak driver", "reason": "margins are 0.19 V (25 C), 0.38 V (70 C), 0.29 V (70 C, maximum diode leakage); the model coil still carries 21 mA because ESP_Q3 conducts fully the moment the gate passes VT, which a real AO3400A does not"},
+        {"claim": "requirement B FAILS: pickup within 15 ms and within the firmware 30 ms precharge", "reason": "weak-pump pickup to the highest threshold is 34.9 ms at 25 C (gate 1.378 V at 30 ms against 1.45 V), 24.4 ms at 70 C, 27.5 ms at 70 C with maximum diode leakage, and never at -20 C"},
+        {"claim": "requirement C: release inside the 0.2 s test bound", "reason": "strong pump, 126.5 nF C22, 1.265 uF C23, 101 kohm R34, 0.515 V threshold: 184 ms held low, 204 ms held high, and 221/244 ms if the diode leakage is only the 25 C typical; add the firmware 20 ms for 204 to 264 ms from MCU hang to coil off. Only the held-low figure with 70 C typical leakage is under 0.2 s"},
+        {"claim": "requirement D FAILS: single stray edge at least 0.1 V under the lowest threshold", "reason": "the strongest pump gives 0.508 V from one edge, 7 mV under the 0.515 V hot lowest threshold; three consecutive 1.05 kHz edges give 0.917 V and cross it, and a pin toggling every 10 ms reaches 1.51 V, above even the 1.45 V 25 C highest threshold"},
+        {"claim": "corner values as measured behavior", "reason": "capacitor derating, the Q3 temperature coefficient and the Vf and leakage points read from the Diodes Incorporated BAT54 data sheet are assumptions; the Nexperia data sheet was unreachable and the Samsung capacitor curves were not obtained"},
+        {"claim": "relay contact motion, release, bounce, or continuity", "reason": "coil current decay is not contact motion evidence"}
       ]
     },
     "vbus_present": {

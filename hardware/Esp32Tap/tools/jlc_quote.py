@@ -5,9 +5,15 @@ Drives JLC's own quote pages in a browser, because JLC has no public quote
 API for assembly: upload the Gerber archive, pick the board options, turn on
 Standard assembly, upload the BOM and placement file, select any part JLC did
 not match by its LCSC number, capture the placement preview, and read the
-price. It stops on the last page. It never saves to the cart, orders or pays:
-`guarded_click` refuses any control whose text looks like one of those, and
-the "SAVE TO CART" button is disabled in the page as soon as it appears.
+price. By default it stops on the last page and saves nothing: `guarded_click`
+refuses any control whose text looks like cart, order or pay, and the
+"SAVE TO CART" button is disabled in the page as soon as it appears.
+
+`quote --save-to-cart --max-total USD` goes one step further and saves the
+order to the account's cart, for the account owner to review and pay for. It
+does so only if JLC raised no warning, every part is confirmed, the total is
+at or under the limit given, and `jlc_rotation_check.py` passes on the preview
+just captured. It never opens the cart's checkout, orders or pays.
 
 Runs under a Python that has `camoufox` installed (not the system Python).
 The session lives in a browser profile directory, so you sign in once:
@@ -31,8 +37,10 @@ import argparse
 import asyncio
 import csv
 import json
+import math
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -50,6 +58,14 @@ BOARD_OPTIONS = (
     'button:visible:text-is("ENIG")',
     'button:visible:has-text("0.2mm/(0.3/0.35mm)")',
 )
+
+# The customs description JLC requires before an order can be saved, by the
+# page's own labels (the first is JLC's spelling).
+PRODUCT_DESCRIPTION = ("Reserch\\Education\\DIY\\Entertainment", "DIY - HS Code 902300")
+# The page writes the label in mixed case and upper-cases it with a style.
+SAVE_TO_CART_LABEL = re.compile(r"^\s*save to cart\s*$", re.IGNORECASE)
+# jlc_rotation_check.py needs KiCad's pcbnew, which lives in the system Python.
+PCBNEW_PYTHON = os.environ.get("JLC_PCBNEW_PYTHON", "/usr/bin/python3")
 
 FORBIDDEN = re.compile(r"cart|pay|checkout|place\s+order|submit|buy", re.IGNORECASE)
 
@@ -244,7 +260,76 @@ def parse_charges(text: str) -> dict[str, float]:
     return charges
 
 
-async def quote(out: Path, quantity: int, headed: bool, cpl: Path = CPL) -> int:
+def charge_problems(charges: dict[str, float]) -> list[str]:
+    problems = [
+        f"JLC charges {label}: ${value:.2f}"
+        for label, value in charges.items()
+        if re.search(r"hand|manual", label, re.IGNORECASE) and value > 0
+    ]
+    if "Total Price" not in charges:
+        problems.append("no total price was found on the quote page")
+    return problems
+
+
+def charge_warnings(result: dict) -> None:
+    result["warnings"].extend(charge_problems(result.get("charges", {})))
+
+
+def cart_refusal(result: dict, max_total: float, rotation_status: int) -> str | None:
+    """Why this quote must not be saved to the cart, or None if it may be."""
+    # Judged from the charges as they are now, not from warnings recorded
+    # earlier: the price is read again just before saving.
+    warnings = list(dict.fromkeys(result["warnings"] + charge_problems(result.get("charges", {}))))
+    if warnings:
+        return "JLC raised warnings: " + "; ".join(warnings)
+    if not math.isfinite(max_total):
+        return f"the limit {max_total} is not a number"
+    confirmed, detected = result.get("parts_confirmed"), result.get("parts_detected")
+    if not detected or confirmed != detected:
+        return f"parts confirmed {confirmed} of {detected}"
+    total = result["charges"]["Total Price"]
+    if total > max_total:
+        return f"total ${total:.2f} is over the limit ${max_total:.2f}"
+    if rotation_status != 0:
+        return "jlc_rotation_check.py did not pass on the captured preview"
+    return None
+
+
+async def save_to_cart(page, out: Path, result: dict, max_total: float) -> None:
+    rotation = subprocess.run(
+        [PCBNEW_PYTHON, str(ROOT / "tools" / "jlc_rotation_check.py"), str(out)],
+        capture_output=True, text=True, check=False)
+    (out / "rotation_check.txt").write_text(rotation.stdout, encoding="utf-8")
+    refusal = cart_refusal(result, max_total, rotation.returncode)
+    if refusal:
+        raise QuoteError("not saving to the cart: " + refusal)
+
+    category, item = PRODUCT_DESCRIPTION
+    await page.locator('input[placeholder="Select"]:visible').first.click()
+    await page.locator(".el-cascader-node:visible", has_text=category).first.click()
+    await page.locator(".el-cascader-node:visible", has_text=item).first.click()
+    await page.wait_for_timeout(1500)
+    result["product_description"] = list(PRODUCT_DESCRIPTION)
+    # The price can change between reading it and saving; read it again.
+    result["charges"] = parse_charges(await body_text(page))
+    refusal = cart_refusal(result, max_total, 0)
+    if refusal:
+        raise QuoteError("not saving to the cart: " + refusal)
+    await page.screenshot(path=str(out / "before_save.png"), full_page=True)
+
+    # The one deliberate click on an ordering control in this tool.
+    button = page.locator("button:visible", has_text=SAVE_TO_CART_LABEL)
+    if await button.count() != 1:
+        raise QuoteError(f"expected one SAVE TO CART button, found {await button.count()}")
+    await button.click()
+    await page.wait_for_timeout(15000)
+    result["after_save_url"] = page.url
+    await page.screenshot(path=str(out / "after_save.png"), full_page=True)
+    (out / "after_save.txt").write_text(page.url + "\n\n" + await body_text(page), encoding="utf-8")
+    result["saved_to_cart"] = True
+
+
+async def quote(out: Path, quantity: int, headed: bool, cpl: Path = CPL, max_total: float | None = None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     for path in (GERBERS, BOM, cpl):
         if not path.is_file():
@@ -254,7 +339,9 @@ async def quote(out: Path, quantity: int, headed: bool, cpl: Path = CPL) -> int:
         page = context.pages[0] if context.pages else await context.new_page()
         page.set_default_timeout(45000)
         try:
-            await run_quote_flow(page, out, quantity, result, cpl)
+            await run_quote_flow(page, out, quantity, result, cpl, keep_ordering=max_total is not None)
+            if max_total is not None:
+                await save_to_cart(page, out, result, max_total)
         except Exception:
             # What the page looked like is the only useful evidence of a
             # selector or flow change on JLC's side.
@@ -264,7 +351,7 @@ async def quote(out: Path, quantity: int, headed: bool, cpl: Path = CPL) -> int:
     return report(out, result)
 
 
-async def run_quote_flow(page, out: Path, quantity: int, result: dict, cpl: Path) -> None:
+async def run_quote_flow(page, out: Path, quantity: int, result: dict, cpl: Path, keep_ordering: bool = False) -> None:
     if True:
         # 1. Bare board.
         await page.goto(JLC_QUOTE_URL, wait_until="load")
@@ -291,7 +378,9 @@ async def run_quote_flow(page, out: Path, quantity: int, result: dict, cpl: Path
         await require_signed_in(page)
         result["order_url"] = page.url
 
-        # 3. BOM and placement file.
+        # 3. BOM and placement file. NEXT does nothing until the page has
+        # finished loading the saved board, so wait for it to go idle.
+        await page.wait_for_load_state("networkidle")
         await guarded_click(page, 'button:visible:has-text("NEXT")')
         await page.wait_for_function("document.querySelectorAll('input[type=file]').length >= 2")
         uploads = page.locator("input[type=file]")
@@ -332,18 +421,15 @@ async def run_quote_flow(page, out: Path, quantity: int, result: dict, cpl: Path
         await guarded_click(page, 'button:visible:has-text("NEXT")')
         await page.wait_for_function("document.body.innerText.includes('Total Price')", timeout=120_000)
         await page.wait_for_timeout(3000)
-        await disable_ordering(page)
+        if not keep_ordering:
+            await disable_ordering(page)
         text = await body_text(page)
         result["charges"] = parse_charges(text)
         await page.screenshot(path=str(out / "quote.png"), full_page=True)
 
 
 def report(out: Path, result: dict) -> int:
-    for label, value in result["charges"].items():
-        if re.search(r"hand|manual", label, re.IGNORECASE) and value > 0:
-            result["warnings"].append(f"JLC charges {label}: ${value:.2f}")
-    if "Total Price" not in result["charges"]:
-        result["warnings"].append("no total price was found on the quote page")
+    charge_warnings(result)
     (out / "quote.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     for label, value in result["charges"].items():
@@ -352,7 +438,10 @@ def report(out: Path, result: dict) -> int:
           f"selected by LCSC number: {[p['reference'] for p in result['selected_by_lcsc']]}")
     for warning in result["warnings"]:
         print("WARNING:", warning)
-    print("Nothing was added to the cart. Now run tools/jlc_rotation_check.py", out)
+    if result.get("saved_to_cart"):
+        print("Saved to the JLC cart. Nothing was ordered or paid for: review the cart and check out yourself.")
+    else:
+        print("Nothing was added to the cart. Now run tools/jlc_rotation_check.py", out)
     return 1 if result["warnings"] else 0
 
 
@@ -365,11 +454,22 @@ def main(argv: list[str] | None = None) -> int:
     quote_parser.add_argument("--quantity", type=int, default=5)
     quote_parser.add_argument("--headed", action="store_true", help="show the browser window")
     quote_parser.add_argument("--cpl", type=Path, default=CPL, help="placement file to upload instead of bom/CPL-positions.csv")
+    quote_parser.add_argument("--save-to-cart", action="store_true",
+                              help="after a clean quote, save the order to the cart (never checks out or pays)")
+    quote_parser.add_argument("--max-total", type=float,
+                              help="with --save-to-cart: refuse if the total in USD is above this")
     args = parser.parse_args(argv)
+    if args.command == "quote":
+        if args.save_to_cart != (args.max_total is not None):
+            parser.error("--save-to-cart and --max-total go together")
+        if args.max_total is not None and not math.isfinite(args.max_total):
+            parser.error("--max-total must be a number")
+        if args.save_to_cart and args.cpl != CPL:
+            parser.error("--save-to-cart only uses the repository's own placement file")
     try:
         if args.command == "login":
             return asyncio.run(login())
-        return asyncio.run(quote(args.out, args.quantity, args.headed, args.cpl))
+        return asyncio.run(quote(args.out, args.quantity, args.headed, args.cpl, args.max_total))
     except QuoteError as error:
         print(f"jlc_quote: {error}", file=sys.stderr)
         return 2

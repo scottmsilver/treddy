@@ -106,7 +106,7 @@ not their production DFM result and not a built board.
 ### Repeating the quote
 
 `tools/jlc_quote.py` drives the same pages unattended and stops at the price.
-It cannot save to the cart, order or pay. It needs a Python with `camoufox`
+By default it cannot save to the cart, order or pay. It needs a Python with `camoufox`
 and a signed-in browser profile (`jlc_quote.py login`, once, by hand; the
 tool never handles the password).
 
@@ -117,6 +117,13 @@ python3 tools/jlc_rotation_check.py /tmp/jlc                 # pin-1 verdict per
 
 Run both after any change to the BOM, a part number, a footprint or a
 placement, and whenever `JLC_ROTATION_OFFSET_DEG` is touched.
+
+To put the order in the account's cart, add `--save-to-cart --max-total USD`.
+The tool then saves only if JLC raised no warning, all parts are confirmed,
+the total is at or under the limit and the rotation check passes on the
+preview it just captured. It declares the boards to customs as
+`DIY - HS Code 902300`. It never checks out or pays: the account owner reviews
+the cart, picks shipping and pays by hand.
 
 ## Order options to select (upload procedure)
 

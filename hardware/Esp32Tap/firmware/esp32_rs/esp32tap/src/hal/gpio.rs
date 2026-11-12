@@ -77,6 +77,16 @@ fn configure_input(io: u32) -> bool {
     config(&cfg)
 }
 
+/// RELAY_PULSE (IO8): output, low. Owned by `hal::pulse`.
+pub(crate) fn configure_relay_pulse() -> bool {
+    configure_output_low(pins::K_RELAY_PULSE)
+}
+
+/// The single RELAY_PULSE write site, called from the pulse timer.
+pub(crate) fn drive_relay_pulse(level: bool) {
+    let _ = set_level(pins::K_RELAY_PULSE, level as u32);
+}
+
 #[derive(Default)]
 pub struct Esp32SafetyIo {
     ready: bool,

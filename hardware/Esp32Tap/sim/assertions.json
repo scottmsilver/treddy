@@ -641,7 +641,33 @@
         },
         {
           "claim": "firmware RELAY_PULSE generation",
-          "reason": "the 1 kHz square wave is an ideal source; the IO8 toggle rate, task ownership, and watchdog coupling are unimplemented firmware requirements"
+          "reason": "the 1 kHz square wave is an ideal source; the real-pin IO8 edge timing under load, the esp_timer task, and the firmware watchdog coupling are unproven on hardware"
+        }
+      ]
+    },
+    "liveness_firmware_trace": {
+      "deck": "decks/liveness_firmware_trace.cir",
+      "assertions": {
+        "fw_precharge_wait_s": {"unit": "s", "min": 0.03, "max": 0.036, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "fw_gate_at_command_v": {"unit": "V", "min": 2.3, "max": 2.7, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "fw_entry_pickup_vt_hi_s": {"unit": "s", "min": 0.002, "max": 0.0035, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "fw_entry_pickup_vt_lo_s": {"unit": "s", "min": 0.002, "max": 0.0035, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "fw_hang_release_vt_hi_s": {"unit": "s", "min": 0.065, "max": 0.095, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "fw_hang_release_vt_lo_s": {"unit": "s", "min": 0.14, "max": 0.18, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "fw_cancel_release_vt_hi_s": {"unit": "s", "min": 0.045, "max": 0.075, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "fw_cancel_release_vt_lo_s": {"unit": "s", "min": 0.12, "max": 0.16, "abs_tolerance": 1e-05, "rel_tolerance": 0.001},
+        "fw_stall_gate_min_v": {"unit": "V", "min": 2.2, "max": 2.6, "abs_tolerance": 0.0001, "rel_tolerance": 0.001},
+        "fw_stall_coil_min_a": {"unit": "A", "min": 0.0205, "max": 0.0215, "abs_tolerance": 1e-07, "rel_tolerance": 0.0001},
+        "fw_slow_tick_gate_max_v": {"unit": "V", "min": 0.9, "max": 1.3, "abs_tolerance": 0.0001, "rel_tolerance": 0.001}
+      },
+      "unsupported": [
+        {
+          "claim": "real esp_timer and safety-loop timing on the chip",
+          "reason": "tick and loop times are chosen by the trace generator, not measured; jitter under Wi-Fi, BLE and flash load is unproven on hardware"
+        },
+        {
+          "claim": "measured Q3 pickup and release timing, and relay contact motion",
+          "reason": "same low-order pump, Q3 and coil models as relay_drive_release; coil current is not contact motion"
         }
       ]
     },

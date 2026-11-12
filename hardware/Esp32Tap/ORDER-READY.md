@@ -13,7 +13,7 @@ advance. It does not authorize an order or payment.
 | USB route and antenna-band keepout | PASS | PCB semantic tests; inner/bottom layers forbid tracks, vias and fills, the front layer forbids fills and vias and allows the U1 pad fan-out stubs |
 | BOM/CPL/DNP/placement parity | PASS | exporter assembly audit |
 | Exact deterministic fabrication package | PASS | 13-member export and reproduction gate |
-| Dual-engine behavioral simulations | PASS within declared models | eight decks, three repeats, two ngspice majors; one deck (`harness_supply_drop`) is a retired historical model |
+| Dual-engine behavioral simulations | PASS within declared models | nine decks, three repeats, two ngspice majors; one deck (`harness_supply_drop`) is a retired historical model |
 | Enclosure source/mesh/fit checks | PASS geometrically | pinned render and functional probes |
 | Host firmware safety contract | PASS as reference only | safety model and manifest-builder tests; does not implement `RELAY_PULSE` |
 | Recent exact-page part identity/stock | PASS at snapshot time | BOM-bound sanitized snapshot, refreshed 2026-11-12: all 46 distinct parts listed in stock; C585890 (the RJ45 jack, 2 per board) is the thinnest at 64 units |
@@ -33,7 +33,6 @@ mean a physical board has passed.
 | SMT-only reflow confirmation | OPEN | J1, J2 and J3 placed by standard top-side reflow, confirmed by JLC; no wave, manual solder or pigtail line item |
 | BOM/CPL placement | OPEN | Exact-part resolution and visual placement review |
 | Placement rotation preview | OPEN | CPL rotations are raw KiCad angles with no JLC correction table. Check every polarized or multi-pin part in JLC's placement preview before paying (see `ORDERING.md`) |
-| RJ45 pad 1 = Molex circuit 1 | OPEN, blocking | The footprint pad dimensions match the Molex SD-44144-001 drawing text, but nobody has confirmed by eye that footprint pad 1 is Molex circuit 1. If mirrored, supply polarity and the pin-3/pin-6 taps swap. bd `precor-9_3x-192` |
 | Substitutions | OPEN | None, or a new engineering review |
 | Enclosure material/mesh DFM | OPEN | JLC3DP acceptance without scaling or geometry changes; owner supplies the screws listed in `enclosure/DIMENSIONS.md` |
 | Current quote | OPEN | Fresh quote tied to artifact hashes |
@@ -47,10 +46,12 @@ payment was made.
 ## Open firmware gates
 
 - Production ESP-IDF application implementing `firmware/PLAN.md`.
-- `RELAY_PULSE` (IO8) liveness toggle, bd issue `precor-9_3x-4uv`: toggled
-  from the watchdog-supervised safety task as a 1 kHz square wave or faster, never from
-  LEDC/hardware PWM or a free-running timer. Until it exists the board cannot
-  transfer the relay and stays in bypass/Proxy.
+- `RELAY_PULSE` (IO8) liveness toggle, bd issue `precor-9_3x-4uv`: implemented
+  in `firmware/esp32_rs` (500 us `esp_timer` toggle, permission renewed by the
+  WDT-supervised serial engine, expiry 20 ms, not LEDC/RMT/PWM), unproven on
+  hardware. The issue stays open until bench proof: edge timing on the real pin
+  under load, the charge pump and K1 release, and the `esp_timer` task as a
+  dependency outside the supervised-task matrix.
 - Active-low VBUS attach strategy reviewed against ROM/reset behavior.
 - Exact sdkconfig, application, bootloader, partition table
   (`firmware/esp32_rs/partitions_esp32tap.csv`, not yet verified against a real
@@ -79,6 +80,10 @@ The host model is a contract, not a firmware deliverable.
   R34 open, C23 open, Q3 drain-source short; each needs a second fault).
 - Scope Q1 base, emitter and collector when the pulses stop with `RELAY_GATE`
   high (BC817 reverse VBE limit is 5 V).
+- RJ45 pad 1 orientation: verified by eye against Molex SD-44144-001 rev H9
+  sheet 2 (circuit 1 is the leftmost contact land in the component-side layout,
+  matching footprint pad 1 at x = -4.45); bd `precor-9_3x-192` closed. A built
+  board still has to confirm supply polarity and the pin-3/pin-6 taps.
 - SW1/SW2 pad numbering (corrected to rows; an earlier column numbering would
   have held the module in reset) confirmed on a built board.
 - R33 undervoltage hysteresis (calculated about 6.31 V falling, 6.85 V rising).

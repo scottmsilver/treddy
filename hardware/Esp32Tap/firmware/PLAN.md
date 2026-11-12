@@ -87,24 +87,48 @@ needs a second fault to matter. Open bench item: scope the Q1 base, emitter and
 collector when the pulses stop with `RELAY_GATE` high (BC817 reverse VBE limit
 is 5 V).
 
-Firmware requirements — **not implemented** (bd issue `precor-9_3x-4uv`):
+Firmware status: **implemented, unproven on hardware** (bd issue
+`precor-9_3x-4uv` stays open until bench proof).
 
-* toggle IO8 from the watchdog-supervised safety task, as a 1 kHz square wave or faster,
-  only while the task's own checks (owner lease, console freshness,
-  `TREAD_OK`, feedback state) permit Emulate;
-* never drive IO8 from LEDC / hardware PWM, a free-running timer, or an ISR
-  that keeps running when the safety task hangs; those would keep the relay
-  powered through the stall this contact exists to catch;
-* hold IO8 static (not toggling) in Proxy, at boot, at reset, and on every
-  fail-closed path;
-* keep the gap-safe entry order: `RELAY_PULSE` toggling must be established
-  before `RELAY_CMD` is asserted and the feedback window opens, so allow for
-  the pump's pickup time (modelled at roughly 7-17 ms; measure it);
-* bench-measure pickup time, release time, and a deliberately stalled
-  safety task with a scope on the K1 contacts before any Emulate use.
-
-Until firmware does this, the board cannot transfer the relay. It stays in
-bypass/Proxy, which is the safe direction.
+* Code: policy in `esp32_rs/safety_core/src/liveness.rs` (no unsafe; 12 host
+  tests in `safety_core/tests/liveness.rs`); pin and timer in
+  `esp32tap/src/hal/pulse.rs`; `K_RELAY_PULSE = 8` in `pins.rs`; wiring in
+  `tasks/serial_engine.rs` and `context.rs`.
+* Mechanism: a 500 us `esp_timer` callback toggles IO8 (1 kHz square wave) only
+  while a permission is live. The WDT-supervised serial engine renews that
+  permission on every 5 ms pass and it expires 20 ms after the last renewal, by
+  clock time. A hung safety loop therefore stops the pulses within 20 ms, and
+  the hardware then releases K1 roughly 50-150 ms later (calculated). It is
+  deliberately not LEDC, RMT or other hardware PWM, and not a free-running
+  timer, because those keep running when the task hangs.
+* Pulses are wanted in EntryWaitGap, EntryWaitFeedback, Emulating and
+  ExitWaitGap. They are off in Proxy and ExitWaitFeedback, at boot, at reset and
+  on every fail-closed path; `Guarded::apply_outputs` cancels them at once
+  whenever the mode stops wanting them. So in Proxy a stuck `RELAY_GATE` still
+  cannot energize K1.
+* Entry precharge: the controller gives K1 10 ms to report closed and the pump
+  needs several ms (modelled at roughly 5-10 ms), so entry gap qualification
+  waits until 60 uninterrupted edges (30 ms) have actually been emitted; any
+  pulse outage restarts the count. This gates only the voluntary gap
+  observation. The 1 s transfer deadline is unchanged and the
+  differential-tested safety controller was not modified.
+* Verification so far: the first implementation passed the full firmware sweep
+  (26 of 26 gates including the QEMU entry/exit scenarios). An independent
+  review then found three defects (precharge surviving a pulse outage, pulses
+  not cancelled when another task forces Proxy, and a callback-count budget
+  that did not bound elapsed time), all fixed with a host test each. Firmware
+  sweep on the fixed code: see commit message. The production unsafe budget
+  went 69 to 76 lines. `tests/test_firmware_pins.py` checks `pins.rs` against
+  `design.py`; the firmware build's own `check_pins.py` reads only the legacy
+  C++ `pins.hpp`.
+* **Not proven:** nothing has run on hardware; QEMU cannot observe the charge
+  pump and its relay model follows `RELAY_CMD` alone; edge timing on the real
+  pin under flash, network and BLE load needs a scope; the `esp_timer` task
+  (priority 22, IDF-owned) is a new dependency outside the supervised-task
+  matrix, with failure direction "pulses stop".
+* Still required on the bench before any Emulate use: pickup time, release
+  time, and a deliberately stalled safety task, with a scope on the K1
+  contacts.
 
 ## Task layout / core pinning (explicit sdkconfig — NOT the IDF defaults)
 

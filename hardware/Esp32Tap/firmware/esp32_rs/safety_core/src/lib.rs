@@ -33,6 +33,7 @@ pub mod fixed_str;
 pub mod hal;
 pub mod key_cache;
 pub mod kv;
+pub mod liveness;
 pub mod mode;
 pub mod parse_buf;
 pub mod ring;

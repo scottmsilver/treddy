@@ -37,6 +37,13 @@ pub const K_TREAD_OK_MCU: u32 = 6;
 /// hardware-gated by TREAD_OK; R23 10k pull-down fails safe.
 pub const K_RELAY_CMD: u32 = 21;
 
+/// net RELAY_PULSE — relay liveness pulses through R35/C22 into the Q3 charge
+/// pump. K1 can only energize while this pin TOGGLES (1 kHz); a steady level,
+/// high or low, leaves Q3 off. Driven only by `hal::pulse`, from the budget in
+/// `safety_core::liveness`. Never give it a hardware PWM: that would keep
+/// pulsing through a hung safety loop.
+pub const K_RELAY_PULSE: u32 = 8;
+
 /// net TX_ENABLE — motor-TX permission into the U6 AND gate (2A);
 /// hardware-gated by TREAD_OK; R27 10k pull-down fails safe.
 pub const K_TX_ENABLE: u32 = 15;

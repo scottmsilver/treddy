@@ -11,11 +11,12 @@
 //! zero-byte reads.
 
 use crate::context::{lock, FirmwareContext, Guarded};
-use crate::hal::{delay::RomDelay, wdt};
+use crate::hal::{delay::RomDelay, pulse, wdt};
 use crate::logi;
 use crate::tasks::{delay_ms, SERIAL_LOOP_MS};
 use safety_core::hal::{DelayUs, SafetyIo, SerialIn};
 use safety_core::kv::kv_parse;
+use safety_core::liveness::pulse_wanted;
 use safety_core::safety::constants::{FEEDBACK_POLL_US, GAP_QUALIFY_US};
 use safety_core::safety::controller::{OutputIntent, SafeMode};
 use safety_core::safety::{in_feedback_wait, run_feedback_window, FeedbackWindowIo};
@@ -46,6 +47,14 @@ impl FeedbackWindowIo for WindowIo<'_> {
         self.io.tread_ok()
     }
     fn apply(&mut self, intent: OutputIntent) {
+        // The feedback window can hold this task for its whole 10 ms
+        // deadline. Keep the liveness switch fed while the relay is being
+        // commanded closed, and cut it at once when it is commanded open.
+        if intent.relay.get() {
+            pulse::renew();
+        } else {
+            pulse::cancel();
+        }
         self.io.apply(intent);
     }
     fn delay(&mut self) {
@@ -196,8 +205,29 @@ pub fn run(ctx: &'static FirmwareContext) -> ! {
             // and opens K1 without it (N19), so a stuck writer cannot hold the
             // relay closed.
             let exit_frame_owed = m == SafeMode::ExitWaitGap && g.controller.exit_zero_frame_owed();
+
+            // Relay liveness switch (Rev E Q3). Renew the pulse permission on
+            // every pass while the controller is out of Proxy; this renewal
+            // is the only thing that keeps IO8 toggling, so a stall here opens
+            // Q3 in hardware. Entry additionally waits for the gate to charge:
+            // the pump needs several milliseconds and the controller gives
+            // the relay only 10 ms to report closed, so commanding K1 into a
+            // cold switch would fail every transfer. `precharged` counts
+            // edges the timer really emitted without interruption, so a pass
+            // that was blocked long enough for the pulses to lapse starts the
+            // wait again. Like `exit_frame_owed`, this gates ONLY the
+            // voluntary gap observation; the 1 s transfer deadline still
+            // fires on time.
+            if pulse_wanted(m) {
+                pulse::renew();
+            } else {
+                pulse::cancel();
+            }
+            let entry_precharging = m == SafeMode::EntryWaitGap && !pulse::precharged();
+
             if (m == SafeMode::EntryWaitGap || m == SafeMode::ExitWaitGap)
                 && !exit_frame_owed
+                && !entry_precharging
                 && now - g.last_console_rx >= GAP_QUALIFY_US
             {
                 g.controller.observe_interframe_gap(now);

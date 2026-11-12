@@ -59,6 +59,7 @@ PRODUCTION_UNSAFE = {
     "hal/clock.rs",
     "hal/delay.rs",
     "hal/gpio.rs",
+    "hal/pulse.rs",
     "hal/uart.rs",
     "hal/wdt.rs",
     "log.rs",
@@ -134,7 +135,10 @@ ALLOW_SITES = {
 # The earlier hand-written figure of "66 production lines" was produced by an
 # unstated rule and is superseded: 69 is what the rule above measures on the
 # same code, and it is now a build gate rather than a claim.
-PRODUCTION_UNSAFE_LINES = 69
+# 2026-11-12: 69 -> 76 for hal/pulse.rs, the RELAY_PULSE liveness toggler
+# (one esp_timer callback, which the counting rule attributes whole, plus the
+# esp_timer_create/esp_timer_start_periodic block).
+PRODUCTION_UNSAFE_LINES = 76
 # 22 shim + 25 net (eth) + 49 net (http: banner + ws handler). The ws
 # handler is one `unsafe extern "C"` fn, so the counting rule attributes its
 # whole body; the FFI surface inside it is 4 calls. The net delta is Slice 1's esp_netif/esp_eth bring-up:

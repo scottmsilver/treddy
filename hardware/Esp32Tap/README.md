@@ -31,11 +31,15 @@ a certified functional-safety controller.
   Calculated, not measured: the relay releases roughly 50-150 ms after
   toggling stops (not a guaranteed deadline), and one stray edge cannot turn
   Q3 on. The switch alone is not single-fault tolerant (C22 short, R34 open,
-  C23 open or Q3 drain-source short each defeat it; each needs a second fault). Firmware must toggle
-  IO8 from the watchdog-supervised safety task as a 1 kHz square wave or faster, not from
-  LEDC/PWM or a free-running timer. That firmware does not exist yet (bd
-  `precor-9_3x-4uv`), so the board cannot yet transfer the relay and stays in
-  bypass/Proxy, which is the safe direction.
+  C23 open or Q3 drain-source short each defeat it; each needs a second fault). The pulse
+  firmware is implemented in `firmware/esp32_rs` but unproven on hardware (bd
+  `precor-9_3x-4uv` stays open until bench proof): a 500 µs `esp_timer`
+  callback toggles IO8 (1 kHz) only while the WDT-supervised serial engine keeps
+  renewing a permission (every 5 ms pass; it expires 20 ms after the last
+  renewal), so a hung safety loop stops the pulses within 20 ms. It is
+  deliberately not LEDC/RMT/hardware PWM. Pulses are wanted only in
+  EntryWaitGap, EntryWaitFeedback, Emulating and ExitWaitGap, so in Proxy a
+  stuck `RELAY_GATE` still cannot energize K1.
 - K1 uses one transfer pole and one armature-feedback pole; feedback does not
   prove transfer-contact continuity.
 - U3 (USBLC6-2SC6) pin 5 is unconnected. Tied to the VBUS sense net it let the
@@ -103,7 +107,7 @@ make -C hardware/Esp32Tap check
 git diff --check
 ```
 
-The simulation runner executes eight decks three times on host ngspice 42 and
+The simulation runner executes nine decks three times on host ngspice 42 and
 pinned Docker ngspice 39. Passing proves only the declared models and artifact
 parity. The Q3 liveness switch is simulated as a behavioral charge pump; the
 times it reports are model outputs, not measurements.
@@ -143,12 +147,15 @@ The exact unsupported harness claims are `RJ45_SINGLE_OPEN_2A`,
   before paying. bd `precor-9_3x-f5y`.
 - Treadmill serial line level and +8 V rail under load are unmeasured. bd
   `precor-9_3x-3pb`.
-- `RELAY_PULSE` firmware is not implemented. bd `precor-9_3x-4uv`. Bench: scope
+- `RELAY_PULSE` firmware is implemented, unproven on hardware (nothing has run
+  on a board; QEMU cannot observe the charge pump; edge timing on the real pin
+  under flash/network/BLE load needs a scope). bd `precor-9_3x-4uv`. Bench: scope
   Q1 base/emitter/collector when the pulses stop with `RELAY_GATE` high (BC817
   reverse VBE limit 5 V).
-- Blocking: nobody has confirmed by eye that RJ45 footprint pad 1 is Molex
-  circuit 1 (pad dimensions match the Molex SD-44144-001 drawing text only). If
-  mirrored, supply polarity and the pin-3/pin-6 taps swap. bd `precor-9_3x-192`.
+- Verified by eye: RJ45 footprint pad 1 (x = -4.45) matches Molex circuit 1,
+  the leftmost contact land in the component-side layout of SD-44144-001 rev H9
+  sheet 2. bd `precor-9_3x-192` is closed. A built board still has to confirm
+  supply polarity and the pin-3/pin-6 taps.
 - The buck input capacitor C3 was not moved closer to U2 (low-severity review
   note).
 - `firmware/esp32_rs/partitions_esp32tap.csv` (nvs 24K, phy_init 4K, factory

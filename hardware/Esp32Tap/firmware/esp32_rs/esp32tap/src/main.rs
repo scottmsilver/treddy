@@ -103,6 +103,11 @@ fn main() {
             halt("safety IO init failed — halting in Proxy");
         }
     }
+    // (1b) Relay liveness pulses: pin low, tick running, budget empty. No
+    // edge is emitted until the supervised serial engine starts refilling it.
+    if !hal::pulse::init() {
+        halt("relay pulse timer init failed — halting in Proxy");
+    }
 
 
     // (2) Inverted UARTs.

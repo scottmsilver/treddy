@@ -1,0 +1,88 @@
+Esp32Tap Rev E liveness switch driven by the firmware's own RELAY_PULSE waveform
+* ASSUMPTIONS:
+* The pin waveforms in traces/liveness_firmware.inc are produced by the real
+* firmware pulse-permission code (safety_core PulseBudget) in
+* firmware/esp32_rs/safety_core/tests/liveness_trace.rs, which fails if the
+* committed trace is stale. The safety loop runs every 5 ms and the timer
+* every 500 us, at times the scenario chooses. The pin is an ideal 0/3.3 V
+* source with 1 us edges. The pump, Q3 and coil models and their limits are
+* those of relay_drive_release: K1 237 ohm, 0.5 H assumed, Q3 threshold swept
+* 0.65...1.45 V.
+* Scenarios: HANG (entry, then the safety loop stops at 300 ms while the timer
+* keeps running), CANCEL (entry, then the permission is withdrawn at 300 ms),
+* STALL (timer held off 9 ms in every 100 ms), SLOW (one tick every 10 ms,
+* the slowest ticking the firmware still counts as unbroken).
+* NON-CLAIMS:
+* Tick and loop times are chosen, not measured on a chip: the real esp_timer
+* task's jitter under Wi-Fi, BLE and flash load is not modeled. Coil current
+* is not contact motion. Nothing here is a bench measurement.
+
+.include models/behavioral.inc
+.include traces/liveness_firmware.inc
+
+V33 v33 0 3.3
+
+XPUMP_HANG pin_hang gate_hang PUMP
+XPUMP_CANCEL pin_cancel gate_cancel PUMP
+XPUMP_STALL pin_stall gate_stall PUMP
+XPUMP_SLOW pin_slow gate_slow PUMP
+
+* HANG: Q1 closes when the firmware reports the gate precharged (cmd).
+V5_HHI v5_hhi 0 5
+LHHI v5_hhi hhi_r 0.5
+RHHI hhi_r hhi_s 237
+VHHI_COIL_SENSE hhi_s hhi_col 0
+XHHI_CLAMP v5_hhi hhi_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SHHI_Q1 hhi_col hhi_rtn cmd 0 ESP_SWITCH
+XHHI hhi_rtn gate_hang ESP_Q3 params: VT=1.45
+
+V5_HLO v5_hlo 0 5
+LHLO v5_hlo hlo_r 0.5
+RHLO hlo_r hlo_s 237
+VHLO_COIL_SENSE hlo_s hlo_col 0
+XHLO_CLAMP v5_hlo hlo_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SHLO_Q1 hlo_col hlo_rtn cmd 0 ESP_SWITCH
+XHLO hlo_rtn gate_hang ESP_Q3 params: VT=0.65
+
+* CANCEL: worst case, Q1 stays closed (RELAY_CMD stuck high) and only the
+* missing pulses release the coil.
+V5_CHI v5_chi 0 5
+LCHI v5_chi chi_r 0.5
+RCHI chi_r chi_s 237
+VCHI_COIL_SENSE chi_s chi_col 0
+XCHI_CLAMP v5_chi chi_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SCHI_Q1 chi_col chi_rtn v33 0 ESP_SWITCH
+XCHI chi_rtn gate_cancel ESP_Q3 params: VT=1.45
+
+V5_CLO v5_clo 0 5
+LCLO v5_clo clo_r 0.5
+RCLO clo_r clo_s 237
+VCLO_COIL_SENSE clo_s clo_col 0
+XCLO_CLAMP v5_clo clo_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SCLO_Q1 clo_col clo_rtn v33 0 ESP_SWITCH
+XCLO clo_rtn gate_cancel ESP_Q3 params: VT=0.65
+
+* STALL: does the coil hold through the stalls at the highest threshold?
+V5_SHI v5_shi 0 5
+LSHI v5_shi shi_r 0.5
+RSHI shi_r shi_s 237
+VSHI_COIL_SENSE shi_s shi_col 0
+XSHI_CLAMP v5_shi shi_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SSHI_Q1 shi_col shi_rtn v33 0 ESP_SWITCH
+XSHI shi_rtn gate_stall ESP_Q3 params: VT=1.45
+
+.tran 2u 500m 0 2u
+
+.meas tran fw_precharge_wait_s TRIG v(mark_entry) VAL=1.65 RISE=1 TARG v(cmd) VAL=1.65 RISE=1
+.meas tran fw_gate_at_command_v FIND v(gate_hang) WHEN v(cmd)=1.65 RISE=1
+.meas tran fw_entry_pickup_vt_hi_s TRIG v(cmd) VAL=1.65 RISE=1 TARG i(VHHI_COIL_SENSE) VAL=0.0147 RISE=1
+.meas tran fw_entry_pickup_vt_lo_s TRIG v(cmd) VAL=1.65 RISE=1 TARG i(VHLO_COIL_SENSE) VAL=0.0147 RISE=1
+.meas tran fw_hang_release_vt_hi_s TRIG v(mark_stop) VAL=1.65 RISE=1 TARG i(VHHI_COIL_SENSE) VAL=0.0021 FALL=1
+.meas tran fw_hang_release_vt_lo_s TRIG v(mark_stop) VAL=1.65 RISE=1 TARG i(VHLO_COIL_SENSE) VAL=0.0021 FALL=1
+.meas tran fw_cancel_release_vt_hi_s TRIG v(mark_cancel) VAL=1.65 RISE=1 TARG i(VCHI_COIL_SENSE) VAL=0.0021 FALL=1
+.meas tran fw_cancel_release_vt_lo_s TRIG v(mark_cancel) VAL=1.65 RISE=1 TARG i(VCLO_COIL_SENSE) VAL=0.0021 FALL=1
+.meas tran fw_stall_gate_min_v MIN v(gate_stall) FROM=100m TO=500m
+.meas tran fw_stall_coil_min_a MIN i(VSHI_COIL_SENSE) FROM=100m TO=500m
+.meas tran fw_slow_tick_gate_max_v MAX v(gate_slow) FROM=400m TO=500m
+
+.end

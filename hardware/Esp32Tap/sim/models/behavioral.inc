@@ -68,3 +68,18 @@ SDET out 0 gate 0 ESP_SWITCH_1V
 RPULL rail out 10k
 SDET out 0 gate 0 ESP_SWITCH_2V5
 .ends ESP_VBUS_DETECTOR_2V5
+
+* Rev E liveness switch building blocks: the RELAY_PULSE charge pump and Q3.
+.subckt PUMP pin gate
+R35 pin pump_in 560
+C22 pump_in pump_ac 100n
+D8A 0 pump_ac ESP_BAT54S
+D8B pump_ac gate ESP_BAT54S
+C23 gate 0 1u
+R34 gate 0 100k
+.ends PUMP
+
+.subckt ESP_Q3 d g params: VT=1.05
+BQ3 d 0 I={v(d)*20*min(max((v(g)-VT)/0.5,0),1)}
+RQ3 d 0 1g
+.ends ESP_Q3

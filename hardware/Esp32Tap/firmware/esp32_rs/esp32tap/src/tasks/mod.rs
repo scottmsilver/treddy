@@ -75,6 +75,15 @@
 //! A stall in any of them panics -> silent reboot -> GPIO21 Hi-Z -> R23
 //! pull-down -> relay released. The hardware completes the guarantee; there is
 //! deliberately no software "WDT handler".
+//!
+//! ONE THING OUTSIDE THIS MATRIX CARRIES SAFETY WEIGHT: the RELAY_PULSE
+//! toggler (`hal/pulse.rs`) runs as a callback in the IDF esp_timer task
+//! (priority 22, created by IDF, not by `spawn_pinned`, not WDT-subscribed).
+//! It needs no supervision of its own because it can only emit an edge under a
+//! permission the serial engine renewed in the last 20 ms: if the serial
+//! engine stalls the pulses stop, and if the esp_timer task stalls the pulses
+//! stop. Either way Q3 opens and K1 releases, in hardware, without waiting for
+//! the 2 s WDT.
 
 // COMPILER-ENFORCED unsafe containment for this module and every module
 // below it. `forbid` (unlike the crate root's `deny`) CANNOT be lifted by an

@@ -111,7 +111,17 @@ impl Guarded {
 
     /// Push the controller's commanded outputs to hardware. `SafetyIo::apply`
     /// is the only write site and orders tx before relay.
+    ///
+    /// Also the one place every task passes through after changing the
+    /// controller's mode, so it withdraws the relay liveness pulses the moment
+    /// the mode stops wanting them (an emergency stop from the HTTP task, a
+    /// deadline firing inside `tick`). Renewal is NOT done here: only the
+    /// supervised serial engine may renew, because renewal is the liveness
+    /// signal.
     pub fn apply_outputs(&mut self) {
+        if !safety_core::liveness::pulse_wanted(self.controller.mode()) {
+            crate::hal::pulse::cancel();
+        }
         self.io.apply(self.controller.output_intent());
     }
 }

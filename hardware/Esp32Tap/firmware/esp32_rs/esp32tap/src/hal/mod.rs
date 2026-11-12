@@ -32,6 +32,7 @@
 pub mod clock;
 pub mod delay;
 pub mod gpio;
+pub mod pulse;
 pub mod uart;
 pub mod wdt;
 

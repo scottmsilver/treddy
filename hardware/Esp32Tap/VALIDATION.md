@@ -144,11 +144,13 @@ presented as review of these bytes.
   including Q3 liveness pickup/release (calculated roughly 50-150 ms, not a guaranteed deadline), gate
   level (about 2.55 V at 1 kHz) and stray-edge immunity, a scope of Q1
   base/emitter/collector when pulses stop with `RELAY_GATE` high (BC817 reverse
-  VBE limit 5 V), the fact that the switch is not single-fault tolerant alone, which firmware cannot yet exercise
-  (`RELAY_PULSE` unimplemented; bd `precor-9_3x-4uv`);
+  VBE limit 5 V), the fact that the switch is not single-fault tolerant alone, and real-pin IO8 edge timing under
+  flash/network/BLE load (`RELAY_PULSE` is implemented but unproven on hardware;
+  bd `precor-9_3x-4uv`);
 - treadmill serial line level and +8 V under load (bd `precor-9_3x-3pb`);
-- RJ45 footprint pad 1 = Molex circuit 1, confirmed by eye (blocking; bd
-  `precor-9_3x-192`);
+- RJ45 footprint pad 1 = Molex circuit 1: verified by eye against SD-44144-001
+  rev H9 sheet 2 (bd `precor-9_3x-192` closed); supply polarity and the
+  pin-3/pin-6 taps still to confirm on a built board;
 - SW1/SW2 pad numbering, R33 hysteresis, and U3 pin 5 / `VBUS_PRESENT_N`
   behavior confirmed on a built board;
 - native USB attach/enumeration/unplug/eye/ground-current tests;

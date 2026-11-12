@@ -22,7 +22,7 @@ Rev E is internally coherent under the checked repository models:
 - exact 2 A emitted-copper trace-union analysis with independent GND-via
   envelope;
 - exact schematic/PCB/BOM/CPL/fabrication parity;
-- eight repeated dual-engine behavioral simulation decks.
+- nine repeated dual-engine behavioral simulation decks.
 
 This closes repository-detectable consistency defects. It does not close
 vendor, firmware, or physical safety work.
@@ -54,10 +54,12 @@ below the 0.65 V minimum threshold; release roughly 50-150 ms after toggling
 stops (not a guaranteed deadline). The switch alone is not single-fault tolerant:
 a C22 short, R34 open, C23 open or Q3 drain-source short each defeats it, and
 each needs a second fault to matter. Bench: scope Q1 base/emitter/collector when
-pulses stop with `RELAY_GATE` high (BC817 reverse VBE limit 5 V). Firmware must toggle IO8 from the watchdog-supervised safety task at
-a 1 kHz square wave or faster, never from LEDC/hardware PWM or a free-running timer. That
-firmware is not implemented (bd `precor-9_3x-4uv`); until it is, the board
-cannot transfer the relay and stays in bypass/Proxy.
+pulses stop with `RELAY_GATE` high (BC817 reverse VBE limit 5 V). The pulse firmware is
+implemented in `firmware/esp32_rs` but unproven on hardware (bd
+`precor-9_3x-4uv` stays open until bench proof): a 500 us `esp_timer` callback
+toggles IO8 at 1 kHz only while the supervised serial engine keeps renewing a
+permission that expires 20 ms after the last renewal; it is not LEDC/RMT/PWM.
+Nothing has run on a board, and QEMU cannot observe the charge pump.
 
 R33 (1 MΩ, `TREAD_OK` to `UV_SENSE`) adds about 0.45 V of undervoltage
 hysteresis; nominal UV is about 6.31 V falling and 6.85 V rising (calculated).
@@ -137,9 +139,9 @@ items are recorded honestly, not solved:
   plus rails and fiducials. The order needs JLC-added rails to reach 70 mm
   (or a 2-up panel), with routed tabs away from C2, C7, F1, D1, D3 and R5.
   Those parts were not moved. bd `precor-9_3x-idr`.
-- Blocking: nobody has confirmed by eye that RJ45 footprint pad 1 is Molex
-  circuit 1 (pad dimensions match the Molex SD-44144-001 drawing text only);
-  if mirrored, supply polarity and the pin-3/pin-6 taps swap. bd `precor-9_3x-192`.
+- RJ45 footprint pad 1 verified by eye as Molex circuit 1 (SD-44144-001 rev
+  H9 sheet 2); bd `precor-9_3x-192` closed. A built board still has to confirm
+  supply polarity and the pin-3/pin-6 taps.
 - CPL rotations are raw KiCad angles with no JLC correction table; every
   polarized or multi-pin part must be checked in JLC's placement preview
   before paying. bd `precor-9_3x-f5y`.

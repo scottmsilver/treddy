@@ -33,7 +33,7 @@ on these safety-critical facts:
 - U5, Q1 and Q3 are series coil controls; U7 is the independent TX output-enable.
 - Q3 conducts only while firmware keeps toggling `RELAY_PULSE` (IO8) through
   the C22/D8 charge pump, so K1 needs `TREAD_OK`, `RELAY_CMD` and the pulse.
-  Firmware for the pulse is not implemented, so the relay cannot yet transfer.
+  The pulse firmware is implemented but unproven on hardware; nothing has run on a board.
 - K1 pole A transfers MOT6 between CONS6 and TX_DRV.
 - K1 pole B reports normally closed/normally open armature state.
 - R7/R8 are passive 10 kΩ receive taps and do not interrupt the through bus.

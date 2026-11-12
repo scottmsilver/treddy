@@ -61,7 +61,7 @@ Split, each crate gets its own `.cargo/config.toml` and its own `Cargo.lock`.
 | IO5 | `K1_NO_FB` | input | K1 feedback pole, normally open |
 | IO6 | `TREAD_OK_MCU` | input only | via R32; never drive |
 | IO7 | `VBUS_PRESENT_N` | input | LOW = VBUS present |
-| IO8 | `RELAY_PULSE` | output | liveness toggle, 1 kHz square wave or faster, from the supervised safety task only (see `../PLAN.md`); not implemented, and absent from `pins.hpp` and `check_pins.py` |
+| IO8 | `RELAY_PULSE` | output | liveness toggle, 1 kHz square wave: a 500 us `esp_timer` callback, enabled only while the supervised serial engine renews its permission (`K_RELAY_PULSE = 8` in `pins.rs`, `esp32tap/src/hal/pulse.rs`, policy in `safety_core/src/liveness.rs`); implemented, unproven on hardware (see `../PLAN.md`). `tests/test_firmware_pins.py` checks `pins.rs` against `design.py`; `tools/check_pins.py` only reads the legacy C++ `pins.hpp` |
 | IO15 | `TX_ENABLE` | output | |
 | IO16 | `PIN3_RX` | input | |
 | IO17 | `ESP_TX` | output | |
@@ -164,7 +164,7 @@ zero-init-then-assign.
     required gate in `tools/build.sh`: it asserts the allowlist of
     unsafe-bearing files, the allowlist of `allow(unsafe_code)` sites, a
     `// SAFETY:` comment on every unsafe block, and the exact line budget
-    (69 production lines across `hal/` + `log.rs`; 346 more in code the
+    (76 production lines across `hal/` + `log.rs`; 346 more in code the
     flashed image does not contain — `qemu_test/` behind `feature = "qemu-test"`
     and `net/` behind `feature = "net"`). Its counting rule is stated in the
     script, so the number is reproducible rather than asserted.

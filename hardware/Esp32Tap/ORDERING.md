@@ -57,6 +57,19 @@ Require the preview and quote to show:
 U1 is fully on-board with 3.25/3.30 mm margins (no antenna overhang), so no
 antenna carrier is needed. Keep metal and tooling out of the antenna keepout.
 
+## Operator-observed JLC quote tool, 2026-11-12 (not vendor-signed)
+
+Recorded by the operator from the JLC quote tool; not a vendor-signed result
+and not a production-file approval. The Gerber archive `a22659b7...` (the
+current `kicad/Esp32Tap-gerbers.zip`) parsed as 4-layer, 58 x 95 mm. Options
+used: Epoxy Filled & Capped via covering plus Horizontal Electroless Copper
+Plating, ENIG, minimum via 0.2 mm (0.3/0.35 mm), Standard PCBA top side, and
+Edge Rails/Fiducials Added by JLCPCB (the tool reported 95 x 70 mm with rails).
+Bare-board total USD 83.98 for 5: base 8.00, via covering 17.37, via plating
+3.39, ENIG 17.40, 0.2 mm via 17.37, 4-wire Kelvin test 16.98, material 3.47.
+The BOM/CPL step requires a login and was not done. Nothing was added to a
+cart. Re-check the price in the tool at the time of any real order.
+
 ## Order options to select (upload procedure)
 
 Keep HOLD: this is the procedure for a future owner-authorized review, not
@@ -83,7 +96,11 @@ authorization to order. Do not pay on the strength of any preview.
 4. **Confirm parts placement.** Enable "Confirm Parts Placement" (and
    "Confirm production files") so a JLC engineer shows the placement preview
    before production.
-5. **Check the RJ45 pad-1 orientation first (blocking).** Before relying on any preview, confirm by eye that footprint pad 1 of J1/J2 is Molex circuit 1 (the pad dimensions match the Molex SD-44144-001 drawing text only). If mirrored, supply polarity and the pin-3/pin-6 taps swap. bd `precor-9_3x-192`.
+5. **RJ45 pad 1 orientation: verified by eye** against Molex SD-44144-001 rev H9
+   sheet 2 (circuit 1 is the leftmost contact land in the component-side layout,
+   matching footprint pad 1 at x = -4.45); bd `precor-9_3x-192` closed. This
+   is not a vendor result; a built board still has to confirm supply polarity
+   and the pin-3/pin-6 taps.
 6. **Check every rotation in the preview.** `bom/CPL-positions.csv` carries
    raw KiCad angles with no JLC correction table. Compare pin 1 / polarity /
    orientation of each of these in JLC's placement preview against
@@ -144,8 +161,7 @@ Before purchase, obtain and archive:
 4. rails/panel-to-70-mm drawing, J1/J2/J3 standard top-side reflow
    confirmation (no wave/manual line item), and Epoxy Filled & Capped via
    covering with its quoted price;
-5. RJ45 pad 1 confirmed as Molex circuit 1 (bd `precor-9_3x-192`), and
-   placement-rotation preview checked for every part listed above;
+5. placement-rotation preview checked for every part listed above;
 6. exact enclosure quote/drawings (the owner supplies the screws listed in
    `enclosure/DIMENSIONS.md`);
 7. owner authorization for the specified verification quantity.

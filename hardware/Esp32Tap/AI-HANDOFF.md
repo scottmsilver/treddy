@@ -51,11 +51,25 @@ and physical evidence. A passing model is not an assembled-treadmill result.
   moves the gate about 0.27 V (below the 0.65 V minimum threshold); release
   roughly 50-150 ms after toggling stops (R34 x C23 = 100 ms time constant; not a guaranteed deadline). The
   `sim/` models agree in order of magnitude and are also not measurements.
-  **Firmware requirement, not implemented (bd `precor-9_3x-4uv`):** IO8 must
-  be toggled from the watchdog-supervised safety task as a 1 kHz square wave or faster, and
-  must NOT be driven by LEDC/hardware PWM or a free-running timer, because
-  those keep running when the task hangs. Until then the board cannot transfer
-  the relay (it stays in bypass/Proxy, the safe direction). The liveness
+  **Firmware: implemented, unproven on hardware (bd `precor-9_3x-4uv` stays
+  open until bench proof).** Policy is `safety_core/src/liveness.rs` (12 host
+  tests in `safety_core/tests/liveness.rs`); pin and timer are
+  `esp32tap/src/hal/pulse.rs` (`K_RELAY_PULSE = 8` in `pins.rs`); wiring is in
+  `tasks/serial_engine.rs` and `context.rs`. A 500 us `esp_timer` callback
+  toggles IO8 (1 kHz) only while a permission is live; the WDT-supervised serial
+  engine renews it every 5 ms pass and it expires 20 ms after the last renewal,
+  so a hung loop stops the pulses within 20 ms and K1 releases roughly 50-150 ms
+  later (calculated). It must stay off LEDC/RMT/hardware PWM, which keep running
+  when the task hangs. Pulses are wanted in EntryWaitGap, EntryWaitFeedback,
+  Emulating and ExitWaitGap, off in Proxy and ExitWaitFeedback, and
+  `Guarded::apply_outputs` cancels them at once, so in Proxy a stuck
+  `RELAY_GATE` still cannot energize K1. Entry gap qualification waits for 60
+  uninterrupted emitted edges (30 ms); the 1 s transfer deadline and the
+  differential-tested controller are unchanged. NOT proven: nothing has run on
+  hardware; QEMU cannot see the charge pump (its relay model follows `RELAY_CMD`
+  alone); edge timing under flash/network/BLE load needs a scope; the
+  `esp_timer` task (priority 22, IDF-owned) is a new dependency outside the
+  supervised-task matrix, failing in the direction "pulses stop". The liveness
   switch is not single-fault tolerant on its own: a C22 short, R34 open, C23
   open or Q3 drain-source short each defeats it, and each needs a second fault
   to matter. Open bench item: scope Q1 base/emitter/collector when the pulses
@@ -103,7 +117,7 @@ Gerbers.
   D+ A/B = 55.8729617233/54.8729617233 mm. Per-side D+/D− skew is
   0.0799168981 mm (gate 0.5 mm). Signals stay on F.Cu with zero signal vias; controlled
   sections use 0.2906 mm copper and 0.2000 mm edge gap.
-- The simulation gate has **eight decks**. Each runs three times on host
+- The simulation gate has **nine decks**. Each runs three times on host
   ngspice 42 and pinned offline Docker ngspice 39. `harness_supply_drop`
   models the removed Micro-Fit pigtail harness and is historical only. The
   VIN decks use 26 uF effective capacitance (22 uF worst corner), from C1 22 +
@@ -159,7 +173,7 @@ make -C hardware/Esp32Tap check
 git diff --check
 ```
 
-The eight simulations run with:
+The nine simulations run with:
 
 ```bash
 python3 hardware/Esp32Tap/sim/run_simulations.py \
@@ -194,9 +208,6 @@ harness list is: `RJ45_SINGLE_OPEN_2A`, `MINIMUM_VIN`, `SOURCE_IMPEDANCE`,
   correction table; check every polarized or multi-pin part in JLC's preview
   before paying. bd `precor-9_3x-f5y`;
 - treadmill serial line level and +8 V under load. bd `precor-9_3x-3pb`;
-- **blocking:** nobody has confirmed by eye that RJ45 footprint pad 1 is Molex
-  circuit 1 (pad dimensions match the Molex SD-44144-001 drawing text only). If
-  mirrored, supply polarity and the pin-3/pin-6 taps swap. bd `precor-9_3x-192`;
 - enclosure quote, material, physical fit, installed clearance, and RF range
   for the J1/J2 RJ45 wall apertures;
 - treadmill +8 V/VIN/source-impedance/transient/load/thermal measurements;

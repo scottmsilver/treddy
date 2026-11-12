@@ -1,4 +1,4 @@
-Esp32Tap Rev B F1 D1 D3 input protection behavioral corners
+Esp32Tap Rev E F1 D1 D3 input protection behavioral corners
 * ASSUMPTIONS:
 * F1 1812L075/24DR is resistance-only at 0.11 ohm cold and 0.29 ohm
 * hot/post-trip bound. D1 is SS34. D3 is SMBJ10A on protected VIN.
@@ -7,6 +7,10 @@ Esp32Tap Rev B F1 D1 D3 input protection behavioral corners
 * fraction of the published SMBJ pulse envelope in assertions.json. Its
 * 11.1 V breakdown corner bounds current/energy; 12.3 V/high-clamp copies
 * independently bound the protected-VIN peak.
+* VIN CAPACITANCE (Rev E): C1 22u + C2 10u + C3 10u + C15 1u + 0.2u = 43.2 uF
+* nominal, about 26 uF effective at 7.5 V DC bias (22 uF worst corner). The
+* decks use 26 uF, and 22 uF where a worst-corner copy is declared. This is
+* the datasheet-derating estimate, not a measured value.
 * NON-CLAIMS:
 * PTC thermal trip/hold/reset, repetitive surges, wiring inductance, and any
 * pulse beyond published F1/D1/D3 envelopes are not certified by this deck.
@@ -21,7 +25,7 @@ DNOM_C_D1 nom_c_a nom_c_vin ESP_SS34
 VNOM_C_D3_SENSE nom_c_d3_a 0 0
 DNOM_C_D3 nom_c_d3_a nom_c_vin ESP_SMBJ10A
 RNOM_C_LOAD nom_c_vin 0 53.333333
-CNOM_C nom_c_vin 0 120u
+CNOM_C nom_c_vin 0 26u
 
 VNOM_H nom_h_src 0 8
 RNOM_H_SRC nom_h_src nom_h_f 0.5
@@ -30,7 +34,7 @@ DNOM_H_D1 nom_h_a nom_h_vin ESP_SS34
 VNOM_H_D3_SENSE nom_h_d3_a 0 0
 DNOM_H_D3 nom_h_d3_a nom_h_vin ESP_SMBJ10A
 RNOM_H_LOAD nom_h_vin 0 53.333333
-CNOM_H nom_h_vin 0 120u
+CNOM_H nom_h_vin 0 26u
 
 * Supported 16 V / 1 ms low-source-resistance pulse.
 VSAFE16 safe16_src 0 PWL(0 8 1m 8 1.001m 16 2.001m 16 2.002m 8 20m 8)
@@ -41,7 +45,7 @@ DSAFE16_D1 safe16_d1_a safe16_vin ESP_SS34
 VSAFE16_D3_SENSE safe16_d3_a 0 0
 DSAFE16_D3 safe16_d3_a safe16_vin ESP_SMBJ10A
 RSAFE16_LOAD safe16_vin 0 53.333333
-CSAFE16 safe16_vin 0 120u
+CSAFE16 safe16_vin 0 26u
 
 * Same 16 V pulse with D3 maximum-breakdown/high-clamp corner for worst VIN.
 VSAFE16_H safe16_h_src 0 PWL(0 8 1m 8 1.001m 16 2.001m 16 2.002m 8 20m 8)
@@ -50,7 +54,7 @@ RSAFE16_H_F1 safe16_h_f safe16_h_a 0.11
 DSAFE16_H_D1 safe16_h_a safe16_h_vin ESP_SS34
 DSAFE16_H_D3 0 safe16_h_vin ESP_SMBJ10A_HIGH
 RSAFE16_H_LOAD safe16_h_vin 0 53.333333
-CSAFE16_H safe16_h_vin 0 120u
+CSAFE16_H safe16_h_vin 0 22u
 
 * Supported 20 V / 10 ms pulse with 10 ohm source resistance.
 VSAFE20 safe20_src 0 PWL(0 8 3m 8 3.001m 20 13.001m 20 13.002m 8 20m 8)
@@ -61,7 +65,7 @@ DSAFE20_D1 safe20_d1_a safe20_vin ESP_SS34
 VSAFE20_D3_SENSE safe20_d3_a 0 0
 DSAFE20_D3 safe20_d3_a safe20_vin ESP_SMBJ10A
 RSAFE20_LOAD safe20_vin 0 53.333333
-CSAFE20 safe20_vin 0 120u
+CSAFE20 safe20_vin 0 26u
 
 * Same 20 V pulse with D3 maximum-breakdown/high-clamp corner for worst VIN.
 VSAFE20_H safe20_h_src 0 PWL(0 8 3m 8 3.001m 20 13.001m 20 13.002m 8 20m 8)
@@ -70,7 +74,7 @@ RSAFE20_H_F1 safe20_h_f safe20_h_a 0.29
 DSAFE20_H_D1 safe20_h_a safe20_h_vin ESP_SS34
 DSAFE20_H_D3 0 safe20_h_vin ESP_SMBJ10A_HIGH
 RSAFE20_H_LOAD safe20_h_vin 0 53.333333
-CSAFE20_H safe20_h_vin 0 120u
+CSAFE20_H safe20_h_vin 0 22u
 
 * Deliberately unsupported 36 V / 1 ms case: simulated only to make the
 * out-of-envelope case visible. The runner must print UNSUPPORTED, never PASS.
@@ -81,10 +85,10 @@ DUNSUP36_D1 unsup36_a unsup36_vin ESP_SS34
 VUNSUP36_D3_SENSE unsup36_d3_a 0 0
 DUNSUP36_D3 unsup36_d3_a unsup36_vin ESP_SMBJ10A
 RUNSUP36_LOAD unsup36_vin 0 53.333333
-CUNSUP36 unsup36_vin 0 120u
+CUNSUP36 unsup36_vin 0 26u
 
 * Reverse-polarity branch: D1 must isolate local VIN. The long tail allows
-* the real 120 uF modeled input capacitance to discharge through its load.
+* the modeled 26 uF effective input capacitance to discharge through its load.
 VREV rev_src 0 PWL(0 8 10m 8 10.001m -8 60m -8)
 RREV_SRC rev_src rev_f 0.5
 RREV_F1 rev_f rev_a 0.11
@@ -93,7 +97,7 @@ DREV_D1 rev_d1_a rev_vin ESP_SS34
 VREV_D3_SENSE rev_d3_a 0 0
 DREV_D3 rev_d3_a rev_vin ESP_SMBJ10A
 RREV_LOAD rev_vin 0 53.333333
-CREV rev_vin 0 120u
+CREV rev_vin 0 26u
 
 .tran 5u 60m
 

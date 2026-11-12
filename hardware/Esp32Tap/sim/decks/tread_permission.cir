@@ -1,4 +1,4 @@
-Esp32Tap Rev B TPS3700 window and relay-supply permission corners
+Esp32Tap Rev E TPS3700 window and relay-supply permission corners
 * ASSUMPTIONS:
 * R17/R18 are 150k/10k, R19/R20 are 255k/10k, all 1 percent.
 * C18/C19 are 1 nF. TPS3700 rising threshold is 396...404 mV,
@@ -10,6 +10,9 @@ Esp32Tap Rev B TPS3700 window and relay-supply permission corners
 * TPS70950 uses its guaranteed 1.5 ms maximum EN-to-95%-VOUT startup
 * (VOUT > 3.3 V) as a first-order ramp, then a 2 ohm Thevenin output feeding
 * C16=4.7 uF and K1=237 ohm. Disable opens the source so C16 discharges.
+* R33 NOT MODELED: Rev E adds R33 (1 Mohm, TREAD_OK to UV_SENSE), which
+* raises the rising UV threshold by about 0.45 V of VIN. The UV corners below
+* are the divider-only values and do not include that hysteresis.
 * NON-CLAIMS:
 * This is not a transistor-level TPS3700/TPS70950 model and does not prove
 * regulator current-limit, relay contact motion, treadmill rail quality, or

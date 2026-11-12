@@ -28,7 +28,7 @@ SWITCH = """(footprint "SW_SPST_SKRPACE010"
 \t(generator "pcbnew")
 \t(generator_version "9.0")
 \t(layer "F.Cu")
-\t(descr "Alps Alpine SKRPACE010, official 5.2 x 2.8 mm land pattern")
+\t(descr "Alps Alpine SKRPACE010, official 5.2 x 2.8 mm land pattern; terminals are joined along each row, so pad 1 is both top lands and pad 2 both bottom lands")
 \t(attr smd)
 \t(fp_line
 \t\t(start -1.4 -1.65)
@@ -58,9 +58,9 @@ SWITCH = """(footprint "SW_SPST_SKRPACE010"
 \t)
 \t(pad "1" smd rect (at -2.075 -1.075) (size 1.05 0.65)
 \t\t(layers "F.Cu" "F.Paste" "F.Mask"))
-\t(pad "1" smd rect (at -2.075 1.075) (size 1.05 0.65)
+\t(pad "1" smd rect (at 2.075 -1.075) (size 1.05 0.65)
 \t\t(layers "F.Cu" "F.Paste" "F.Mask"))
-\t(pad "2" smd rect (at 2.075 -1.075) (size 1.05 0.65)
+\t(pad "2" smd rect (at -2.075 1.075) (size 1.05 0.65)
 \t\t(layers "F.Cu" "F.Paste" "F.Mask"))
 \t(pad "2" smd rect (at 2.075 1.075) (size 1.05 0.65)
 \t\t(layers "F.Cu" "F.Paste" "F.Mask"))
@@ -72,8 +72,28 @@ TABLE = """(fp_lib_table
   (lib (name "Button_Switch_SMD")(type "KiCad")(uri "${KIPRJMOD}/Button_Switch_SMD.pretty")(options "")(descr "Esp32Tap qualified switch footprints"))
   (lib (name "RF_Module")(type "KiCad")(uri "${KIPRJMOD}/RF_Module.pretty")(options "")(descr "Esp32Tap pinned ESP32 module footprint"))
   (lib (name "RJ45_SMD")(type "KiCad")(uri "${KIPRJMOD}/RJ45_SMD.pretty")(options "")(descr "Esp32Tap pinned RJ45 SMD jack footprint"))
-)
+@STOCK@)
 """
+# Every other footprint the board uses is a pinned copy of the KiCad stock
+# library under tools/footprint_sources/stock (see its MANIFEST.json).  The
+# project table shadows the global nicknames with those copies so neither
+# the generator nor DRC's library-parity check depends on whichever KiCad
+# library version is installed.  A KiCad library update that renamed the
+# USB-C shell pads once made this board impossible to regenerate.
+STOCK_LIBRARIES = sorted(
+    path.name[: -len(".pretty")]
+    for path in (PINNED_SOURCES / "stock").glob("*.pretty")
+    if path.name != "Button_Switch_SMD.pretty"
+)
+TABLE = TABLE.replace(
+    "@STOCK@",
+    "".join(
+        f'  (lib (name "{name}")(type "KiCad")'
+        f'(uri "${{KIPRJMOD}}/../tools/footprint_sources/stock/{name}.pretty")'
+        '(options "")(descr "Esp32Tap pinned copy of the KiCad stock library"))\n'
+        for name in STOCK_LIBRARIES
+    ),
+)
 
 
 def atomic_write(path: Path, content: str) -> None:

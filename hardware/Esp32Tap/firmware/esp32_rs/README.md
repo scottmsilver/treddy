@@ -17,7 +17,7 @@ esp32_rs/
 │                                 esp Rust 1.90.0.0, ldproxy 0.3.4)
 ├── sdkconfig.defaults            PLAN normative key set + Rust-specific keys
 ├── sdkconfig.defaults.qemu    -> ../esp32/sdkconfig.defaults.qemu   (symlink)
-├── partitions_esp32tap.csv    -> ../esp32/partitions_esp32tap.csv   (symlink)
+├── partitions_esp32tap.csv    custom table: nvs / phy_init / 2 MB factory / 1 MB storage (LittleFS)
 ├── build/  build_qemu_test/      idf.py-shaped artifacts (gitignored)
 │
 ├── safety_core/    CRATE 1 — portable, no_std, ZERO dependencies, host-tested
@@ -50,6 +50,25 @@ esp32_rs/
 a `build-std` xtensa member and host members forces a default target on every
 member, so `cargo test -p safety_core` would try to build tests for xtensa.
 Split, each crate gets its own `.cargo/config.toml` and its own `Cargo.lock`.
+
+---
+
+## GPIO map (Rev E, from `tools/design.py`)
+
+| GPIO | Net | Direction | Note |
+|---|---|---|---|
+| IO4 | `K1_NC_FB` | input | K1 feedback pole, normally closed |
+| IO5 | `K1_NO_FB` | input | K1 feedback pole, normally open |
+| IO6 | `TREAD_OK_MCU` | input only | via R32; never drive |
+| IO7 | `VBUS_PRESENT_N` | input | LOW = VBUS present |
+| IO8 | `RELAY_PULSE` | output | liveness toggle, 1 kHz square wave or faster, from the supervised safety task only (see `../PLAN.md`); not implemented, and absent from `pins.hpp` and `check_pins.py` |
+| IO15 | `TX_ENABLE` | output | |
+| IO16 | `PIN3_RX` | input | |
+| IO17 | `ESP_TX` | output | |
+| IO18 | `CONS_RX` | input | |
+| IO19 / IO20 | `USB_DN_R` / `USB_DP_R` | native USB | |
+| IO21 | `RELAY_CMD` | output | R23 10 k pull-down |
+| IO38 | `STATUS_LED` | output | |
 
 ---
 
@@ -287,15 +306,14 @@ Not proven, and not claimed:
   127.0.0.1, and `espressif/mdns` drops any packet whose source is outside the
   interface's subnet before parsing it. The capture proves the announcement;
   the query/response path needs a real L2 network.
-* **The QEMU-test image is 838,560 bytes of the 1 MB factory partition (79%).**
-  TLS (mbedtls X.509 write + PEM + ECDSA) and mDNS are what moved it and the
-  headroom is not comfortable; the 8 MB N8R8 layout is the answer when it runs
-  out, not a harness edit. `tools/build.sh` now parses the GENERATED partition
-  table and fails the build if the image does not fit — the old hard-coded
-  "factory partition = 2097152" label was wrong by 2x (the custom 8 MB table
-  does not apply under esp-idf-sys, so the stock 2 MB single-app table with a
-  1 MB factory partition is what is actually flashed), so every headroom figure
-  derived from it was half the real utilisation. The **production image is
+* **The QEMU-test image is 838,560 bytes of the 2 MB factory partition (40%).**
+  TLS (mbedtls X.509 write + PEM + ECDSA) and mDNS are what moved it; the
+  factory partition is 2 MB (0x200000) in the custom table
+  `partitions_esp32tap.csv`, which sdkconfig.defaults selects by absolute path.
+  `tools/build.sh` parses the GENERATED partition table and fails the build if
+  the image does not fit. (Earlier figures of "79% of a 1 MB factory
+  partition" described the stock single-app table, which does not carry the
+  `storage` partition and is no longer what is flashed.) The **production image is
   454,176 bytes (43%)** and contains neither feature: `net` is off there, and
   `xtensa-esp32s3-elf-nm` on the two ELFs finds `httpd_ssl_start`, `mdns_init`
   and `mdns_service_add` in the qemu-test binary and **none of them** in the

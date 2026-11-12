@@ -60,6 +60,9 @@ def _sample_report() -> dict[str, object]:
                     "pads": {str(index): {"at": [177.2, 141.45 - 1.27 * (index - 1)]} for index in range(1, 9)},
                 },
                 "J3": {"at": [183.6, 151.2], "pads": {}},
+                # board-local (93.0, 13.0) and (41.2, 55.4): real inspector output
+                "LED1": {"at": [193.0, 110.0], "pads": {}},
+                "LED2": {"at": [141.2, 152.4], "pads": {}},
                 "SW1": {"at": [142.0, 104.0], "pads": {}},
                 "SW2": {"at": [191.0, 117.0], "pads": {}},
                 "MH1": {"at": [120.0, 103.0], "pads": {}},
@@ -112,7 +115,9 @@ def test_scad_encodes_rev_c_air_gap_and_overlapping_posts(
     assert parameters["j2_yc"] == pytest.approx(40.0)
     assert "post_inset = post_d / 2 - post_wall_overlap;" in source
     assert source.count("wall+post_inset") == 4
-    assert "d = post_d + 0.6" in source
+    assert "d = post_d + post_relief" in source
+    assert parameters["post_relief"] == pytest.approx(0.8)
+    assert parameters["lip_clr"] == pytest.approx(0.4)
 
 
 def test_enclosure_dimensions_are_derived_from_rev_c_parameters(
@@ -129,7 +134,7 @@ def test_enclosure_dimensions_are_derived_from_rev_c_parameters(
         "base_height_mm": pytest.approx(23.6),
         "antenna_void_mm": pytest.approx(15.0),
         "post_wall_overlap_mm": pytest.approx(0.25),
-        "lid_post_relief_mm": pytest.approx(7.6),
+        "lid_post_relief_mm": pytest.approx(7.8),
     }
 
 
@@ -248,6 +253,77 @@ def test_validator_rejects_stale_rj45_and_tangent_post_geometry(
             stale_mounting_holes,
             parameters,
             geometry,
+        )
+
+
+def test_led_positions_are_read_from_the_pcb() -> None:
+    geometry = validate_enclosure.derive_board_geometry(_sample_report())
+
+    assert geometry["led_centers_mm"][0] == pytest.approx((93.0, 13.0))
+    assert geometry["led_centers_mm"][1] == pytest.approx((41.2, 55.4))
+
+
+def test_validator_rejects_the_old_misplaced_led1_hole(
+    esp32tap_dir: Path,
+) -> None:
+    source = (esp32tap_dir / "enclosure" / "esp32tap_case.scad").read_text(encoding="utf-8")
+    parameters = validate_enclosure.parse_scad_parameters(source)
+    geometry = validate_enclosure.derive_board_geometry(_sample_report())
+    validate_enclosure.validate_fit(source, parameters, geometry)  # current SCAD passes
+
+    old = source.replace("led1 = [93.0, 13.0];", "led1 = [79.0, 12.97];")
+    assert old != source
+    with pytest.raises(validate_enclosure.ValidationError, match="LED1 SCAD axis 0"):
+        validate_enclosure.validate_fit(old, parameters, geometry)
+
+    off_by_a_bit = source.replace("led2 = [41.2, 55.4];", "led2 = [41.2, 55.5];")
+    assert off_by_a_bit != source
+    with pytest.raises(validate_enclosure.ValidationError, match="LED2 SCAD axis 1"):
+        validate_enclosure.validate_fit(off_by_a_bit, parameters, geometry)
+
+
+def test_lid_is_open_above_each_led_and_closure_is_screws_only(
+    esp32tap_dir: Path,
+) -> None:
+    source = (esp32tap_dir / "enclosure" / "esp32tap_case.scad").read_text(encoding="utf-8")
+    parameters = validate_enclosure.parse_scad_parameters(source)
+    geometry = validate_enclosure.derive_board_geometry(_sample_report())
+    enclosure = esp32tap_dir / "enclosure"
+    result = validate_enclosure.validate_functional_geometry(
+        enclosure / "esp32tap_base.stl",
+        enclosure / "esp32tap_lid.stl",
+        parameters,
+        geometry,
+    )
+    assert result["closure"].startswith("SCREWS_ONLY")
+
+    # A lid whose LED1 hole is at the old (wrong) place is rejected by the probe.
+    lid = trimesh.load_mesh(enclosure / "esp32tap_lid.stl", process=True)
+    wall, board_x, board_y = parameters["wall"], parameters["wall"] + parameters["clr"], (
+        parameters["wall"] + parameters["ant_overhang"] + parameters["ant_air_gap"]
+    )
+    led1 = [board_x + 93.0, board_y + 13.0, parameters["lid_t"] / 2]
+    assert not lid.contains([led1])[0]
+    old = [board_x + 79.0, board_y + 12.97, parameters["lid_t"] / 2]
+    assert lid.contains([old])[0], "old LED1 location must be solid plastic now"
+    assert wall > 0
+
+
+def test_validator_rejects_the_solid_box_stl_for_led_probe_too(
+    esp32tap_dir: Path,
+    tmp_path: Path,
+) -> None:
+    source = (esp32tap_dir / "enclosure" / "esp32tap_case.scad").read_text(encoding="utf-8")
+    parameters = validate_enclosure.parse_scad_parameters(source)
+    geometry = validate_enclosure.derive_board_geometry(_sample_report())
+    enclosure = esp32tap_dir / "enclosure"
+    plate = trimesh.creation.box(extents=[104.0, 83.7, 4.2])
+    plate.apply_translation([52.0, 41.85, 2.1])
+    plate_path = tmp_path / "solid-lid.stl"
+    plate.export(plate_path)
+    with pytest.raises(validate_enclosure.ValidationError):
+        validate_enclosure.validate_functional_geometry(
+            enclosure / "esp32tap_base.stl", plate_path, parameters, geometry
         )
 
 
@@ -404,13 +480,12 @@ def test_rev_d_source_encodes_rj45_aperture_and_service_contract(
     assert parameters["j2_cable_exit_direction"] == pytest.approx(1.0)
     assert parameters["cable_bend_radius"] == pytest.approx(18.0)
     assert parameters["latch_clearance"] >= 6.0
-    assert parameters["snap_clearance"] == pytest.approx(0.3)
     assert "module rj45_wall_aperture" in source
     assert "module rj45_wall_aperture_right" in source
     assert "module rj45_plug_service_envelope" in source
     assert "module rj45_plug_service_envelope_right" in source
     assert "cable_exit_direction" in source
-    assert "module snap_latch" in source
+    assert "snap" not in source.lower()  # closure is screws only
 
 
 def test_rj45_aperture_clears_the_jack_body_by_0p2mm() -> None:

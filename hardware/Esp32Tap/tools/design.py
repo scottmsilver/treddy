@@ -14,7 +14,7 @@ Conventions:
 
 from types import MappingProxyType
 
-FPLIB = "/usr/share/kicad/footprints"
+FPLIB = str(__import__("pathlib").Path(__file__).resolve().parent / "footprint_sources" / "stock")
 
 # ref: (value, footprint_lib, footprint_name, LCSC, jlc_class, unit_cost_usd,
 #       description, pins {num: name})
@@ -221,6 +221,20 @@ COMPONENTS = {
         "45V NPN relay coil driver",
         {"1": "B", "2": "E", "3": "C"},
     ),
+    "Q3": (
+        "AO3400A",
+        "Package_TO_SOT_SMD",
+        "SOT-23",
+        "C20917",
+        "Basic",
+        0.03,
+        "30V logic-level N-MOSFET (Vgs(th) 0.65-1.45V) in series with Q1's "
+        "emitter: the relay liveness switch. Its gate is fed only by the "
+        "RELAY_PULSE charge pump, so the coil return path exists only while "
+        "firmware keeps toggling that pin (1 kHz square wave or faster: the "
+        "gate then sits near 2.5 V, the AO3400A's specified drive level)",
+        {"1": "G", "2": "S", "3": "D"},
+    ),
     "Q2": (
         "2N7002",
         "Package_TO_SOT_SMD",
@@ -263,37 +277,50 @@ COMPONENTS = {
         {"1": "K", "2": "A"},
     ),
     "D5": (
-        "PESD3V3L1BA-N",
+        "PESD5V0S1BA,115",
         "Diode_SMD",
         "D_SOD-323",
-        "C316020",
+        "C19224",
         "Extended",
-        0.061,
-        "Bidirectional ESD clamp to GND (NOT rail-referenced — stays inert "
-        "when the board is unpowered), console pin-6 line (BORN PESD3V3L1BA-N; "
-        "drop-in for Nexperia C51450 which showed 0 stock at validation "
-        "2026-07-23)",
+        0.05,
+        "Bidirectional ESD clamp to GND (NOT rail-referenced), console "
+        "pin-6 line. 5V standoff: the treadmill bus level has never been "
+        "measured, and this clamp sits on the console-to-motor path even in "
+        "unpowered bypass, so it must stay inert on a 5V bus as well as a "
+        "3.3V one (Nexperia PESD5V0S1BA, 35pF)",
         {"1": "1", "2": "2"},
     ),
     "D6": (
-        "PESD3V3L1BA-N",
+        "PESD5V0S1BA,115",
         "Diode_SMD",
         "D_SOD-323",
-        "C316020",
+        "C19224",
         "Extended",
-        0.061,
-        "Bidirectional ESD clamp, motor pin-6 line",
+        0.05,
+        "Bidirectional 5V-standoff ESD clamp, motor pin-6 line",
         {"1": "1", "2": "2"},
     ),
     "D7": (
-        "PESD3V3L1BA-N",
+        "PESD5V0S1BA,115",
         "Diode_SMD",
         "D_SOD-323",
-        "C316020",
+        "C19224",
         "Extended",
-        0.061,
-        "Bidirectional ESD clamp, pin-3 tap line",
+        0.05,
+        "Bidirectional 5V-standoff ESD clamp, pin-3 tap line",
         {"1": "1", "2": "2"},
+    ),
+    "D8": (
+        "BAT54S,215",
+        "Package_TO_SOT_SMD",
+        "SOT-23",
+        "C47546",
+        "Extended",
+        0.03,
+        "Series Schottky pair: relay liveness charge-pump rectifier "
+        "(pin 1 anode to GND, pin 3 common to the pump capacitor, pin 2 "
+        "cathode to the Q3 gate)",
+        {"1": "A1", "2": "K2", "3": "COM"},
     ),
     # --- LEDs / switches / fuse / inductor --------------------------------
     "LED1": (
@@ -682,6 +709,41 @@ COMPONENTS = {
         "open-drain (review finding B2)",
         {"1": "1", "2": "2"},
     ),
+    "R33": (
+        "1M",
+        "Resistor_SMD",
+        "R_0603_1608Metric",
+        "C22935",
+        "Basic",
+        0.002,
+        "Undervoltage hysteresis: positive feedback from TREAD_OK to "
+        "UV_SENSE adds about 0.45V of VIN-referred hysteresis so load "
+        "bursts near the UV threshold cannot chatter the relay",
+        {"1": "1", "2": "2"},
+    ),
+    "R34": (
+        "100k",
+        "Resistor_SMD",
+        "R_0603_1608Metric",
+        "C25803",
+        "Basic",
+        0.002,
+        "Q3 gate bleed: holds the liveness switch off at boot/reset and "
+        "opens it roughly 50-150 ms after RELAY_PULSE stops toggling "
+        "(100 ms time constant with C23; calculated, not measured)",
+        {"1": "1", "2": "2"},
+    ),
+    "R35": (
+        "560R",
+        "Resistor_SMD",
+        "R_0603_1608Metric",
+        "C23204",
+        "Basic",
+        0.002,
+        "Relay liveness charge-pump series resistor (limits the "
+        "RELAY_PULSE pin edge current into C22)",
+        {"1": "1", "2": "2"},
+    ),
     "C1": (
         "22uF/25V X7R 1210",
         "Capacitor_SMD",
@@ -887,6 +949,28 @@ COMPONENTS = {
         "U7 buffer-supply decoupling",
         {"1": "1", "2": "2"},
     ),
+    "C22": (
+        "100nF",
+        "Capacitor_SMD",
+        "C_0603_1608Metric",
+        "C14663",
+        "Basic",
+        0.004,
+        "Relay liveness charge-pump coupling capacitor (blocks DC, so a "
+        "stuck-high or stuck-low RELAY_PULSE pin cannot hold Q3 on)",
+        {"1": "1", "2": "2"},
+    ),
+    "C23": (
+        "1uF",
+        "Capacitor_SMD",
+        "C_0603_1608Metric",
+        "C15849",
+        "Basic",
+        0.006,
+        "Q3 gate hold capacitor (10x C22, so one stray edge moves the gate "
+        "only about 0.27V, below the 0.65V minimum threshold)",
+        {"1": "1", "2": "2"},
+    ),
     # --- Test points (bare pads, no BOM line) -----------------------------
     "TP1": ("TXD0", "TestPoint", "TestPoint_Pad_1.5x1.5mm", "", "none", 0, "UART0 TX test pad", {"1": "1"}),
     "TP2": ("RXD0", "TestPoint", "TestPoint_Pad_1.5x1.5mm", "", "none", 0, "UART0 RX test pad", {"1": "1"}),
@@ -988,7 +1072,10 @@ NETS = {
         ("U6", "4"),
         ("U7", "3"),
         ("K1", "6"),
-        ("Q1", "2"),
+        ("Q3", "2"),
+        ("D8", "1"),
+        ("C23", "2"),
+        ("R34", "2"),
         ("Q2", "2"),
         ("R2", "2"),
         ("R4", "2"),
@@ -1082,7 +1169,6 @@ NETS = {
         ("J3", "B4"),
         ("J3", "A9"),
         ("J3", "B9"),
-        ("U3", "5"),
         ("C11", "1"),
         ("R29", "1"),
         ("Q2", "1"),
@@ -1108,7 +1194,7 @@ NETS = {
     "PIN3_RX": [("R8", "2"), ("U1", "9")],  # IO16 = UART2 RX
     "PIN4_PASS": [("J1", "4"), ("J2", "4")],
     "PIN5_SAFETY": [("J1", "5"), ("J2", "5")],
-    "UV_SENSE": [("U4", "3"), ("R17", "2"), ("R18", "1"), ("C18", "1")],
+    "UV_SENSE": [("U4", "3"), ("R17", "2"), ("R18", "1"), ("C18", "1"), ("R33", "2")],
     "OV_SENSE": [("U4", "4"), ("R19", "2"), ("R20", "1"), ("C19", "1")],
     "TREAD_OK": [
         ("U4", "1"),
@@ -1118,6 +1204,7 @@ NETS = {
         ("R21", "2"),
         ("R22", "1"),
         ("R32", "1"),
+        ("R33", "1"),
         ("TP7", "1"),
     ],
     # Series isolation between the U4 window-comparator open-drain output
@@ -1126,6 +1213,16 @@ NETS = {
     "TREAD_OK_MCU": [("U1", "6"), ("R32", "2")],
     "RELAY_CMD": [("U1", "23"), ("U6", "1"), ("R23", "1")],
     "RELAY_GATE": [("U6", "7"), ("U5", "3"), ("R9", "1"), ("R24", "1"), ("TP8", "1")],
+    # Relay liveness switch.  Q3 sits in series with Q1's emitter and
+    # conducts only while firmware keeps toggling RELAY_PULSE (IO8),
+    # because C22 passes edges, not levels.  RELAY_GATE (U5 enable + Q1
+    # base) and RELAY_PULSE are independent: a stuck U6 output, or a hung
+    # MCU holding its pins static, can no longer keep K1 energized.
+    "RELAY_PULSE": [("U1", "12"), ("R35", "1")],
+    "PUMP_IN": [("R35", "2"), ("C22", "1")],
+    "PUMP_AC": [("C22", "2"), ("D8", "3")],
+    "Q3_G": [("Q3", "1"), ("D8", "2"), ("C23", "1"), ("R34", "1")],
+    "RELAY_RTN": [("Q1", "2"), ("Q3", "3")],
     "+5V_RLY": [("U5", "5"), ("C16", "1"), ("K1", "1"), ("D4", "1"), ("TP6", "1")],
     "RELAY_SW": [("K1", "8"), ("Q1", "3"), ("D4", "2"), ("TP9", "1")],
     "Q1_B": [("Q1", "1"), ("R9", "2"), ("R10", "1")],
@@ -1147,7 +1244,6 @@ NETS = {
 NC = [
     ("U1", n)
     for n in [
-        "12",
         "15",
         "16",
         "17",
@@ -1177,6 +1273,11 @@ NC = [
     ("J3", "A8"),
     ("J3", "B8"),
     ("U5", "4"),
+    # U3's VBUS pin is left open: tied to the VBUS sense net it let the
+    # ESP32's D+ pull-up leak through U3's upper clamp diode onto that
+    # net and falsely assert VBUS_PRESENT_N with no cable.  The I/O
+    # lines are still clamped to GND through U3's internal Zener.
+    ("U3", "5"),
 ]
 
 DNP = {"C13", "C14"}
@@ -1215,7 +1316,6 @@ _PIN_TYPE_OVERRIDES = {
     ("U3", "2"): "power_in",
     ("U3", "3"): "bidirectional",
     ("U3", "4"): "bidirectional",
-    ("U3", "5"): "power_in",
     ("U3", "6"): "bidirectional",
     ("U4", "1"): "open_collector",
     ("U4", "2"): "power_in",
@@ -1243,6 +1343,9 @@ _PIN_TYPE_OVERRIDES = {
     ("U7", "5"): "power_in",
     ("Q1", "1"): "input",
     ("Q1", "3"): "open_collector",
+    ("Q3", "1"): "input",
+    ("Q3", "3"): "open_collector",
+    ("U1", "12"): "output",
     ("Q2", "1"): "input",
     ("Q2", "3"): "open_collector",
 }
@@ -1265,7 +1368,6 @@ _ACTIVE_PIN_TYPE_LOCKS = MappingProxyType(
         ("U1", "9"): "input",
         ("U1", "10"): "output",
         ("U1", "11"): "input",
-        ("U1", "12"): "no_connect",
         ("U1", "13"): "bidirectional",
         ("U1", "14"): "bidirectional",
         ("U1", "15"): "no_connect",
@@ -1305,8 +1407,8 @@ _ACTIVE_PIN_TYPE_LOCKS = MappingProxyType(
         ("U3", "2"): "power_in",
         ("U3", "3"): "bidirectional",
         ("U3", "4"): "bidirectional",
-        ("U3", "5"): "power_in",
-        ("U3", "6"): "bidirectional",
+            ("U3", "6"): "bidirectional",
+        ("U3", "5"): "no_connect",
         ("U4", "1"): "open_collector",
         ("U4", "2"): "power_in",
         ("U4", "3"): "input",
@@ -1333,6 +1435,9 @@ _ACTIVE_PIN_TYPE_LOCKS = MappingProxyType(
         ("U7", "5"): "power_in",
         ("Q1", "1"): "input",
         ("Q1", "3"): "open_collector",
+        ("Q3", "1"): "input",
+        ("Q3", "3"): "open_collector",
+        ("U1", "12"): "output",
         ("Q2", "1"): "input",
         ("Q2", "3"): "open_collector",
         ("J1", "9"): "no_connect",
@@ -1420,6 +1525,8 @@ _PART_LOCKS = {
         {"1": "COIL+", "2": "NC_A", "3": "COM_A", "4": "NO_A", "5": "NO_B", "6": "COM_B", "7": "NC_B", "8": "COIL-"},
     ),
     "Q1": ("BC817-40,215", "Package_TO_SOT_SMD", "SOT-23", "C52801", {"1": "B", "2": "E", "3": "C"}),
+    "Q3": ("AO3400A", "Package_TO_SOT_SMD", "SOT-23", "C20917", {"1": "G", "2": "S", "3": "D"}),
+    "D8": ("BAT54S,215", "Package_TO_SOT_SMD", "SOT-23", "C47546", {"1": "A1", "2": "K2", "3": "COM"}),
     "U4": (
         "TPS3700DDCR",
         "Package_TO_SOT_SMD",
@@ -1463,6 +1570,8 @@ _PART_LOCKS = {
     "C19": ("1nF/50V C0G 0603", "Capacitor_SMD", "C_0603_1608Metric", "C342541", _TWO_PIN_LOCK),
     "C20": ("100nF", "Capacitor_SMD", "C_0603_1608Metric", "C14663", _TWO_PIN_LOCK),
     "C21": ("100nF", "Capacitor_SMD", "C_0603_1608Metric", "C14663", _TWO_PIN_LOCK),
+    "C22": ("100nF", "Capacitor_SMD", "C_0603_1608Metric", "C14663", _TWO_PIN_LOCK),
+    "C23": ("1uF", "Capacitor_SMD", "C_0603_1608Metric", "C15849", _TWO_PIN_LOCK),
 }
 _PART_LOCKS = MappingProxyType(
     {
@@ -1503,7 +1612,6 @@ _NET_LOCKS = {
         ("J3", "A9"),
         ("J3", "B4"),
         ("J3", "B9"),
-        ("U3", "5"),
         ("C11", "1"),
         ("R29", "1"),
         ("Q2", "1"),
@@ -1512,7 +1620,7 @@ _NET_LOCKS = {
     "USB_DP_MCU": {("U3", "4"), ("R16", "1")},
     "USB_DN_R": {("R15", "2"), ("C13", "1"), ("U1", "13")},
     "USB_DP_R": {("R16", "2"), ("C14", "1"), ("U1", "14")},
-    "UV_SENSE": {("U4", "3"), ("R17", "2"), ("R18", "1"), ("C18", "1")},
+    "UV_SENSE": {("U4", "3"), ("R17", "2"), ("R18", "1"), ("C18", "1"), ("R33", "2")},
     "OV_SENSE": {("U4", "4"), ("R19", "2"), ("R20", "1"), ("C19", "1")},
     "TREAD_OK": {
         ("U4", "1"),
@@ -1522,11 +1630,17 @@ _NET_LOCKS = {
         ("R21", "2"),
         ("R22", "1"),
         ("R32", "1"),
+        ("R33", "1"),
         ("TP7", "1"),
     },
     "TREAD_OK_MCU": {("U1", "6"), ("R32", "2")},
     "RELAY_CMD": {("U1", "23"), ("U6", "1"), ("R23", "1")},
     "RELAY_GATE": {("U6", "7"), ("U5", "3"), ("R9", "1"), ("R24", "1"), ("TP8", "1")},
+    "RELAY_PULSE": {("U1", "12"), ("R35", "1")},
+    "PUMP_IN": {("R35", "2"), ("C22", "1")},
+    "PUMP_AC": {("C22", "2"), ("D8", "3")},
+    "Q3_G": {("Q3", "1"), ("D8", "2"), ("C23", "1"), ("R34", "1")},
+    "RELAY_RTN": {("Q1", "2"), ("Q3", "3")},
     "+5V_RLY": {("U5", "5"), ("C16", "1"), ("K1", "1"), ("D4", "1"), ("TP6", "1")},
     "RELAY_SW": {("K1", "8"), ("Q1", "3"), ("D4", "2"), ("TP9", "1")},
     "Q1_B": {("Q1", "1"), ("R9", "2"), ("R10", "1")},
@@ -1553,6 +1667,7 @@ _TERMINAL_NET_LOCKS = {
     "R21": {"+3V3", "TREAD_OK"},
     "R22": {"TREAD_OK", "GND"},
     "R32": {"TREAD_OK", "TREAD_OK_MCU"},
+    "R33": {"TREAD_OK", "UV_SENSE"},
     "R23": {"RELAY_CMD", "GND"},
     "R24": {"RELAY_GATE", "GND"},
     "R25": {"+3V3", "K1_NC_FB"},
@@ -1603,7 +1718,7 @@ _VBUS_ADJACENT_PIN_NET_LOCKS = MappingProxyType(
         ("U3", "2"): "GND",
         ("U3", "3"): "USB_DP",
         ("U3", "4"): "USB_DP_MCU",
-        ("U3", "5"): "VBUS",
+        ("U3", "5"): "<NC>",
         ("U3", "6"): "USB_DN_MCU",
         ("C11", "1"): "VBUS",
         ("C11", "2"): "GND",
@@ -1637,7 +1752,7 @@ _POWER_PIN_NET_LOCKS = MappingProxyType(
         ("U2", "5"): "BUCK_EN",
         ("U2", "6"): "BST",
         ("U3", "2"): "GND",
-        ("U3", "5"): "VBUS",
+        ("U3", "5"): "<NC>",
         ("U4", "2"): "GND",
         ("U4", "5"): "VIN",
         ("U5", "1"): "VIN",
@@ -1702,8 +1817,23 @@ _SAFETY_PIN_NET_LOCKS = MappingProxyType(
         ("U7", "3"): "GND",
         ("U7", "4"): "TX_BUF",
         ("U7", "5"): "+3V3",
+        ("U1", "12"): "RELAY_PULSE",
         ("Q1", "1"): "Q1_B",
-        ("Q1", "2"): "GND",
+        ("Q1", "2"): "RELAY_RTN",
+        ("Q3", "1"): "Q3_G",
+        ("Q3", "2"): "GND",
+        ("Q3", "3"): "RELAY_RTN",
+        ("D8", "1"): "GND",
+        ("D8", "2"): "Q3_G",
+        ("D8", "3"): "PUMP_AC",
+        ("C22", "1"): "PUMP_IN",
+        ("C22", "2"): "PUMP_AC",
+        ("C23", "1"): "Q3_G",
+        ("C23", "2"): "GND",
+        ("R34", "1"): "Q3_G",
+        ("R34", "2"): "GND",
+        ("R35", "1"): "RELAY_PULSE",
+        ("R35", "2"): "PUMP_IN",
         ("Q1", "3"): "RELAY_SW",
         ("K1", "1"): "+5V_RLY",
         ("K1", "2"): "CONS6",
@@ -1786,7 +1916,8 @@ def _require_pin_net_locks(used, locks, label):
 
 def _safety_lock_label(ref, pad):
     pin = (ref, pad)
-    if ref in {"K1", "Q1", "D4", "R9", "R10", "U5", "R32"} or pin in {
+    if ref in {"K1", "Q1", "Q3", "D4", "D8", "C22", "C23", "R9", "R10", "R34", "R35", "U5", "R32"} or pin in {
+        ("U1", "12"),
         ("U1", "4"),
         ("U1", "5"),
         ("U1", "6"),
@@ -2035,7 +2166,7 @@ def validate():
         used[("U5", "4")] == "<NC>",
         "U5.4 must remain deliberately unconnected",
     )
-    actual_gpio_map = {pad: used[("U1", pad)] for pad in ("4", "5", "6", "7", "8", "9", "10", "11", "23", "27", "31")}
+    actual_gpio_map = {pad: used[("U1", pad)] for pad in ("4", "5", "6", "7", "8", "9", "10", "11", "12", "23", "27", "31")}
     expected_gpio_map = {
         "4": "K1_NC_FB",
         "5": "K1_NO_FB",
@@ -2045,6 +2176,7 @@ def validate():
         "9": "PIN3_RX",
         "10": "ESP_TX",
         "11": "CONS_RX",
+        "12": "RELAY_PULSE",
         "23": "RELAY_CMD",
         "27": "IO0",
         "31": "STATUS_LED",

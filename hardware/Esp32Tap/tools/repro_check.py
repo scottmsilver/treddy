@@ -28,6 +28,14 @@ SOURCE_PATHS = (
     Path("tools/gen_footprints.py"),
     Path("tools/footprint_sources/RJ45-SMD_441440003.kicad_mod"),
     Path("tools/footprint_sources/ESP32-S3-WROOM-1.kicad_mod"),
+    # Pinned copies of the KiCad stock footprints (and their manifest):
+    # the clean-room regeneration must use these, never the installed
+    # system library.
+    *sorted(
+        path.relative_to(ROOT)
+        for path in (ROOT / "tools" / "footprint_sources" / "stock").rglob("*")
+        if path.is_file()
+    ),
     Path("tools/gen_sch.py"),
     Path("tools/gen_pcb.py"),
     Path("tools/power_intent.py"),
@@ -82,7 +90,9 @@ def _run(command: list[str], *, cwd: Path, label: str) -> None:
             check=False,
             capture_output=True,
             text=True,
-            timeout=180,
+            # The router is CPU-bound (about 40 s idle); a shared machine
+            # under load has stretched it past four minutes.
+            timeout=900,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ReproError(f"{label} could not run: {error}") from error

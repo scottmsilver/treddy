@@ -237,7 +237,7 @@ def test_firmware_plan_preserves_exact_safety_gates(
         "before the 10 ms deadline",
         "at most 2.25 s",
         "`bundle_sha256`",
-        "USB alone cannot power or program Rev B",
+        "USB alone cannot power or program Rev E",
     )
     missing = [phrase for phrase in required if phrase not in plan]
     assert not missing

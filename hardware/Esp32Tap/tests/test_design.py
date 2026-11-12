@@ -344,7 +344,7 @@ EXPECTED_ACTIVE_PIN_TYPES = {
     ("U1", "9"): "input",
     ("U1", "10"): "output",
     ("U1", "11"): "input",
-    ("U1", "12"): "no_connect",
+    ("U1", "12"): "output",
     ("U1", "13"): "bidirectional",
     ("U1", "14"): "bidirectional",
     ("U1", "15"): "no_connect",
@@ -383,7 +383,7 @@ EXPECTED_ACTIVE_PIN_TYPES = {
     ("U3", "2"): "power_in",
     ("U3", "3"): "bidirectional",
     ("U3", "4"): "bidirectional",
-    ("U3", "5"): "power_in",
+    ("U3", "5"): "no_connect",
     ("U3", "6"): "bidirectional",
     ("U4", "1"): "open_collector",
     ("U4", "2"): "power_in",
@@ -411,6 +411,8 @@ EXPECTED_ACTIVE_PIN_TYPES = {
     ("U7", "5"): "power_in",
     ("Q1", "1"): "input",
     ("Q1", "3"): "open_collector",
+    ("Q3", "1"): "input",
+    ("Q3", "3"): "open_collector",
     ("Q2", "1"): "input",
     ("Q2", "3"): "open_collector",
     # Rev D: both J1 and J2 are the RJ45 jack with mechanical-only pads 9/10.
@@ -640,11 +642,15 @@ def test_usb_is_data_only_and_d2_is_absent(design: SimpleNamespace) -> None:
         ("J3", "A9"),
         ("J3", "B4"),
         ("J3", "B9"),
-        ("U3", "5"),
         ("C11", "1"),
         ("R29", "1"),
         ("Q2", "1"),
     }
+    # U3 pin 5 is deliberately open: tied to VBUS it let the ESP32 D+
+    # pull-up leak through U3's upper clamp diode onto the sense net.
+    assert ("U3", "5") in design.NC
+    assert design.PIN_TYPES[("U3", "5")] == "no_connect"
+    assert all(("U3", "5") not in pins for pins in design.NETS.values())
 
 
 def test_all_local_input_power_is_downstream_of_d1(
@@ -812,6 +818,7 @@ def test_supervisor_and_both_hardware_and_gate_equations(
         ("R17", "2"),
         ("R18", "1"),
         ("C18", "1"),
+        ("R33", "2"),
     }
     assert _pins(design, "OV_SENSE") == {
         ("U4", "4"),
@@ -829,6 +836,7 @@ def test_supervisor_and_both_hardware_and_gate_equations(
         ("R21", "2"),
         ("R22", "1"),
         ("R32", "1"),
+        ("R33", "1"),
         ("TP7", "1"),
     }
     assert _pins(design, "TREAD_OK_MCU") == {
@@ -875,7 +883,10 @@ def test_u5_and_q1_are_series_relay_controls(design: SimpleNamespace) -> None:
     }
     assert _net_for(design, "U5", "3") == "RELAY_GATE"
     assert _net_for(design, "Q1", "1") == "Q1_B"
-    assert _net_for(design, "Q1", "2") == "GND"
+    # Q1's emitter returns to ground only through the Q3 liveness switch.
+    assert _net_for(design, "Q1", "2") == "RELAY_RTN"
+    assert _net_for(design, "Q3", "3") == "RELAY_RTN"
+    assert _net_for(design, "Q3", "2") == "GND"
 
 
 def test_d4_is_connected_directly_across_the_relay_coil(
@@ -1099,7 +1110,7 @@ def test_all_non_passive_pin_types_match_independent_contract(
 ) -> None:
     actual = {pin: pin_type for pin, pin_type in design.PIN_TYPES.items() if pin_type != "passive"}
 
-    assert len(EXPECTED_ACTIVE_PIN_TYPES) == 86
+    assert len(EXPECTED_ACTIVE_PIN_TYPES) == 88
     assert actual == EXPECTED_ACTIVE_PIN_TYPES
 
 
@@ -1408,3 +1419,74 @@ def test_optimized_python_still_rejects_invalid_design(
     assert result.returncode == 0, result.stderr or result.stdout
     assert "PIN_TYPES" in result.stdout
     assert "missing" in result.stdout
+
+
+def test_relay_liveness_switch_has_no_dc_path_from_the_pulse_pin(
+    design: SimpleNamespace,
+) -> None:
+    # RELAY_PULSE reaches the rest of the circuit only via R35 -> C22, so a
+    # stuck-high/low pin or hung MCU cannot hold Q3 (and therefore K1) on.
+    assert _pins(design, "RELAY_PULSE") == {("U1", "12"), ("R35", "1")}
+    assert _pins(design, "PUMP_IN") == {("R35", "2"), ("C22", "1")}
+    assert _pins(design, "PUMP_AC") == {("C22", "2"), ("D8", "3")}
+    assert design.COMPONENTS["R35"][0] == "560R"
+    assert design.COMPONENTS["C22"][0] == "100nF"
+    assert design.PIN_TYPES[("U1", "12")] == "output"
+    assert ("U1", "12") not in design.NC
+    # C22 is the only part bridging the pulse side to the gate side.
+    pulse_side = {"RELAY_PULSE", "PUMP_IN"}
+    gate_side = {"PUMP_AC", "Q3_G", "RELAY_RTN", "RELAY_GATE", "Q1_B"}
+
+    def nets_of(ref: str) -> set[str]:
+        return {net for net, pins in design.NETS.items() if any(pin[0] == ref for pin in pins)}
+
+    bridges = [
+        ref
+        for ref in design.COMPONENTS
+        if nets_of(ref) & pulse_side and nets_of(ref) & gate_side
+    ]
+    assert bridges == ["C22"]
+    assert _pins(design, "RELAY_PULSE").isdisjoint(_pins(design, "RELAY_GATE"))
+
+
+def test_q3_is_in_series_between_q1_emitter_and_ground_with_gate_bleed(
+    design: SimpleNamespace,
+) -> None:
+    q3 = design.COMPONENTS["Q3"]
+    assert (q3[0], q3[3], q3[4], q3[2]) == ("AO3400A", "C20917", "Basic", "SOT-23")
+    assert q3[7] == {"1": "G", "2": "S", "3": "D"}
+    assert _pins(design, "RELAY_RTN") == {("Q1", "2"), ("Q3", "3")}
+    assert _net_for(design, "Q3", "2") == "GND"
+    # Q1 collector/base wiring is unchanged.
+    assert _net_for(design, "Q1", "3") == "RELAY_SW"
+    assert _net_for(design, "Q1", "1") == "Q1_B"
+    # Q3 gate: Schottky-pair pump, hold cap and bleed resistor to GND.
+    assert _pins(design, "Q3_G") == {("Q3", "1"), ("D8", "2"), ("C23", "1"), ("R34", "1")}
+    assert _net_for(design, "R34", "2") == "GND"
+    assert _net_for(design, "C23", "2") == "GND"
+    assert design.COMPONENTS["R34"][0] == "100k"
+    assert design.COMPONENTS["C23"][0] == "1uF"
+    d8 = design.COMPONENTS["D8"]
+    assert (d8[0], d8[3]) == ("BAT54S,215", "C47546")
+    assert _net_for(design, "D8", "1") == "GND"
+    assert _net_for(design, "D8", "3") == "PUMP_AC"
+    assert _net_for(design, "D8", "2") == "Q3_G"
+
+
+def test_esd_clamps_use_five_volt_standoff_part(design: SimpleNamespace) -> None:
+    for ref in ("D5", "D6", "D7"):
+        component = design.COMPONENTS[ref]
+        assert component[0] == "PESD5V0S1BA,115"
+        assert component[3] == "C19224"
+        assert component[4] == "Extended"
+        assert component[2] == "D_SOD-323"
+    assert not any(c[3] == "C316020" for c in design.COMPONENTS.values())
+
+
+def test_uv_hysteresis_resistor_r33_feeds_tread_ok_back_to_uv_sense(
+    design: SimpleNamespace,
+) -> None:
+    r33 = design.COMPONENTS["R33"]
+    assert (r33[0], r33[3]) == ("1M", "C22935")
+    assert _net_for(design, "R33", "1") == "TREAD_OK"
+    assert _net_for(design, "R33", "2") == "UV_SENSE"

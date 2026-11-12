@@ -1,4 +1,5 @@
-Esp32Tap Rev C harness supply path and degraded new-board-contact corners
+Esp32Tap RETIRED Rev C pigtail-harness supply path (historical; not a Rev E model)
+* RETIRED: the Micro-Fit pigtail harness this deck models was removed; Rev E plugs RJ45 cables into J1/J2 directly. Retained as historical regression evidence only and carries no Rev E claim.
 * ASSUMPTIONS:
 * The predecessor-authorized verification envelope is 2.0 A total. Normal
 * unequal sharing is explicitly 1.35 A / 0.65 A on power and ground.

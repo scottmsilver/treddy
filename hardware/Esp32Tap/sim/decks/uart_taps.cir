@@ -1,4 +1,4 @@
-Esp32Tap Rev B 10k UART receive tap timing and dead-board injection
+Esp32Tap Rev E 10k UART receive tap timing and dead-board injection
 * ASSUMPTIONS:
 * R7/R8 are 10k (+1 percent timing corner), UART is 9600 baud
 * (104.167 us/bit), and 50 pF bounds GPIO+trace+ESD capacitance.

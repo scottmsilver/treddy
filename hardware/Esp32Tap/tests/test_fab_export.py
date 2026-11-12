@@ -1309,6 +1309,9 @@ def _assembly_fixture() -> dict[str, Any]:
                 "MH1": [101.0, 101.0],
                 "MH2": [199.0, 101.0],
                 "MH3": [199.0, 154.0],
+                "FID1": [106.0, 102.0],
+                "FID2": [106.0, 150.0],
+                "FID3": [190.0, 150.0],
             }.items()
         }
     )
@@ -1369,6 +1372,8 @@ def test_assembly_parity_accepts_only_populated_exact_mappings(
         ("none-not-excluded", "PCB TP1 assembly flags"),
         ("design-board-only", "PCB U1 assembly flags"),
         ("mounting-hole-not-board-only", "PCB MH1 assembly flags"),
+        ("fiducial-not-board-only", "PCB FID2 assembly flags"),
+        ("missing-fiducial", "PCB references"),
         ("extra-bom-column", "BOM columns"),
         ("extra-cpl-column", "CPL columns"),
     ],
@@ -1418,6 +1423,10 @@ def test_assembly_parity_fails_closed(
         fixture["board"]["footprints"]["U1"]["board_only"] = True
     elif mutation == "mounting-hole-not-board-only":
         fixture["board"]["footprints"]["MH1"]["board_only"] = False
+    elif mutation == "fiducial-not-board-only":
+        fixture["board"]["footprints"]["FID2"]["board_only"] = False
+    elif mutation == "missing-fiducial":
+        fixture["board"]["footprints"].pop("FID3")
     elif mutation == "extra-bom-column":
         fixture["bom_rows"][0]["Supplier note"] = "silently ignored"
     else:

@@ -1,4 +1,4 @@
-Esp32Tap Rev B active-low VBUS_PRESENT_N hot-plug and unplug corners
+Esp32Tap Rev E active-low VBUS_PRESENT_N hot-plug and unplug corners
 * ASSUMPTIONS:
 * USB VBUS is data-interface sensing only; it does not power VIN or +3V3.
 * C11=100 nF (+/-10 percent), R29=10k (+/-1 percent), R30=10k.

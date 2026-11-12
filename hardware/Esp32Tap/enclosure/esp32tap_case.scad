@@ -4,8 +4,9 @@
 // overhang).  Board-position parameters below are taken directly from
 // kicad/Esp32Tap.kicad_pcb (see DIMENSIONS.md for the full table).
 //
-// Print: JLC3DP SLA resin (LEDO 6060 / 8001) or MJF PA12.  PLASTIC ONLY —
-// no conductive finish (2.4 GHz antenna inside).  Orderable as two STLs:
+// Print: JLC3DP MJF nylon (PA12) -- not brittle SLA resin.  PLASTIC ONLY —
+// no conductive finish (2.4 GHz antenna inside).  Closure is SCREWS ONLY
+// (4x M3 lid screws; 3x M2.5 board screws) -- see DIMENSIONS.md.  Orderable as two STLs:
 //   openscad -D part=\"base\" -o esp32tap_base.stl esp32tap_case.scad
 //   openscad -D part=\"lid\"  -o esp32tap_lid.stl  esp32tap_case.scad
 // Checked-in STLs are rendered with the immutable OpenSCAD image documented
@@ -54,22 +55,22 @@ j2_cable_exit_direction = 1.0;  // J2 opens outward through X-max
 
 // USB-C on the Y=board_w (bottom) wall.  The receptacle face sits at the
 // board edge, wall + bot_clr = 11.5 mm behind the exterior wall face, so
-// the wall aperture must pass the CABLE OVERMOLD all the way to the board
-// edge — otherwise no standard cable can mate.  13 x 8 covers typical
-// overmolds (<=12 x 6.5) and doubles as the plug-alignment funnel; the
-// deeper tunnel needs an overmold at least ~12 mm long, which every
-// standard moulded USB-C cable provides.
+// the wall aperture must pass the CABLE OVERMOLD -- otherwise no standard
+// cable can mate.  12 x 8 covers typical overmolds (<=12 x 6.5).  The cut
+// goes through the wall only: the cavity between wall and board edge is
+// already open, and cutting further inboard nicks the MH3 post (which
+// reaches y = board edge) and crowds the bottom-right lid post.
 usb_xc = 83.6;
 usb_w = 9.4;
 usb_h = 3.4;
-usb_om_w = 13.0;
+usb_om_w = 12.0;  // 13.0->12.0: leaves 0.65 mm (was 0.15) to the lid post
 usb_om_h = 8.0;   // overmold aperture through the wall
 
 // M2.5 board mounting holes (X, Y)
 mh = [[20.0, 6.0], [48.0, 6.0], [92.0, 55.0]];
 
 // LED light pipes + button access (X, Y) in board coords
-led1 = [79.0, 12.97];   // status (green)
+led1 = [93.0, 13.0];    // status (green), PCB LED1 board-local
 led2 = [41.2, 55.4];    // power (red)
 sw1  = [42.0, 7.0];     // EN / reset
 sw2  = [91.0, 20.0];    // BOOT
@@ -97,9 +98,12 @@ lip       = 1.2;                     // 1.8→1.2: shorter lip = less of a thin
 lip_w     = 4.0;                     // 2.0→4.0: much wider band, no longer a
                                      // thin freestanding wall
 post_d = 7.0;
+post_relief = 0.8;                   // lid relief dia = post_d + post_relief (0.4/side)
+lip_clr = 0.4;                       // lid lip clearance per side to the inner wall
+board_pilot_d = 2.0;                 // M2.5 self-tap pilot
+board_pilot_depth = 4.0;             // 2.5 mm floor remains 1.5 mm under it
 post_wall_overlap = 0.25;
 post_inset = post_d / 2 - post_wall_overlap;
-snap_clearance = 0.3;
 
 int_l = board_l + 2*clr;                              // interior X
 int_w = board_w + bot_clr + ant_overhang + ant_air_gap; // interior Y
@@ -169,14 +173,22 @@ module rj45_plug_service_envelope_right(yc) {
           aperture_w, aperture_h]);
 }
 
-module snap_latch(xc, far_side=false) {
-  yc = far_side ? out_w - wall : 0;
-  translate([xc - 4, yc - (far_side ? 0 : 1.2), base_h - 3])
-    cube([8, 1.2, 3]);
-}
-
 /* ------------------------- base ------------------------------------- */
 module base() {
+  difference() {
+    base_solid();
+    // M2.5 self-tap pilots (blind).  The board underside is fixed 3.0 mm
+    // above the floor, so each pilot runs 1.0 mm down into the floor (1.5 mm
+    // of floor remains under it): 4.0 mm deep in total; M2.5 x 5 engages
+    // 3.4 mm.
+    for (p = mh)
+      translate([wall + bx0 + p[0], wall + by0 + p[1],
+                 wall + standoff - board_pilot_depth])
+        cylinder(h = board_pilot_depth + 1, d = board_pilot_d);
+  }
+}
+
+module base_solid() {
   difference() {
     union() {
       rrect(out_l, out_w, base_h, 3);
@@ -194,13 +206,11 @@ module base() {
     rj45_wall_aperture_right(j2_yc);
 
     // USB-C aperture, Y = out_w (bottom) wall — overmold-sized (see the
-    // parameter note): the receptacle is recessed wall + bot_clr behind
-    // the exterior face, so the opening passes the cable overmold all the
-    // way to the board edge.
+    // parameter note); wall-only cut, the cavity inboard of it is open.
     translate([wall + bx0 + usb_xc - usb_om_w/2,
-               out_w - wall - bot_clr - 1,
+               out_w - wall - 1,
                bz0 + board_t + usb_h/2 - usb_om_h/2])
-      cube([usb_om_w, wall + bot_clr + 2, usb_om_h]);
+      cube([usb_om_w, wall + 2, usb_om_h]);
 
     // side vents (both long walls, away from the antenna end)
     for (i = [0:4]) {
@@ -210,16 +220,10 @@ module base() {
         cube([4, wall + 2, 6]);
     }
   }
-  // Two optional tool-less closure latches; supplied M3 screws remain usable.
-  snap_latch(out_l/2, false);
-  snap_latch(out_l/2, true);
-  // board posts (M2.5 self-tap, 2.0 mm pilot)
+  // board posts (pilot is cut in base())
   for (p = mh)
     translate([wall + bx0 + p[0], wall + by0 + p[1], wall])
-      difference() {
-        cylinder(h = standoff, d = 6.0);
-        cylinder(h = standoff + 1, d = 2.0);
-      }
+      cylinder(h = standoff, d = 6.0);
   // board edge ledges (support the unsupported corners)
   for (p = [[bx0 + 50, by0 - 0.1], [bx0 + 20, by0 + board_w - 1.9],
             [bx0 + 70, by0 + board_w - 1.9]])
@@ -249,15 +253,15 @@ module lid() {
       // registration lip: a PERIMETER RING (not a solid slab), so it never
       // lands on the screw posts or the 13.4 mm RJ45 bodies — the interior
       // stays open above the components.
-      translate([wall + 0.15, wall + 0.15, lid_t])
+      translate([wall + lip_clr, wall + lip_clr, lid_t])
         difference() {
-          rrect(int_l - 0.3, int_w - 0.3, lip, 2);
+          rrect(int_l - 2*lip_clr, int_w - 2*lip_clr, lip, 2);
           translate([lip_w, lip_w, -1])
-            rrect(int_l - 0.3 - 2*lip_w, int_w - 0.3 - 2*lip_w, lip + 2, 2);
-          // clear the four screw posts (0.3 mm radial clearance)
+            rrect(int_l - 2*lip_clr - 2*lip_w, int_w - 2*lip_clr - 2*lip_w, lip + 2, 2);
+          // clear the four screw posts (0.4 mm radial clearance)
           for (p = posts)
-            translate([p[0] - (wall + 0.15), p[1] - (wall + 0.15), -1])
-              cylinder(h = lip + 2, d = post_d + 0.6);
+            translate([p[0] - (wall + lip_clr), p[1] - (wall + lip_clr), -1])
+              cylinder(h = lip + 2, d = post_d + post_relief);
         }
     }
     // M3 clearance holes + countersink over the 4 posts
@@ -265,10 +269,6 @@ module lid() {
       translate([p[0], p[1], -1]) cylinder(h = lid_t + lip + 2, d = 3.4);
       translate([p[0], p[1], -0.01]) cylinder(h = 1.8, d1 = 6.4, d2 = 3.4);
     }
-    // Tool-less latch receiver slots (0.3 mm modeled clearance).
-    for (yc = [wall - snap_clearance, out_w - wall + snap_clearance])
-      translate([out_l/2 - 4 - snap_clearance, yc - 0.7, -1])
-        cube([8 + 2*snap_clearance, 1.4, lid_t + lip + 2]);
     // light pipes (3.2 mm — press-fit pipe or leave open)
     for (p = [led1, led2])
       translate([wall + bx0 + p[0], wall + by0 + p[1], -1])

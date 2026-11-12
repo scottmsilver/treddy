@@ -1,4 +1,4 @@
-* Esp32Tap Rev B shared ngspice behavioral primitives
+* Esp32Tap Rev E shared ngspice behavioral primitives
 *
 * These are deliberately transparent envelope models, not vendor macromodels.
 * Selected-part anchors:
@@ -24,6 +24,10 @@
 *   loop, current limit, and thermal behavior are not modeled.
 * - 2N7002: represented as a voltage-controlled open-drain switch with
 *   1.0...2.5 V threshold corners; gate leakage/capacitance are not modeled.
+* - D8 BAT54S: low-order Schottky approximation anchored to the Nexperia
+*   BAT54 family Vf of about 0.26 V at 0.1 mA and 0.32 V at 1 mA.
+* - Q3 AO3400A: voltage-controlled switch; the gate threshold is swept over
+*   the 0.65...1.45 V Vgs(th) range. Gate charge/capacitance is not modeled.
 *
 * Sources: manufacturer data sheets cited in ../README.md.
 
@@ -35,6 +39,9 @@
 .model ESP_SWITCH SW(Ron=0.05 Roff=1e12 Vt=1.65 Vh=0.05)
 .model ESP_SWITCH_1V SW(Ron=5 Roff=1e12 Vt=1.0 Vh=0.02)
 .model ESP_SWITCH_2V5 SW(Ron=5 Roff=1e12 Vt=2.5 Vh=0.02)
+.model ESP_BAT54S D(Is=4.2n N=1.0 Rs=4 Cjo=10p)
+.model ESP_Q3_VT_LO SW(Ron=0.05 Roff=1e12 Vt=0.65 Vh=0.02)
+.model ESP_Q3_VT_HI SW(Ron=0.05 Roff=1e12 Vt=1.45 Vh=0.02)
 
 * Symmetric fast-release clamp.  VCLAMP is the low-current avalanche
 * corner and RDYN raises the clamp toward the data-sheet high-current value.

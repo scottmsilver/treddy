@@ -1,4 +1,4 @@
-Esp32Tap Rev B K1 Q1 D4 drive release and single-fault envelopes
+Esp32Tap Rev E K1 Q1 Q3 D4 drive release, liveness switch and single-fault envelopes
 * ASSUMPTIONS:
 * K1 is G6K-2F-Y-TR DC5, nominal 237 ohm/100 mW. Resistance corners are
 * +/-10 percent (213.3...260.7 ohm), supply corners are 4.9...5.1 V.
@@ -6,10 +6,17 @@ Esp32Tap Rev B K1 Q1 D4 drive release and single-fault envelopes
 * are explicit engineering sweep assumptions, not selected-part limits.
 * D4 SMAJ6.0CA is directly across pins 1/8 and uses its 6.67 V low-current
 * breakdown plus dynamic resistance. Dynamic branches treat Q1 as saturated.
-* R9 is the approved Rev B 560 ohm value. A conservative drive branch
+* R9 is the approved 560 ohm value. A conservative drive branch
 * combines 2.3 V logic, 1.2 V VBE, +1% R9, -1% R10,
 * the 10k base pull-down, 0.7 V maximum data-sheet VCEsat, 4.9 V supply,
 * and the +10% coil-resistance/temperature proxy.
+* Q3/D8 LIVENESS SWITCH (Rev E): Q3 is in series with Q1's emitter. Its gate
+* is fed only by the RELAY_PULSE charge pump (R35 560 ohm, C22 100 nF, D8
+* BAT54S pair, C23 1 uF, R34 100 kohm), simulated here as a real circuit
+* with a 3.3 V, 1 kHz, 50 percent square wave and low-order Schottky and
+* switch approximations. The pickup and release times below are model
+* outputs, NOT measured timing. Q3 is a smooth voltage-controlled
+* conductance whose threshold is swept over the 0.65...1.45 V Vgs(th) range.
 * NON-CLAIMS:
 * Coil-current decay does not prove K1 contact motion, release time, bounce,
 * transfer sequencing, or the required contact-measured <=10 ms fault result.
@@ -20,6 +27,21 @@ Esp32Tap Rev B K1 Q1 D4 drive release and single-fault envelopes
 .include models/behavioral.inc
 
 VCTRL ctrl 0 PULSE(3.3 0 10m 1u 1u 40m 80m)
+
+* Rev E liveness switch building blocks.
+.subckt PUMP pin gate
+R35 pin pump_in 560
+C22 pump_in pump_ac 100n
+D8A 0 pump_ac ESP_BAT54S
+D8B pump_ac gate ESP_BAT54S
+C23 gate 0 1u
+R34 gate 0 100k
+.ends PUMP
+
+.subckt ESP_Q3 d g params: VT=1.05
+BQ3 d 0 I={v(d)*20*min(max((v(g)-VT)/0.5,0),1)}
+RQ3 d 0 1g
+.ends ESP_Q3
 
 * 0.1 H / high-current corner.
 V5_LO_L v5_lo_l 0 5.1
@@ -97,7 +119,67 @@ RCAP_FAULT cap_r cap_s 237
 VCAP_COIL_SENSE cap_s 0 0
 DCAP_NEG 0 cap_store ESP_SIGNAL_DIODE
 
-.tran 2u 50m
+* RELAY_PULSE run/stop cases. VENV is high while the safety task toggles the
+* pin (0...200 ms) and low afterwards. After the stop the pin is either held
+* low (SLO) or held high (SHI): both hung-MCU static states.
+VENV env 0 PULSE(3.3 0 200m 1u 1u 1 2)
+VENVN envn 0 PULSE(0 3.3 200m 1u 1u 1 2)
+VSQ sq 0 PULSE(0 3.3 0 1u 1u 0.5m 1m)
+V33 v33 0 3.3
+
+* Held-low after stop.
+SRUN_P sq pl env 0 ESP_SWITCH
+SRUN_L pl 0 envn 0 ESP_SWITCH
+XPUMP_L pl gate_l PUMP
+* Held-high after stop.
+SRUN_P2 sq ph env 0 ESP_SWITCH
+SRUN_H ph v33 envn 0 ESP_SWITCH
+XPUMP_H ph gate_h PUMP
+
+* K1 coil branch behind Q1 (static ON, as RELAY_CMD held high) and Q3.
+V5_Q3LO v5_q3lo 0 5
+LQ3LO v5_q3lo q3lo_r 0.5
+RQ3LO q3lo_r q3lo_s 237
+VQ3LO_COIL_SENSE q3lo_s q3lo_col 0
+XQ3LO_CLAMP v5_q3lo q3lo_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ3LO_Q1 q3lo_col q3lo_rtn v33 0 ESP_SWITCH
+XQ3LO q3lo_rtn gate_l ESP_Q3 params: VT=0.65
+
+V5_Q3HI v5_q3hi 0 5
+LQ3HI v5_q3hi q3hi_r 0.5
+RQ3HI q3hi_r q3hi_s 237
+VQ3HI_COIL_SENSE q3hi_s q3hi_col 0
+XQ3HI_CLAMP v5_q3hi q3hi_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ3HI_Q1 q3hi_col q3hi_rtn v33 0 ESP_SWITCH
+XQ3HI q3hi_rtn gate_l ESP_Q3 params: VT=1.45
+
+V5_Q3HH v5_q3hh 0 5
+LQ3HH v5_q3hh q3hh_r 0.5
+RQ3HH q3hh_r q3hh_s 237
+VQ3HH_COIL_SENSE q3hh_s q3hh_col 0
+XQ3HH_CLAMP v5_q3hh q3hh_col ESP_BIDI_TVS params: VCLAMP=6.67 RDYN=0.094
+SQ3HH_Q1 q3hh_col q3hh_rtn v33 0 ESP_SWITCH
+XQ3HH q3hh_rtn gate_h ESP_Q3 params: VT=0.65
+
+* Fault: Q1 shorted (collector tied to Q3) and the pin never toggles, held
+* low, so Q3 stays off.
+V5_Q1S v5_q1s 0 5
+LQ1S v5_q1s q1s_r 0.5
+RQ1S q1s_r q1s_s 237
+VQ1S_COIL_SENSE q1s_s q1s_col 0
+XQ1S q1s_col gate_dead ESP_Q3 params: VT=0.65
+RDEAD_PIN dead_pin 0 1
+XPUMP_DEAD dead_pin gate_dead PUMP
+
+* Single stray edge from rest, a pin that steps high at 10 ms and stays, and a pin stuck low.
+VSTRAY stray 0 PULSE(0 3.3 10m 1u 1u 1m 1)
+XPUMP_STRAY stray gate_stray PUMP
+VSTUCKH stuckh 0 PULSE(0 3.3 10m 1u 1u 1 2)
+XPUMP_STUCKH stuckh gate_stuckh PUMP
+VSTUCKL stuckl 0 0
+XPUMP_STUCKL stuckl gate_stuckl PUMP
+
+.tran 2u 450m 0 2u
 
 .meas tran coil_current_max_a AVG i(VLO_L_COIL_SENSE) FROM=8m TO=9m
 .meas tran coil_current_nominal_a AVG i(VNOM_COIL_SENSE) FROM=8m TO=9m
@@ -118,5 +200,19 @@ DCAP_NEG 0 cap_store ESP_SIGNAL_DIODE
 .meas tran q1_open_coil_current_a AVG i(VOPEN_COIL_SENSE) FROM=8m TO=9m
 .meas tran q1_short_fault_current_a AVG i(VSHORT_COIL_SENSE) FROM=8m TO=9m
 .meas tran q1_short_u5_off_tail_s TRIG i(VCAP_COIL_SENSE) VAL=0.018 FALL=1 TARG i(VCAP_COIL_SENSE) VAL=0.002 FALL=1
+
+* Liveness switch: steady gate, pickup, release, and no-pulse behavior.
+.meas tran pump_gate_steady_v AVG v(gate_l) FROM=180m TO=200m
+.meas tran liveness_pickup_vt_lo_s TRIG v(sq) VAL=1.65 RISE=1 TARG i(VQ3LO_COIL_SENSE) VAL=0.0147 RISE=1
+.meas tran liveness_pickup_vt_hi_s TRIG v(sq) VAL=1.65 RISE=1 TARG i(VQ3HI_COIL_SENSE) VAL=0.0147 RISE=1
+.meas tran liveness_coil_current_a AVG i(VQ3LO_COIL_SENSE) FROM=190m TO=200m
+.meas tran liveness_release_vt_hi_s TRIG v(env) VAL=1.65 FALL=1 TARG i(VQ3HI_COIL_SENSE) VAL=0.0021 FALL=1
+.meas tran liveness_release_vt_lo_s TRIG v(env) VAL=1.65 FALL=1 TARG i(VQ3LO_COIL_SENSE) VAL=0.0021 FALL=1
+.meas tran liveness_release_held_high_vt_lo_s TRIG v(env) VAL=1.65 FALL=1 TARG i(VQ3HH_COIL_SENSE) VAL=0.0021 FALL=1
+.meas tran q1_short_no_pulse_coil_current_a MAX i(VQ1S_COIL_SENSE) FROM=0 TO=450m
+.meas tran single_edge_gate_peak_v MAX v(gate_stray) FROM=0 TO=450m
+.meas tran stuck_high_gate_peak_v MAX v(gate_stuckh) FROM=0 TO=450m
+.meas tran stuck_high_gate_final_v AVG v(gate_stuckh) FROM=440m TO=450m
+.meas tran stuck_low_gate_peak_v MAX v(gate_stuckl) FROM=0 TO=450m
 
 .end

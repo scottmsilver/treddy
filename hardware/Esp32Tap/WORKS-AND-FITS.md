@@ -15,7 +15,7 @@ replaces a vendor preview or a physical verification build.
 | Does the checked PCB geometry fit the checked enclosure geometry? | Yes, under mesh and functional-probe validation |
 | Is production firmware implemented and physically tested? | No |
 | Was the exact current archive observed completing JLC's online PCB DFM analysis? | No. An operator-recorded analysis is retained for a superseded archive only (`vendor/JLC-DFM-REVIEW.json` is `NOT_REVIEWED_EXACT_ARCHIVE`); the current archive must be re-uploaded before its DFM state is evidence |
-| Has JLC production engineering accepted placement, stackup, carrier, THT process, or substitutions? | No |
+| Has JLC production engineering accepted placement, stackup, rails/panel, SMT reflow of J1-J3, filled-and-capped vias, or substitutions? | No |
 | Has any assembled board been powered or connected to a treadmill? | No |
 
 ## Electrical coherence
@@ -30,7 +30,10 @@ on these safety-critical facts:
 - U4 creates treadmill-derived `TREAD_OK`.
 - U6 computes `RELAY_GATE = RELAY_CMD AND TREAD_OK` and
   `TX_GATE = TX_ENABLE AND TREAD_OK`.
-- U5 and Q1 are series coil controls; U7 is the independent TX output-enable.
+- U5, Q1 and Q3 are series coil controls; U7 is the independent TX output-enable.
+- Q3 conducts only while firmware keeps toggling `RELAY_PULSE` (IO8) through
+  the C22/D8 charge pump, so K1 needs `TREAD_OK`, `RELAY_CMD` and the pulse.
+  Firmware for the pulse is not implemented, so the relay cannot yet transfer.
 - K1 pole A transfers MOT6 between CONS6 and TX_DRV.
 - K1 pole B reports normally closed/normally open armature state.
 - R7/R8 are passive 10 kΩ receive taps and do not interrupt the through bus.
@@ -47,7 +50,7 @@ failure modes and relay contact timing remain outside that proof.
 | Finished thickness metadata | 1.59 mm |
 | Reference plane | One In1.Cu GND zone, continuous below USB except normal antipads; antenna keepout |
 | ESP32 antenna span | X 69.0–87.0 mm in board coordinates, fully on-board (physical antenna edge 3.3 mm inside the board edge) |
-| Antenna copper exclusion | Module's stock all-copper-layer keepout is track/via-free on every layer (audited), plus the named on-board rule area |
+| Antenna copper exclusion | Split keepout: inner and bottom layers forbid tracks, vias and fills; the front layer forbids fills and vias and allows the U1 pad fan-out stubs (audited), plus the named on-board rule area |
 | RJ45 jacks | One per short edge: J1 (CONSOLE) opens off X=0, J2 (MOTOR) opens off X=95 |
 | USB pair | F.Cu only; no signal vias; 0.2906/0.2000 mm controlled run plus four short 0.20 mm breakouts; J3 on the bottom edge |
 | UART probe pads | TP1/TP2 beside U1's east pad column (short local links; they no longer cross the board) |
@@ -89,9 +92,9 @@ clearance must be checked on physical parts.
 
 ## RF and installation
 
-Every copper layer is excluded beneath the module antenna (the router now
-honours the module's stock keepout, and an audit test holds it to zero
-track/via copper), and the enclosure adds a 15 mm axial void beyond the
+Tracks and vias are excluded on every copper layer beneath the module antenna
+(the router honours the keepout, and an audit test holds it to zero
+track/via copper; only the front layer allows the U1 pad fan-out stubs), and the enclosure adds a 15 mm axial void beyond the
 antenna edge. Keep the antenna end away from the metal motor hood and do not
 select metal-filled or conductively coated material. These precautions do not
 predict BLE/Wi-Fi range; perform an installed RSSI and coexistence survey.
@@ -101,8 +104,10 @@ predict BLE/Wi-Fi range; perform an installed RSSI and coexistence survey.
 1. Regenerate and pass the canonical repository gate from clean sources.
 2. Refresh the exact JLC stock snapshot.
 3. Upload the current exact archive to JLC DFM analysis, then complete the
-   JLC PCBA BOM/CPL placement preview and obtain engineering confirmation for
-   stackup/impedance, the RJ45 fixture/process, and the antenna carrier.
+   JLC PCBA BOM/CPL placement preview (including every part rotation) and
+   obtain engineering confirmation for stackup/impedance, standard top-side
+   reflow of J1-J3, Epoxy Filled & Capped via covering, and the rails/panel
+   that bring the 58 mm axis to 70 mm.
 4. Obtain JLC3DP mesh/material/DFM confirmation.
 5. If the owner authorizes a verification build, perform the staged bench
    program in `VALIDATION.md` and `firmware/PLAN.md`.

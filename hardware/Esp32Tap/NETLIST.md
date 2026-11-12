@@ -21,13 +21,15 @@ hand-editing this file.
 | U7 | SN74LVC1G126DBVR | Package_TO_SOT_SMD:SOT-23-5 | C7834 | Extended | Single tri-state buffer with partial-power-down support |
 | K1 | G6K-2F-Y-TR DC5 | Relay_SMD:Relay_DPDT_Omron_G6K-2F-Y | C47190 | Extended | DPDT signal relay, 5VDC coil, SMD — pole A provides fail-safe serial bypass and pole B provides dry-contact armature feedback |
 | Q1 | BC817-40,215 | Package_TO_SOT_SMD:SOT-23 | C52801 | Extended | 45V NPN relay coil driver |
+| Q3 | AO3400A | Package_TO_SOT_SMD:SOT-23 | C20917 | Basic | 30V logic-level N-MOSFET (Vgs(th) 0.65-1.45V) in series with Q1's emitter: the relay liveness switch. Its gate is fed only by the RELAY_PULSE charge pump, so the coil return path exists only while firmware keeps toggling that pin (1 kHz square wave or faster: the gate then sits near 2.5 V, the AO3400A's specified drive level) |
 | Q2 | 2N7002 | Package_TO_SOT_SMD:SOT-23 | C8545 | Basic | N-channel MOSFET, active-low VBUS-present detector |
 | D1 | SS34 | Diode_SMD:D_SMA | C8678 | Basic | Series Schottky providing reverse-polarity protection for local VIN |
 | D3 | SMBJ10A | Diode_SMD:D_SMB | C151250 | Extended | TVS, Littelfuse SMBJ10A — protected-VIN transient clamp |
 | D4 | SMAJ6.0CA | Diode_SMD:D_SMA | C80275 | Extended | Bidirectional TVS directly across the relay coil for fast release |
-| D5 | PESD3V3L1BA-N | Diode_SMD:D_SOD-323 | C316020 | Extended | Bidirectional ESD clamp to GND (NOT rail-referenced — stays inert when the board is unpowered), console pin-6 line (BORN PESD3V3L1BA-N; drop-in for Nexperia C51450 which showed 0 stock at validation 2026-07-23) |
-| D6 | PESD3V3L1BA-N | Diode_SMD:D_SOD-323 | C316020 | Extended | Bidirectional ESD clamp, motor pin-6 line |
-| D7 | PESD3V3L1BA-N | Diode_SMD:D_SOD-323 | C316020 | Extended | Bidirectional ESD clamp, pin-3 tap line |
+| D5 | PESD5V0S1BA,115 | Diode_SMD:D_SOD-323 | C19224 | Extended | Bidirectional ESD clamp to GND (NOT rail-referenced), console pin-6 line. 5V standoff: the treadmill bus level has never been measured, and this clamp sits on the console-to-motor path even in unpowered bypass, so it must stay inert on a 5V bus as well as a 3.3V one (Nexperia PESD5V0S1BA, 35pF) |
+| D6 | PESD5V0S1BA,115 | Diode_SMD:D_SOD-323 | C19224 | Extended | Bidirectional 5V-standoff ESD clamp, motor pin-6 line |
+| D7 | PESD5V0S1BA,115 | Diode_SMD:D_SOD-323 | C19224 | Extended | Bidirectional 5V-standoff ESD clamp, pin-3 tap line |
+| D8 | BAT54S,215 | Package_TO_SOT_SMD:SOT-23 | C47546 | Extended | Series Schottky pair: relay liveness charge-pump rectifier (pin 1 anode to GND, pin 3 common to the pump capacitor, pin 2 cathode to the Q3 gate) |
 | LED1 | XL-1608UGC-04 | LED_SMD:LED_0603_1608Metric | C965804 | Extended | Status LED green (GPIO38; XL-1608UGC-04, 5.2M stock at validation 2026-07-23; replaces C72043 stock=6) |
 | LED2 | RED-0603 | LED_SMD:LED_0603_1608Metric | C2286 | Basic | 3V3 power LED |
 | SW1 | SKRPACE010 | Button_Switch_SMD:SW_SPST_SKRPACE010 | C139797 | Extended | ALPSALPINE SKRPACE010 reel SMD tactile switch — reset (EN); PROVISIONAL_REQUIRES_LIVE_BOM_CPL_PROOF |
@@ -66,6 +68,9 @@ hand-editing this file.
 | R30 | 10k | Resistor_SMD:R_0603_1608Metric | C25804 | Basic | VBUS_PRESENT_N pull-up |
 | R31 | 10k | Resistor_SMD:R_0603_1608Metric | C25804 | Basic | GPIO0 boot pull-up |
 | R32 | 4.7k | Resistor_SMD:R_0603_1608Metric | C23162 | Basic | TREAD_OK→IO6 series isolation: keeps a misconfigured GPIO from overriding the U4 window or contending with its open-drain (review finding B2) |
+| R33 | 1M | Resistor_SMD:R_0603_1608Metric | C22935 | Basic | Undervoltage hysteresis: positive feedback from TREAD_OK to UV_SENSE adds about 0.45V of VIN-referred hysteresis so load bursts near the UV threshold cannot chatter the relay |
+| R34 | 100k | Resistor_SMD:R_0603_1608Metric | C25803 | Basic | Q3 gate bleed: holds the liveness switch off at boot/reset and opens it roughly 50-150 ms after RELAY_PULSE stops toggling (100 ms time constant with C23; calculated, not measured) |
+| R35 | 560R | Resistor_SMD:R_0603_1608Metric | C23204 | Basic | Relay liveness charge-pump series resistor (limits the RELAY_PULSE pin edge current into C22) |
 | C1 | 22uF/25V X7R 1210 | Capacitor_SMD:C_1210_3225Metric | C2918511 | Extended | Input bulk cap: JLC has no in-stock electrolytic for CP_Elec_6.3x7.7, so this reuses the C6/C7 1210 22uF/25V ceramic (SAMWHA CS3225X7R226K250NRL) — non-polarized, machine-placeable, and the board already carries 20uF+ of ceramic front-end bulk across C2/C3/C6/C7 |
 | C2 | 10uF/25V X7R 1206 | Capacitor_SMD:C_1206_3216Metric | C14860 | Extended | Input ceramic |
 | C3 | 10uF/25V X7R 1206 | Capacitor_SMD:C_1206_3216Metric | C14860 | Extended | Buck VIN ceramic (at pin) |
@@ -87,6 +92,8 @@ hand-editing this file.
 | C19 | 1nF/50V C0G 0603 | Capacitor_SMD:C_0603_1608Metric | C342541 | Extended | Overvoltage-sense filter |
 | C20 | 100nF | Capacitor_SMD:C_0603_1608Metric | C14663 | Basic | U6 logic-supply decoupling |
 | C21 | 100nF | Capacitor_SMD:C_0603_1608Metric | C14663 | Basic | U7 buffer-supply decoupling |
+| C22 | 100nF | Capacitor_SMD:C_0603_1608Metric | C14663 | Basic | Relay liveness charge-pump coupling capacitor (blocks DC, so a stuck-high or stuck-low RELAY_PULSE pin cannot hold Q3 on) |
+| C23 | 1uF | Capacitor_SMD:C_0603_1608Metric | C15849 | Basic | Q3 gate hold capacitor (10x C22, so one stray edge moves the gate only about 0.27V, below the 0.65V minimum threshold) |
 | TP1 | TXD0 | TestPoint:TestPoint_Pad_1.5x1.5mm | - | none | UART0 TX test pad |
 | TP2 | RXD0 | TestPoint:TestPoint_Pad_1.5x1.5mm | - | none | UART0 RX test pad |
 | TP3 | 3V3 | TestPoint:TestPoint_Pad_1.5x1.5mm | - | none | 3V3 test pad |
@@ -105,7 +112,7 @@ hand-editing this file.
 
 Every physical connection is listed as `reference.pad (pin-name)`.
 
-* **GND** — `J1.1` (GND_A), `J1.7` (GND_B), `J2.1` (GND_A), `J2.7` (GND_B), `J3.A1` (GND), `J3.B1` (GND), `J3.A12` (GND), `J3.B12` (GND), `J3.S1` (SHIELD), `U1.1` (GND), `U1.40` (GND), `U1.41` (GND_EPAD), `U2.1` (GND), `U3.2` (GND), `U4.2` (GND), `U5.2` (GND), `U6.4` (GND), `U7.3` (GND), `K1.6` (COM_B), `Q1.2` (E), `Q2.2` (S), `R2.2` (2), `R4.2` (2), `R5.2` (2), `R10.2` (2), `R14.1` (1), `R18.2` (2), `R20.2` (2), `R22.2` (2), `R23.2` (2), `R24.2` (2), `R27.2` (2), `R28.2` (2), `R29.2` (2), `C1.2` (2), `C2.2` (2), `C3.2` (2), `C4.2` (2), `C6.2` (2), `C7.2` (2), `C8.2` (2), `C9.2` (2), `C10.2` (2), `C11.2` (2), `C13.2` (2), `C14.2` (2), `C15.2` (2), `C16.2` (2), `C17.2` (2), `C18.2` (2), `C19.2` (2), `C20.2` (2), `C21.2` (2), `D3.2` (A), `D5.2` (2), `D6.2` (2), `D7.2` (2), `LED1.1` (K), `LED2.1` (K), `SW1.2` (B), `SW2.2` (B), `TP4.1` (1)
+* **GND** — `J1.1` (GND_A), `J1.7` (GND_B), `J2.1` (GND_A), `J2.7` (GND_B), `J3.A1` (GND), `J3.B1` (GND), `J3.A12` (GND), `J3.B12` (GND), `J3.S1` (SHIELD), `U1.1` (GND), `U1.40` (GND), `U1.41` (GND_EPAD), `U2.1` (GND), `U3.2` (GND), `U4.2` (GND), `U5.2` (GND), `U6.4` (GND), `U7.3` (GND), `K1.6` (COM_B), `Q3.2` (S), `D8.1` (A1), `C23.2` (2), `R34.2` (2), `Q2.2` (S), `R2.2` (2), `R4.2` (2), `R5.2` (2), `R10.2` (2), `R14.1` (1), `R18.2` (2), `R20.2` (2), `R22.2` (2), `R23.2` (2), `R24.2` (2), `R27.2` (2), `R28.2` (2), `R29.2` (2), `C1.2` (2), `C2.2` (2), `C3.2` (2), `C4.2` (2), `C6.2` (2), `C7.2` (2), `C8.2` (2), `C9.2` (2), `C10.2` (2), `C11.2` (2), `C13.2` (2), `C14.2` (2), `C15.2` (2), `C16.2` (2), `C17.2` (2), `C18.2` (2), `C19.2` (2), `C20.2` (2), `C21.2` (2), `D3.2` (A), `D5.2` (2), `D6.2` (2), `D7.2` (2), `LED1.1` (K), `LED2.1` (K), `SW1.2` (B), `SW2.2` (B), `TP4.1` (1)
 * **+8V_RAW** — `J1.2` (P8V_A), `J1.8` (P8V_B), `J2.2` (P8V_A), `J2.8` (P8V_B), `F1.1` (1)
 * **+8V_F** — `F1.2` (2), `D1.2` (A)
 * **VIN** — `D1.1` (K), `D3.1` (K), `U2.3` (VIN), `U4.5` (VDD), `U5.1` (IN), `C1.1` (1), `C2.1` (1), `C3.1` (1), `C4.1` (1), `C15.1` (1), `C17.1` (1), `R3.1` (1), `R17.1` (1), `R19.1` (1), `TP5.1` (1)
@@ -114,7 +121,7 @@ Every physical connection is listed as `reference.pad (pin-name)`.
 * **BST** — `U2.6` (BOOT), `C5.1` (1)
 * **+3V3** — `L1.2` (2), `C6.1` (1), `C7.1` (1), `R1.1` (1), `C12.1` (1), `U1.2` (3V3), `C8.1` (1), `C9.1` (1), `R12.1` (1), `R13.1` (1), `U6.8` (VCC), `U7.5` (VCC), `C20.1` (1), `C21.1` (1), `R21.1` (1), `R25.1` (1), `R26.1` (1), `R30.1` (1), `R31.1` (1), `TP3.1` (1)
 * **FB** — `U2.4` (FB), `R1.2` (2), `R2.1` (1), `C12.2` (2)
-* **VBUS** — `J3.A4` (VBUS), `J3.B4` (VBUS), `J3.A9` (VBUS), `J3.B9` (VBUS), `U3.5` (VBUS), `C11.1` (1), `R29.1` (1), `Q2.1` (G)
+* **VBUS** — `J3.A4` (VBUS), `J3.B4` (VBUS), `J3.A9` (VBUS), `J3.B9` (VBUS), `C11.1` (1), `R29.1` (1), `Q2.1` (G)
 * **USB_DN** — `J3.A7` (D-), `J3.B7` (D-), `U3.1` (IO1)
 * **USB_DP** — `J3.A6` (D+), `J3.B6` (D+), `U3.3` (IO2)
 * **USB_DN_MCU** — `U3.6` (IO1b), `R15.1` (1)
@@ -133,12 +140,17 @@ Every physical connection is listed as `reference.pad (pin-name)`.
 * **PIN3_RX** — `R8.2` (2), `U1.9` (IO16)
 * **PIN4_PASS** — `J1.4` (PIN4), `J2.4` (PIN4)
 * **PIN5_SAFETY** — `J1.5` (PIN5_SAFETY), `J2.5` (PIN5_SAFETY)
-* **UV_SENSE** — `U4.3` (INA+), `R17.2` (2), `R18.1` (1), `C18.1` (1)
+* **UV_SENSE** — `U4.3` (INA+), `R17.2` (2), `R18.1` (1), `C18.1` (1), `R33.2` (2)
 * **OV_SENSE** — `U4.4` (INB-), `R19.2` (2), `R20.1` (1), `C19.1` (1)
-* **TREAD_OK** — `U4.1` (OUTA), `U4.6` (OUTB), `U6.2` (1B), `U6.6` (2B), `R21.2` (2), `R22.1` (1), `R32.1` (1), `TP7.1` (1)
+* **TREAD_OK** — `U4.1` (OUTA), `U4.6` (OUTB), `U6.2` (1B), `U6.6` (2B), `R21.2` (2), `R22.1` (1), `R32.1` (1), `R33.1` (1), `TP7.1` (1)
 * **TREAD_OK_MCU** — `U1.6` (IO6), `R32.2` (2)
 * **RELAY_CMD** — `U1.23` (IO21), `U6.1` (1A), `R23.1` (1)
 * **RELAY_GATE** — `U6.7` (1Y), `U5.3` (EN), `R9.1` (1), `R24.1` (1), `TP8.1` (1)
+* **RELAY_PULSE** — `U1.12` (IO8), `R35.1` (1)
+* **PUMP_IN** — `R35.2` (2), `C22.1` (1)
+* **PUMP_AC** — `C22.2` (2), `D8.3` (COM)
+* **Q3_G** — `Q3.1` (G), `D8.2` (K2), `C23.1` (1), `R34.1` (1)
+* **RELAY_RTN** — `Q1.2` (E), `Q3.3` (D)
 * **+5V_RLY** — `U5.5` (OUT), `C16.1` (1), `K1.1` (COIL+), `D4.1` (K), `TP6.1` (1)
 * **RELAY_SW** — `K1.8` (COIL-), `Q1.3` (C), `D4.2` (A), `TP9.1` (1)
 * **Q1_B** — `Q1.1` (B), `R9.2` (2), `R10.1` (1)
@@ -157,7 +169,7 @@ Every physical connection is listed as `reference.pad (pin-name)`.
 
 ## Deliberately unconnected pins
 
-`U1.12`, `U1.15`, `U1.16`, `U1.17`, `U1.18`, `U1.19`, `U1.20`, `U1.21`, `U1.22`, `U1.24`, `U1.25`, `U1.26`, `U1.28`, `U1.29`, `U1.30`, `U1.32`, `U1.33`, `U1.34`, `U1.35`, `U1.38`, `U1.39`, `J1.9`, `J1.10`, `J2.9`, `J2.10`, `J3.A8`, `J3.B8`, `U5.4`
+`U1.15`, `U1.16`, `U1.17`, `U1.18`, `U1.19`, `U1.20`, `U1.21`, `U1.22`, `U1.24`, `U1.25`, `U1.26`, `U1.28`, `U1.29`, `U1.30`, `U1.32`, `U1.33`, `U1.34`, `U1.35`, `U1.38`, `U1.39`, `J1.9`, `J1.10`, `J2.9`, `J2.10`, `J3.A8`, `J3.B8`, `U5.4`, `U3.5`
 
 ## Rev E topology
 
@@ -166,13 +178,33 @@ Every physical connection is listed as `reference.pad (pin-name)`.
   regulator and supervisor power inputs are downstream of D1.
 * **USB is data-only:** J3 VBUS supplies USB protection, bypass, discharge,
   and presence sensing only; it has no path into VIN or the local rails.
+  U3 pin 5 (the ESD array's second VBUS-side pin) is deliberately unconnected:
+  tied to the VBUS sense net it let the ESP32 D+ pull-up leak onto that net.
 * **Treadmill permission:** U4 monitors protected VIN and its open-drain
   outputs form TREAD_OK. U6 requires TREAD_OK for both RELAY_GATE and
   TX_GATE, so firmware commands alone cannot enable either path.
+  R33 (1M, TREAD_OK to UV_SENSE) adds about 0.45 V of VIN-referred undervoltage
+  hysteresis (calculated, not measured); nominal UV is about 6.31 V falling and
+  about 6.85 V rising.
 * **TREAD_OK/IO6 isolation:** R32 is a series resistor between TREAD_OK and TREAD_OK_MCU (U1 IO6 only), so a misconfigured push-pull GPIO cannot force the interlock high or contend with U4's open-drain output; U4/U6/R21/R22/TP7 stay directly on TREAD_OK (review finding B2).
 * **Relay control:** U5 enables the +5V_RLY coil supply and Q1 enables
   the low side. These are series hardware controls driven by RELAY_GATE;
   loss of permission removes coil power.
+* **Relay liveness switch:** Q3 (AO3400A) is in series with Q1's emitter
+  (Q1.2 -> RELAY_RTN -> Q3 drain; Q3 source to GND). Q3's gate is fed only
+  through C22 and the D8 charge pump from RELAY_PULSE (U1 IO8, via R35), with
+  R34 || C23 as the hold. K1 can therefore energize only while TREAD_OK,
+  RELAY_CMD (static high) and a toggling RELAY_PULSE are all present. Calculated,
+  not measured: gate about 2.55 V at a 1 kHz square wave (2.33 V at 500 Hz); one stray edge moves
+  the gate about 0.27 V (below the 0.65 V minimum threshold); the relay releases
+  roughly 50-150 ms after toggling stops (100 ms time constant; not a guaranteed deadline). Firmware must toggle IO8 from the
+  watchdog-supervised safety task as a 1 kHz square wave or faster, never from LEDC/hardware
+  PWM or a free-running timer (not implemented; bd precor-9_3x-4uv). Until then
+  the relay stays in bypass.
+  The liveness switch is not single-fault tolerant on its own: a C22 short, an R34 open,
+  a C23 open or a Q3 drain-source short each defeats it, and each needs a second
+  fault to matter. Open bench item: scope the Q1 base, emitter and collector when
+  the pulses stop with RELAY_GATE high (BC817 reverse VBE limit is 5 V).
 * **Relay contacts:** K1 uses one transfer pole for serial bypass/drive
   and one dry feedback pole for K1_NC_FB/K1_NO_FB. The feedback pole
   does not carry or duplicate the serial path.
@@ -185,10 +217,10 @@ Every physical connection is listed as `reference.pad (pin-name)`.
 * **ERC helpers:** four schematic-only power flags declare GND, VIN,
   +3V3, and VBUS as powered after their passive entry paths. They have
   no footprint and are excluded from BOM/CPL; they add no PCB copper.
-* **Harness interfaces:** J1 (CONSOLE) and J2 (MOTOR) are the same Molex 0441440003/C585890 right-angle SMD 8P8C RJ45 jack, one per short board edge (Rev E: J1 left, J2 right). There is no mechanical keying between them; the CONSOLE/MOTOR silkscreen beside each jack is the only differentiator. J1/J2 pads 9/10 are the jack's mechanical shell stakes, not signals.
+* **Harness interfaces:** J1 (CONSOLE) and J2 (MOTOR) are the same Molex 44144-0003 (441440003, LCSC C585890) right-angle SMD 8P8C RJ45 jack, one per short board edge (Rev E: J1 left, J2 right). There is no mechanical keying between them; the CONSOLE/MOTOR silkscreen beside each jack is the only differentiator. J1/J2 pads 9/10 are the jack's mechanical shell stakes, not signals.
 * **Release status:** PROVISIONAL_REQUIRES_LIVE_BOM_CPL_PROOF; public catalog identity is not an order-ready placement result.
 * **GPIO map:** IO4=K1_NC_FB, IO5=K1_NO_FB, IO6=TREAD_OK_MCU,
-  IO7=VBUS_PRESENT_N, IO15=TX_ENABLE, IO16=UART2 RX,
+  IO7=VBUS_PRESENT_N, IO8=RELAY_PULSE, IO15=TX_ENABLE, IO16=UART2 RX,
   IO17=UART1 TX, IO18=UART1 RX, IO21=RELAY_CMD, IO38=status LED.
   Native USB remains on IO19/IO20.
 

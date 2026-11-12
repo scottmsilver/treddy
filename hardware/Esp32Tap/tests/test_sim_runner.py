@@ -210,6 +210,55 @@ def test_manifest_contains_expected_truth_table_rows() -> None:
         assert row["tx_measure"].startswith("tx_gate_row_")
 
 
+def test_manifest_k1_drive_requires_gate_and_pulse_alive() -> None:
+    """K1 energizes only with rail, TREAD_OK, RELAY_CMD and a live pump."""
+    manifest = _manifest()
+    rows = manifest["k1_truth_table"]
+    safety = manifest["scenarios"]["safety_truth_table"]["assertions"]
+
+    assert len(rows) == 16
+    assert len(
+        {
+            (
+                row["rail_3v3"],
+                row["tread_ok"],
+                row["relay_cmd"],
+                row["pulse_alive"],
+            )
+            for row in rows
+        }
+    ) == 16
+    for row in rows:
+        expected_on = bool(
+            row["rail_3v3"]
+            and row["tread_ok"]
+            and row["relay_cmd"]
+            and row["pulse_alive"]
+        )
+        assert bool(row["k1_drive"]) == expected_on
+        assert safety[row["k1_measure"]]["expected"] == (
+            3.3 if expected_on else 0.0
+        )
+    assert sum(row["k1_drive"] for row in rows) == 1
+    for fault in (
+        "k1_fault_stuck_gate_no_pulse_v",
+        "k1_fault_q1_short_no_pulse_v",
+        "k1_fault_q1_short_gate_low_row_08_v",
+    ):
+        assert safety[fault]["expected"] == 0.0
+
+
+def test_liveness_switch_assertions_bound_single_edge_below_threshold() -> None:
+    relay = _manifest()["scenarios"]["relay_drive_release"]["assertions"]
+
+    # One stray edge must stay below the 0.65 V minimum Q3 threshold.
+    assert relay["single_edge_gate_peak_v"]["max"] < 0.65
+    assert relay["stuck_high_gate_peak_v"]["max"] < 0.65
+    assert relay["stuck_low_gate_peak_v"]["max"] <= 1e-6
+    assert relay["q1_short_no_pulse_coil_current_a"]["max"] <= 1e-6
+    assert relay["liveness_release_vt_lo_s"]["max"] < 0.2
+
+
 def test_manifest_has_limits_and_explicit_unsupported_claims() -> None:
     scenarios = _manifest()["scenarios"]
 

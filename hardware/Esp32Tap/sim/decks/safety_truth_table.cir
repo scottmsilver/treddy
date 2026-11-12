@@ -1,8 +1,17 @@
-Esp32Tap Rev B hardware safety gate complete truth table
+Esp32Tap Rev E hardware safety gate complete truth table (gates and K1 drive)
 * ASSUMPTIONS:
 * U6 is represented as partial-power-down AND logic. R23/R27 are 10k input
 * pull-downs and R24/R28 are 10k output-node pull-downs. Each 1 ms row
 * enumerates (+3V3,TREAD_OK,RELAY_CMD,TX_ENABLE) in binary order 0...15.
+* K1 DRIVE (Rev E): K1 is energized only through three series elements, U5
+* (coil supply enable = RELAY_GATE), Q1 (base fed from RELAY_GATE) and Q3
+* (gate fed only by the RELAY_PULSE charge pump). The pump is represented
+* here as a BEHAVIORAL boolean, PULSE_ALIVE, not as a circuit; the circuit
+* model of the pump and its timing is in relay_drive_release.cir. A second
+* 16-row table enumerates (+3V3, TREAD_OK, RELAY_CMD, PULSE_ALIVE) and the
+* expected result is K1_DRIVE = +3V3 AND TREAD_OK AND RELAY_CMD AND
+* PULSE_ALIVE. Fault cases force one element on: a stuck-high U6 output
+* with no pulses, and a shorted Q1 with no pulses.
 * NON-CLAIMS:
 * Logic propagation, ESD transients, powered-off leakage, and firmware
 * sequencing are not established by this static truth-table deck.
@@ -13,6 +22,7 @@ VTX tx_enable 0 PULSE(0 3.3 1m 1n 1n 1m 2m)
 VCMD relay_cmd 0 PULSE(0 3.3 2m 1n 1n 2m 4m)
 VTREAD tread_ok 0 PULSE(0 3.3 4m 1n 1n 4m 8m)
 VRAIL rail_3v3 0 PULSE(0 3.3 8m 1n 1n 8m 16m)
+VPULSE pulse_alive 0 PULSE(0 3.3 1m 1n 1n 1m 2m)
 
 R23 relay_cmd 0 10k
 R27 tx_enable 0 10k
@@ -20,6 +30,35 @@ XRELAY relay_cmd tread_ok rail_3v3 relay_gate ESP_AND_GATE
 XTX tx_enable tread_ok rail_3v3 tx_gate ESP_AND_GATE
 R24 relay_gate 0 10k
 R28 tx_gate 0 10k
+
+* K1 drive = U5 enable AND Q1 on AND Q3 on (pump alive). Normal rows feed
+* U5 and Q1 from RELAY_GATE and Q3 from PULSE_ALIVE.
+XK1A relay_gate relay_gate rail_3v3 k1_ab ESP_AND_GATE
+XK1B k1_ab pulse_alive rail_3v3 k1_drive ESP_AND_GATE
+RK1_DRIVE k1_drive 0 10k
+
+* Fault: U6 RELAY_GATE output stuck high (forces U5 enable and Q1 on) while
+* RELAY_CMD, TREAD_OK and PULSE are all absent. Only Q3 remains.
+VSTUCK_GATE stuck_gate 0 3.3
+VNOPULSE no_pulse 0 0
+XFA_AB stuck_gate stuck_gate rail_3v3 fa_ab ESP_AND_GATE
+XFA_C fa_ab no_pulse rail_3v3 fa_drive ESP_AND_GATE
+RFA_DRIVE fa_drive 0 10k
+
+* Fault: Q1 shorted (always on) with RELAY_GATE commanded high but no
+* pulses. U5 is enabled; only Q3 remains.
+VQ1_SHORT q1_short 0 3.3
+XFB_AB relay_gate_on q1_short rail_3v3 fb_ab ESP_AND_GATE
+XFB_C fb_ab no_pulse rail_3v3 fb_drive ESP_AND_GATE
+VRELAY_GATE_ON relay_gate_on 0 3.3
+RFB_DRIVE fb_drive 0 10k
+
+* Fault: Q1 shorted with pulses alive but RELAY_GATE low (U5 disabled): sampled
+* at the middle of rows 8...13 (3V3 present, RELAY_GATE low).
+XFC_AB relay_gate q1_short rail_3v3 fc_ab ESP_AND_GATE
+XFC_C fc_ab fc_one rail_3v3 fc_drive ESP_AND_GATE
+VFC_ONE fc_one 0 3.3
+RFC_DRIVE fc_drive 0 10k
 
 * Separate undriven boot-default nodes exercise the external pull-downs.
 R23_DEFAULT relay_cmd_default 0 10k
@@ -65,6 +104,30 @@ RLEAK_RAIL rail_default 0 100k
 .meas tran tx_gate_row_14_v FIND v(tx_gate) AT=14.5m
 .meas tran relay_gate_row_15_v FIND v(relay_gate) AT=15.5m
 .meas tran tx_gate_row_15_v FIND v(tx_gate) AT=15.5m
+.meas tran k1_drive_row_00_v FIND v(k1_drive) AT=0.5m
+.meas tran k1_drive_row_01_v FIND v(k1_drive) AT=1.5m
+.meas tran k1_drive_row_02_v FIND v(k1_drive) AT=2.5m
+.meas tran k1_drive_row_03_v FIND v(k1_drive) AT=3.5m
+.meas tran k1_drive_row_04_v FIND v(k1_drive) AT=4.5m
+.meas tran k1_drive_row_05_v FIND v(k1_drive) AT=5.5m
+.meas tran k1_drive_row_06_v FIND v(k1_drive) AT=6.5m
+.meas tran k1_drive_row_07_v FIND v(k1_drive) AT=7.5m
+.meas tran k1_drive_row_08_v FIND v(k1_drive) AT=8.5m
+.meas tran k1_drive_row_09_v FIND v(k1_drive) AT=9.5m
+.meas tran k1_drive_row_10_v FIND v(k1_drive) AT=10.5m
+.meas tran k1_drive_row_11_v FIND v(k1_drive) AT=11.5m
+.meas tran k1_drive_row_12_v FIND v(k1_drive) AT=12.5m
+.meas tran k1_drive_row_13_v FIND v(k1_drive) AT=13.5m
+.meas tran k1_drive_row_14_v FIND v(k1_drive) AT=14.5m
+.meas tran k1_drive_row_15_v FIND v(k1_drive) AT=15.5m
+.meas tran k1_fault_stuck_gate_no_pulse_v MAX v(fa_drive) FROM=0 TO=16m
+.meas tran k1_fault_q1_short_no_pulse_v MAX v(fb_drive) FROM=0 TO=16m
+.meas tran k1_fault_q1_short_gate_low_row_08_v FIND v(fc_drive) AT=8.5m
+.meas tran k1_fault_q1_short_gate_low_row_09_v FIND v(fc_drive) AT=9.5m
+.meas tran k1_fault_q1_short_gate_low_row_10_v FIND v(fc_drive) AT=10.5m
+.meas tran k1_fault_q1_short_gate_low_row_11_v FIND v(fc_drive) AT=11.5m
+.meas tran k1_fault_q1_short_gate_low_row_12_v FIND v(fc_drive) AT=12.5m
+.meas tran k1_fault_q1_short_gate_low_row_13_v FIND v(fc_drive) AT=13.5m
 .meas tran relay_gate_default_v MAX v(relay_gate_default) FROM=0 TO=16m
 .meas tran tx_gate_default_v MAX v(tx_gate_default) FROM=0 TO=16m
 

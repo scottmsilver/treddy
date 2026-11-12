@@ -16,6 +16,37 @@ Run `python3 validate_enclosure.py` from this directory to inspect the live
 KiCad board, render both parts again, compare canonical triangle hashes, and
 run the mesh and functional probes.
 
+## Print material
+
+Order from JLC3DP as **MJF nylon (PA12)**, not SLA resin (the thin lip and
+posts are brittle in resin). Plastic only: no metallic or conductive finish
+(2.4 GHz antenna inside).
+
+## Hardware you must supply (JLC does not)
+
+JLC prints the two plastic parts only. No screws, inserts or washers are
+included.
+
+| Qty | Part | Thread / length | Head | Where |
+|---:|---|---|---|---|
+| 2 | **Nylon** screw | M3 × 10 mm | countersunk (flat), 90° | Lid, the two **top** posts (nearest the ESP32 antenna) |
+| 2 | Steel screw | M3 × 10 mm | countersunk (flat) | Lid, the two **bottom** posts (nearest the USB-C edge) |
+| 3 | Screw (steel) | M2.5 × 5 mm | pan | PCB mounting holes MH1, MH2, MH3 into the base posts |
+| 2–4 (optional) | Cable tie, ≤3 mm wide | n/a | n/a | Mounting ears |
+
+Notes:
+
+- Lid screws: 3.0 mm lid plus 7.0 mm into a 10 mm deep Ø2.5 pilot; the
+  countersink is Ø6.4 mm × 1.8 mm. The lid holes are Ø3.4 mm clearance.
+- Nylon on the top posts: the top-right lid post is about 13.5 mm from the
+  ESP32 antenna edge, so a steel screw there sits in the antenna's near
+  field. Nylon M3 does not cut its own thread in a Ø2.5 pilot reliably:
+  run a steel M3 in once to form the thread, remove it, then fit the nylon
+  screw (do not over-torque nylon).
+- M2.5 × 5: 1.6 mm through the PCB, 3.4 mm into the 4.0 mm pilot. A longer
+  screw bottoms out in the pilot. The nearest M2.5 screw (MH2) is about
+  21 mm from the antenna.
+
 ## Inspector-bound geometry
 
 Coordinates use the PCB outline minimum as `(0, 0)`.
@@ -45,15 +76,17 @@ geometry, not delivered fit evidence.
 |---|---|
 | Interior cavity | 99.0 × 78.7 × 21.1 mm |
 | Outer shell | 104.0 × 83.7 × 23.6 mm |
-| Lid | 104.0 × 83.7 × 3.0 mm, plus 1.2 mm registration lip |
+| Lid | 104.0 × 83.7 × 3.0 mm, plus 1.2 mm registration lip (0.4 mm/side clearance to the inner wall; 0.4 mm/side relief around each lid post) |
 | Wall / floor | 2.5 mm |
 | PCB under-clearance / headroom | 3.0 / 16.5 mm |
 | Antenna void | 15.0 mm plastic/air from the physical antenna edge |
-| USB overmold aperture | 13.0 × 8.0 mm |
+| USB overmold aperture | 12.0 × 8.0 mm, cut through the wall only (0.66 mm to the bottom-right lid post; clear of the MH3 post) |
 | Switch access | Ø2.5 mm tool openings at exact SW1/SW2 centers |
+| LED light holes | Ø3.2 mm through the lid at the PCB LED1 (93.0, 13.0) and LED2 (41.2, 55.4) centers |
 | Connector latch clearance | 6.0 mm modeled straight-access depth |
 | Exterior cable bend service envelope | 18.0 mm minimum radius |
-| Closure | Tool-less snap latches; optional supplied M3 fasteners/posts |
+| Closure | **Screws only**: 4 × M3 lid screws into the corner posts (Ø2.5 mm pilot, 10 mm deep). There are no snap latches. |
+| Board retention | 3 × M2.5 screws into the board posts (Ø2.0 mm pilot, 4.0 mm deep: 3.0 mm post + 1.0 mm into the floor, 1.5 mm of floor remains) |
 
 The enclosure contains no metal in the antenna void. The external 18 mm
 bend envelope is a production routing requirement; it is not represented as
@@ -98,10 +131,11 @@ physical gates.
 
 | Mesh | Byte SHA-256 | Canonical geometry SHA-256 | Volume | Bounds |
 |---|---|---|---:|---|
-| `esp32tap_base.stl` | `1396a586083f3b1b823eb8254922180e8e63e05e15c8c02b79f6e50b3b2ed718` | `1e109aedba97785dc65e21c9f52fb7e7914b50d702fcc56d099f05c5f2c05bc1` | 43,414.399 mm³ | −6…112 × −1.2…83.7 × 0…23.6 mm |
-| `esp32tap_lid.stl` | `8b8c0d8ccc043cdd017fe8340ea51cf5c1c8178e053da94f9642c11eed06a26f` | `39d5f1f75a25ca9b5d6e3328556357d34c5ae0d24bd0a58713c86effb5d900da` | 27,060.858 mm³ | 0…104 × 0…83.7 × 0…4.2 mm |
+| `esp32tap_base.stl` | `11f6544635c570b8d2a8f704f282441f2ebaf4a149c0f5f1fd7abad6948a2028` | `0c2a099b3d88d0329b7672cc62d0f6fef3edd8643ed7e996ebff82b9054ac8c6` | 43,391.435 mm³ | −6…112 × 0…83.7 × 0…23.6 mm |
+| `esp32tap_lid.stl` | `62ecd790fd69490a734259c40d039920b7ffe5b4421af2522b1ba29010d5879a` | `b3ae8428f304909a0f7036821f213d971906531d15c10bc9923213541ead732f` | 27,124.620 mm³ | 0…104 × 0…83.7 × 0…4.2 mm |
 
 Both meshes are single positive-volume, watertight, winding-consistent
-manifolds with exactly two faces per welded edge. Eighty-five occupancy and
-boundary probes cover the cavity, RJ45 apertures, USB, switches, mounting
-posts, lid posts, snap receivers, and antenna void.
+manifolds with exactly two faces per welded edge. Occupancy and
+boundary probes cover the cavity, RJ45 apertures, USB, switches, LED
+light holes, mounting posts (including the 4.0 mm pilots), lid posts, the
+absence of latch geometry, and the antenna void.

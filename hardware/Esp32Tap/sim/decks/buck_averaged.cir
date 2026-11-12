@@ -1,10 +1,14 @@
-Esp32Tap Rev B TPS54202 AVERAGED BEHAVIORAL MODEL
+Esp32Tap Rev E TPS54202 AVERAGED BEHAVIORAL MODEL
 * ASSUMPTIONS:
 * TPS54202 input is behind F1/D1. The source ramp reaches 8 V through
 * explicit 0.5/1.5 ohm source corners and F1=0.11/0.29 ohm.
 * The converter is a 3.3 V Thevenin regulator with the data-sheet 5 ms
 * soft-start, 82/90 percent energy proxies, derated input/output capacitance,
 * 50 mA startup load, and a 450 mA Wi-Fi-like load step.
+* VIN CAPACITANCE (Rev E): C1 22u + C2 10u + C3 10u + C15 1u + 0.2u = 43.2 uF
+* nominal, about 26 uF effective at 7.5 V DC bias (22 uF worst corner). The
+* decks use 26 uF, and 22 uF where a worst-corner copy is declared. This is
+* the datasheet-derating estimate, not a measured value.
 * NON-CLAIMS:
 * This AVERAGED BEHAVIORAL MODEL leaves loop margin, switch-node ripple,
 * EMI, pulse-skip behavior, magnetics saturation, and vendor-model startup
@@ -23,7 +27,7 @@ VSOURCE_N source_n 0 PWL(0 0 0.1m 0 0.5m 8 20m 8)
 RSOURCE_N source_n f1_n_in 0.5
 RF1_N f1_n_in d1_n_a 0.11
 DD1_N d1_n_a vin_n ESP_SS34
-CIN_N vin_n 0 120u
+CIN_N vin_n 0 26u
 BIN_N vin_n bin_n_return I={45u+v(load_n)*v(out_n)/(0.90*8)+u(v(target_n)-v(out_n))*(v(target_n)-v(out_n))*3.3/(0.10*0.90*8)}
 VBIN_N_SENSE bin_n_return 0 0
 
@@ -38,7 +42,7 @@ VSOURCE_W source_w 0 PWL(0 0 0.1m 0 0.5m 8 20m 8)
 RSOURCE_W source_w f1_w_in 1.5
 RF1_W f1_w_in d1_w_a 0.29
 DD1_W d1_w_a vin_w ESP_SS34
-CIN_W vin_w 0 110u
+CIN_W vin_w 0 22u
 BIN_W vin_w bin_w_return I={45u+v(load_w)*v(out_w)/(0.82*8)+u(v(target_w)-v(out_w))*(v(target_w)-v(out_w))*3.3/(0.15*0.82*8)}
 VBIN_W_SENSE bin_w_return 0 0
 

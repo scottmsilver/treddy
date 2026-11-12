@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://precor.local/schemas/esp32tap-safety-manifest-v1.json",
-  "title": "Esp32Tap Rev B production safety bundle",
+  "title": "Esp32Tap Rev E production safety bundle",
   "type": "object",
   "additionalProperties": false,
   "required": [

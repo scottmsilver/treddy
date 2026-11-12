@@ -6,7 +6,7 @@
   "checked_at_utc": "2026-07-25T23:15:05Z",
   "archive": {
     "path": "kicad/Esp32Tap-gerbers.zip",
-    "sha256": "c5d708269400dbed60367d260cf11dd3d824bc02c0465f0a3ee36fd342dee454"
+    "sha256": "a22659b79d96e59ddb3c1b71a8a72e4432c8d52ffe83726e9aaacc3a0b5467bb"
   },
   "parsed_board": {
     "copper_layers": 4,
@@ -281,12 +281,14 @@
     ]
   },
   "open_vendor_gates": [
-    "antenna_overhang_carrier",
     "controlled_impedance_production_confirmation",
-    "mixed_smt_tht_fixture_and_process",
+    "epoxy_filled_capped_via_covering",
     "pcba_bom_cpl_placement_preview",
+    "placement_rotation_preview",
     "pth_barrel_minimum_20um",
     "production_cam_acceptance",
+    "smt_only_top_side_reflow_confirmation",
+    "standard_pcba_rails_panel_to_70mm",
     "substitution_review"
   ],
   "official_sources": [

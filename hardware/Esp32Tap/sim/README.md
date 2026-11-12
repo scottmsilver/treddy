@@ -1,8 +1,13 @@
-# Esp32Tap Rev C behavioral simulations
+# Esp32Tap Rev E behavioral simulations
 
-These eight ngspice decks retain the Rev B behavioral regression evidence and
-add the Rev C harness current-sharing model. They are not a product
-certification and they do not replace production-hardware measurements.
+These eight ngspice decks are behavioral regression evidence for the Rev E
+circuits. Seven model Rev E parts. The eighth, `harness_supply_drop`, models a
+Micro-Fit pigtail harness that Rev E no longer has; it is kept as historical
+regression evidence only and supports no Rev E claim. None of the decks is a
+product certification, and none replaces production-hardware measurements.
+
+The manifest key `rev_b_values` in `assertions.json` is a legacy name for the
+shared component-value block; it is pinned by tests and was not renamed.
 
 ## Reproduce
 
@@ -31,21 +36,45 @@ absolute and relative tolerances in `assertions.json`.
 
 ## Result summary
 
-Fresh runs on 2026-07-24 produced the same declared values on ngspice 42 and
+Fresh runs on 2026-11-11 produced the same declared values on ngspice 42 and
 39. Representative host values are:
 
 | Deck | Behavioral evidence |
 |---|---|
-| `input_protection` | 8 V VIN = 7.625 V (F1 initial resistance) / 7.600 V (higher documented resistance bound); 16 V and 20 V worst high-breakdown pulse VIN peaks = 12.645 V / 12.531 V; low-breakdown D3 pulse energy = 15.5 mJ / 62.1 mJ; reverse VIN decays to 2.82 mV |
+| `input_protection` | VIN capacitance modeled as 26 uF effective (22 uF in the high-breakdown copies); 8 V VIN = 7.625 V (F1 initial resistance) / 7.600 V (higher documented resistance bound); 16 V and 20 V worst high-breakdown pulse VIN peaks = 12.645 V / 12.531 V; low-breakdown D3 pulse energy = 18.1 mJ / 65.7 mJ; reverse VIN minimum = -0.27 mV |
 | `tread_permission` | UV rising corners = 6.224–6.600 V; OV rising corners = 10.300–10.928 V; supervisor startup = 448.9 µs; an intentionally early +3V3 rail waits 364.0 µs; loaded U5 reaches 95% in 1.501 ms; OV disable including the 18 µs propagation corner = 36.1 µs; modeled C16/U5 disable tail to 0.5 V = 2.55 ms |
-| `safety_truth_table` | all 16 `(+3V3, TREAD_OK, RELAY_CMD, TX_ENABLE)` rows match `RELAY_GATE = rail AND TREAD_OK AND RELAY_CMD` and `TX_GATE = rail AND TREAD_OK AND TX_ENABLE`; both default LOW |
-| `relay_drive_release` | 18.79–23.90 mA nominal-corner coil current; approved R9=560 Ω with conservative 2.3 V drive / 1.2 V VBE and resistor tolerances leaves 1.82 mA base current, 4.20 V across the worst-resistance coil, and forced β = 8.83; SMAJ decay to 2 mA = 0.184/0.864/1.628 ms for 0.1/0.5/1 H; Q1 peak = 12.27 V |
+| `safety_truth_table` | all 16 `(+3V3, TREAD_OK, RELAY_CMD, TX_ENABLE)` rows match `RELAY_GATE = rail AND TREAD_OK AND RELAY_CMD` and `TX_GATE = rail AND TREAD_OK AND TX_ENABLE`; both default LOW. A second 16-row table over `(+3V3, TREAD_OK, RELAY_CMD, PULSE_ALIVE)` gives K1 drive HIGH only in the all-ones row. Fault cases: U6 `RELAY_GATE` stuck high with no pulses, and Q1 shorted with no pulses, both leave K1 drive LOW; Q1 shorted with `RELAY_GATE` low also leaves it LOW. `PULSE_ALIVE` is a behavioral boolean in this deck |
+| `relay_drive_release` | 18.79–23.90 mA nominal-corner coil current; approved R9=560 Ω with conservative 2.3 V drive / 1.2 V VBE and resistor tolerances leaves 1.82 mA base current, 4.20 V across the worst-resistance coil, and forced β = 8.83; SMAJ decay to 2 mA = 0.184/0.864/1.628 ms for 0.1/0.5/1 H; Q1 peak = 12.27 V. Q3 liveness switch (simulated charge pump, 1 kHz square wave): gate 2.63 V steady; coil pickup 4.6 ms (0.65 V Q3 threshold) to 9.6 ms (1.45 V); release after the pulses stop held low 60 ms (1.45 V) to 140 ms (0.65 V), 156 ms if held high; one stray 3.3 V edge moves the gate 0.281 V peak, below the 0.65 V minimum threshold; a pin stepped high and held leaves 6.5 mV after 440 ms; a pin held low leaves the gate at 0; Q1 shorted with no pulses leaves 5 nA coil current |
 | `vbus_present` | active-low `VBUS_PRESENT_N` is 1.65 mV with VBUS and 3.3 V absent; true slow hot-plug corner reaches LOW in 4.083 µs; worst unplug-to-HIGH = 1.912 ms, strictly below 3 ms; modeled dead-rail/GPIO injection = 0 |
-| `buck_averaged` | 90% startup = 4.495 ms; 450 mA step minimum = 3.233 V; worst modeled VIN = 6.865 V; input/load energies = 12.95/5.38 mJ |
+| `buck_averaged` | VIN capacitance modeled as 26 uF (22 uF worst corner); 90% startup = 4.634 ms; 450 mA step minimum = 3.233 V; worst modeled VIN = 6.865 V; worst source peak = 0.465 A; input/load energies = 12.93/5.38 mJ |
 | `uart_taps` | 10–90% rise = 1.110 µs versus a 104.167 µs bit; one/two-tap unpowered injection = 0.286/0.572 mA |
-| `harness_supply_drop` | both exact Rev C board connectors and both rails use the predecessor-authorized 1.35/0.65 A unequal case; opening each individual new-board power or ground contact leaves 2.0 A in its surviving Micro-Fit contact; doubling each 10 mΩ Micro-Fit contact in turn produces a 1.333333 A maximum branch current |
+| `harness_supply_drop` | RETIRED, historical only: the removed Rev C Micro-Fit connectors use the predecessor-authorized 1.35/0.65 A unequal case; opening each individual contact leaves 2.0 A in its surviving Micro-Fit contact; doubling each 10 mΩ contact in turn produces a 1.333333 A maximum branch current. Not a Rev E result |
 
 The machine-readable limits, not this table, decide PASS or failure.
+
+### Changes for Rev E
+
+| Measure | Before | After | Cause |
+|---|---|---|---|
+| `buck_averaged` `worst_source_peak_a` | 1.909 A | 0.465 A | VIN capacitance corrected from 110/120 uF to 22/26 uF; the peak is mostly inrush into that capacitance. The assertion band moved from 1.5-2.1 A to 0.35-0.6 A. |
+| `buck_averaged` `startup_90pct_s` | 4.495 ms | 4.634 ms | same |
+| `input_protection` `safe16_d3_energy_j` | 15.5 mJ | 18.1 mJ | same |
+| `input_protection` `safe20_d3_energy_j` | 62.1 mJ | 65.7 mJ | same |
+| `input_protection` `reverse_vin_min_v` | 2.82 mV | -0.27 mV | same (faster discharge; the band still contains it) |
+
+Rev E VIN capacitance is C1 22 uF + C2 10 uF + C3 10 uF + C15 1 uF + 0.2 uF =
+43.2 uF nominal, about 26 uF effective at 7.5 V bias and 22 uF at the worst
+corner. The effective values are a datasheet-derating estimate, not a
+measurement.
+
+### Q3 liveness switch (behavioral)
+
+`relay_drive_release` simulates the R35, C22, D8, C23, R34 charge pump as a
+circuit, with a transparent low-order BAT54S diode model, a smooth-conductance
+Q3 with a 0.65-1.45 V threshold sweep, and an ideal 3.3 V, 1 kHz source.
+`safety_truth_table` uses a boolean `PULSE_ALIVE` instead. The times above are
+model outputs. They are not measured timing, and they do not show that
+firmware can generate the pulses.
 
 ## Corners and source basis
 
@@ -90,20 +119,15 @@ The machine-readable limits, not this table, decide PASS or failure.
   5 ms soft-start and selected 3.3 V network only as an averaged envelope.
   The declared source impedance, capacitor derating, and 82–90% efficiency
   proxies are engineering assumptions.
-- The harness deck binds its only numeric current assertions to the
-  owner-authorized, field-working PiZeroHat predecessor basis: 2.0 A total,
-  explicit 1.35/0.65 A unequal sharing, and no credit for parallel contacts
-  in an individual-open 430450809 or 430451010 board-connector case. The
-  doubled-contact sweep uses the selected Micro-Fit system's published 10 mΩ
-  initial contact-resistance limit. Alpha Wire 3051 conductor resistance is
-  calculated from its 16.2 Ω/1000 ft maximum at 20 °C and the modeled 180/240
-  mm harness lengths. `harness/electrical_limits.json` is the fail-closed
-  machine-readable source for these inputs.
-- The complete harness topology includes both harnesses, four RJ45
-  terminations, both exact board connectors, PCB copper/vias, a local-load
-  probe, source-impedance probe, and USB-ground-path probe. Unmeasured
-  elements use zero-volt or zero-current topology probes, not invented
-  physical resistance, voltage, load, or USB-current defaults.
+- The retired `harness_supply_drop` deck keeps its original numeric
+  assertions, which were tied to the removed Rev C Micro-Fit pigtail harness
+  (430450809/430451010 connectors, Alpha Wire 3051 conductors). Its input
+  file, `harness/electrical_limits.json`, no longer exists in the repository.
+  Rev E has no such harness, so the deck's values describe no Rev E hardware.
+- The Q3 liveness-switch decks use the Nexperia BAT54 family forward-voltage
+  anchor (about 0.26 V at 0.1 mA and 0.32 V at 1 mA) and the AO3400A 0.65-1.45
+  V gate-threshold range. Gate charge, capacitor tolerance, and leakage are
+  not modeled.
 
 ## Explicitly unsupported
 
@@ -120,7 +144,10 @@ Important open gates include:
 - dead-board silicon leakage and real UART through-path edges;
 - BC817 switching dynamics and a guaranteed combined-temperature saturation
   model;
-- RF behavior and all physical enclosure effects.
+- RF behavior and all physical enclosure effects;
+- R33 undervoltage hysteresis (`tread_permission` UV corners are divider-only);
+- measured Q3 pickup and release timing, and firmware generation of the
+  `RELAY_PULSE` toggle.
 - RJ45 single-open 2.0 A capability, minimum treadmill VIN, treadmill source
   impedance, installed ambient/thermal behavior, transient response, complete
   installed supply-plus-return drop, and USB return current;

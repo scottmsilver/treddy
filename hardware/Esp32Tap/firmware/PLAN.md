@@ -39,7 +39,7 @@ RAM/NVS ring during server outages and replays on reconnect.
 
 ## One deliberate hardware-enabled change: Proxy = relay bridge
 
-On Rev B, Proxy mode is a **normally-closed relay bridge** — console
+On Rev E, Proxy mode is a **normally-closed relay bridge** — console
 bytes reach the motor through copper, not software forwarding. The engine
 still parses the console stream (for telemetry and auto-emulate/auto-proxy
 detection) but the forwarding path has zero latency and zero firmware
@@ -60,10 +60,51 @@ WDT. The production timeout is **2 s**. The WDT **action must actually release
 the relay**: ESP-IDF's task-WDT
 default merely prints a warning, so `CONFIG_ESP_TASK_WDT_PANIC=y` is
 mandatory (see the sdkconfig list below) — a stall then panics → reset →
-GPIO21 Hi-Z → 10 k base pull-down → relay released. Without that option the
-"task-WDT stall → relay released" column of the watchdog matrix is
-unimplemented. Boot always releases the relay (GPIO21 has a 10 k pull-down
-at the driver base).
+GPIO21 (`RELAY_CMD`) Hi-Z → R23 10 k pull-down holds it low → `RELAY_GATE`
+low (U5 disabled, Q1 base held low by R10) → relay released. GPIO8
+(`RELAY_PULSE`) also stops toggling, so Q3 opens on its own (below). Without
+that option the "task-WDT stall → relay released" column of the watchdog
+matrix is unimplemented. Boot always releases the relay (`RELAY_CMD` has the
+R23 10 k pull-down; Q3's gate starts discharged).
+
+## Relay liveness pulse — `RELAY_PULSE` (GPIO8) contract
+
+Rev E puts Q3 (AO3400A) in series with Q1's emitter. Its gate is fed only
+through C22 and the D8 charge pump from `RELAY_PULSE` (U1 IO8, via R35), with
+R34 and C23 as the hold. K1 can energize only while all three hold:
+`TREAD_OK`, `RELAY_CMD` static high, and `RELAY_PULSE` toggling. This removes
+two single points: one stuck U6 output, and a hung MCU holding static pins.
+
+Calculated values (not measured; the `sim/` models give the same order of
+magnitude and are also not measurements): gate about 2.55 V at a 1 kHz square
+wave; one stray edge moves the gate about 0.27 V, below the 0.65 V minimum
+Q3 threshold; the relay releases roughly 50-150 ms after toggling stops
+(R34 x C23 = 100 ms time constant; not a guaranteed deadline).
+
+The liveness switch is not single-fault tolerant on its own: a C22 short, an
+R34 open, a C23 open, or a Q3 drain-source short each defeats it, and each
+needs a second fault to matter. Open bench item: scope the Q1 base, emitter and
+collector when the pulses stop with `RELAY_GATE` high (BC817 reverse VBE limit
+is 5 V).
+
+Firmware requirements — **not implemented** (bd issue `precor-9_3x-4uv`):
+
+* toggle IO8 from the watchdog-supervised safety task, as a 1 kHz square wave or faster,
+  only while the task's own checks (owner lease, console freshness,
+  `TREAD_OK`, feedback state) permit Emulate;
+* never drive IO8 from LEDC / hardware PWM, a free-running timer, or an ISR
+  that keeps running when the safety task hangs; those would keep the relay
+  powered through the stall this contact exists to catch;
+* hold IO8 static (not toggling) in Proxy, at boot, at reset, and on every
+  fail-closed path;
+* keep the gap-safe entry order: `RELAY_PULSE` toggling must be established
+  before `RELAY_CMD` is asserted and the feedback window opens, so allow for
+  the pump's pickup time (modelled at roughly 7-17 ms; measure it);
+* bench-measure pickup time, release time, and a deliberately stalled
+  safety task with a scope on the K1 contacts before any Emulate use.
+
+Until firmware does this, the board cannot transfer the relay. It stays in
+bypass/Proxy, which is the safe direction.
 
 ## Task layout / core pinning (explicit sdkconfig — NOT the IDF defaults)
 
@@ -224,7 +265,7 @@ stall to stable NC at most 2.25 s with the 2 s WDT.
 
 ### USB attach
 
-Rev B is self-powered only from treadmill +8 V; USB VBUS is data/presence only.
+Rev E is self-powered only from treadmill +8 V; USB VBUS is data/presence only.
 GPIO7 is `VBUS_PRESENT_N`: LOW means VBUS present and HIGH means absent.
 Production code must explicitly invert that signal and must not advertise the
 native-USB D+ pull-up while it is HIGH. Espressif's stock self-powered
@@ -233,7 +274,7 @@ an explicit, reviewed inversion/attach strategy. Reset/ROM behavior and
 hot-unplug below 3 ms remain bench gates.
 
 Programming requires **both** a USB data cable and current-limited +8 V bench
-power on the treadmill-power pins. USB alone cannot power or program Rev B.
+power on the treadmill-power pins. USB alone cannot power or program Rev E.
 
 ## Security (must land before the WSS port is ever enabled)
 
@@ -288,6 +329,11 @@ The exact sdkconfig gate remains mandatory on every flashed build:
 ```bash
 grep CONFIG_ESP_TASK_WDT_PANIC=y sdkconfig
 ```
+
+The partition table is `firmware/esp32_rs/partitions_esp32tap.csv`: `nvs` 24 KB
+at 0x9000, `phy_init` 4 KB at 0xf000, `factory` 2 MB at 0x10000, and `storage`
+(LittleFS) 1 MB at 0x210000. It has not been verified against a real build;
+the manifest builder hashes whichever table the production build emits.
 
 Every bench log, scope/logic-analyzer capture, and contact-timing record names
 the resulting `bundle_sha256`. Rebuilding or changing any covered byte creates
@@ -352,7 +398,9 @@ requiring M3 before treadmill contact.)
    review flagged: behavior can pass on one build and regress on the flashed
    one; verify the flag on the artifact, every flash.)
 3. The 1,000-cycle no-splice analyzer gate and 10 ms / 250 ms / 2.25 s
-   contact-timing gates pass on that bundle.
+   contact-timing gates pass on that bundle, and the `RELAY_PULSE` contract
+   above is implemented and bench-measured on that bundle (stalled safety task
+   releases K1 within the measured Q3 release time).
 4. Signal-integrity-while-dead test passed (README bring-up step 6).
 5. +8 V rail sourcing capacity measured per the PiZeroHat WIRING-CHECKLIST
    before first connect (carried-forward unknown).
@@ -406,7 +454,7 @@ non-circular).
 RJ45 pin 4 function (pass through untouched, never probe); whether the
 motor tolerates pin-6 silence (no Idle mode on the ESP32 until
 characterized — Proxy bridge is the idle state); BLE RSSI inside the metal
-motor hood (antenna at board edge + plastic enclosure + air gap;
+motor hood (antenna fully on-board, 3.25/3.30 mm from the edge, + plastic enclosure + air gap;
 site-survey before final enclosure placement); +8 V rail sourcing capacity
 under worst-case motor load (WIRING-checklist measurement before first
 connect).

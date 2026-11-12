@@ -100,12 +100,20 @@ def test_jlc_dfm_review_is_bound_to_the_exact_archive(
     )
 
     assert {
-        "antenna_overhang_carrier",
         "controlled_impedance_production_confirmation",
-        "mixed_smt_tht_fixture_and_process",
+        "epoxy_filled_capped_via_covering",
         "pcba_bom_cpl_placement_preview",
+        "placement_rotation_preview",
         "pth_barrel_minimum_20um",
+        "smt_only_top_side_reflow_confirmation",
+        "standard_pcba_rails_panel_to_70mm",
     } <= set(review["open_vendor_gates"])
+    # Rev E has no through-hole RJ45 and no antenna overhang: those retired
+    # gates must not come back.
+    assert not {
+        "antenna_overhang_carrier",
+        "mixed_smt_tht_fixture_and_process",
+    } & set(review["open_vendor_gates"])
     assert len(review["official_sources"]) >= 2
     assert all(
         source.startswith("https://jlcpcb.com/")

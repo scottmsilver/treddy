@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run and cross-check the Esp32Tap Rev B behavioral SPICE evidence.
+"""Run and cross-check the Esp32Tap Rev E behavioral SPICE evidence.
 
 The numeric limits live in assertions.json.  This runner deliberately treats
 ngspice output as hostile input: every expected measurement must occur once,
@@ -710,7 +710,7 @@ def run_all(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run Esp32Tap Rev B behavioral decks on pinned host and Docker "
+            "Run Esp32Tap Rev E behavioral decks on pinned host and Docker "
             "ngspice engines"
         )
     )

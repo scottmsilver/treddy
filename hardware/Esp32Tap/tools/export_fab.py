@@ -148,6 +148,10 @@ class FabExportError(RuntimeError):
     """Raised when fabrication output cannot be proven complete and coherent."""
 
 
+# Footprints that exist only on the board: mounting holes and the three
+# global fiducials for the assembler's camera.  None is a BOM or CPL row.
+BOARD_ONLY_REFERENCES = ("MH1", "MH2", "MH3", "FID1", "FID2", "FID3")
+
 def _require_rev_c_release(
     action: str,
     basis: str | None,
@@ -221,7 +225,7 @@ def validate_assembly_records(
         raise FabExportError("PCB footprints must be an object")
     _exact_reference_set(
         "PCB",
-        design_references | {"MH1", "MH2", "MH3"},
+        design_references | set(BOARD_ONLY_REFERENCES),
         set(footprints),
     )
     flag_names = ("dnp", "excluded_from_bom", "board_only")
@@ -236,7 +240,7 @@ def validate_assembly_records(
             raise FabExportError(
                 f"PCB {reference} assembly flags differ: " f"expected={expected_flags}, actual={actual_flags}"
             )
-    for reference in ("MH1", "MH2", "MH3"):
+    for reference in BOARD_ONLY_REFERENCES:
         expected_flags = {
             "dnp": False,
             "excluded_from_bom": True,
@@ -477,7 +481,17 @@ def isolated_kicad_project(source: Path) -> Iterator[Path]:
     with tempfile.TemporaryDirectory(
         prefix="esp32tap-kicad-project-",
     ) as temporary:
-        isolated_directory = Path(temporary)
+        # Mirror the repository layout (<root>/kicad beside <root>/tools) so
+        # the project fp-lib-table's ${KIPRJMOD}/../tools/footprint_sources
+        # entries resolve to the pinned stock footprints inside the copy.
+        isolated_directory = Path(temporary) / "kicad"
+        isolated_directory.mkdir()
+        pinned_stock = source_directory.parent / "tools" / "footprint_sources" / "stock"
+        if pinned_stock.is_dir() and not pinned_stock.is_symlink():
+            shutil.copytree(
+                pinned_stock,
+                Path(temporary) / "tools" / "footprint_sources" / "stock",
+            )
         filenames = set(KICAD_PROJECT_FILES) | {source.name}
         for filename in sorted(filenames):
             candidate = source_directory / filename

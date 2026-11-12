@@ -98,9 +98,14 @@ def render_netlist() -> str:
             "  regulator and supervisor power inputs are downstream of D1.",
             "* **USB is data-only:** J3 VBUS supplies USB protection, " "bypass, discharge,",
             "  and presence sensing only; it has no path into VIN or the " "local rails.",
+            "  U3 pin 5 (the ESD array's second VBUS-side pin) is deliberately " "unconnected:",
+            "  tied to the VBUS sense net it let the ESP32 D+ pull-up leak onto " "that net.",
             "* **Treadmill permission:** U4 monitors protected VIN and its " "open-drain",
             "  outputs form TREAD_OK. U6 requires TREAD_OK for both " "RELAY_GATE and",
             "  TX_GATE, so firmware commands alone cannot enable either " "path.",
+            "  R33 (1M, TREAD_OK to UV_SENSE) adds about 0.45 V of VIN-referred " "undervoltage",
+            "  hysteresis (calculated, not measured); nominal UV is about 6.31 V " "falling and",
+            "  about 6.85 V rising.",
             "* **TREAD_OK/IO6 isolation:** R32 is a series resistor between "
             "TREAD_OK and TREAD_OK_MCU (U1 IO6 only), so a misconfigured "
             "push-pull GPIO cannot force the interlock high or contend "
@@ -109,6 +114,21 @@ def render_netlist() -> str:
             "* **Relay control:** U5 enables the +5V_RLY coil supply and Q1 " "enables",
             "  the low side. These are series hardware controls driven by " "RELAY_GATE;",
             "  loss of permission removes coil power.",
+            "* **Relay liveness switch:** Q3 (AO3400A) is in series with Q1's " "emitter",
+            "  (Q1.2 -> RELAY_RTN -> Q3 drain; Q3 source to GND). Q3's gate is " "fed only",
+            "  through C22 and the D8 charge pump from RELAY_PULSE (U1 IO8, via " "R35), with",
+            "  R34 || C23 as the hold. K1 can therefore energize only while " "TREAD_OK,",
+            "  RELAY_CMD (static high) and a toggling RELAY_PULSE are all " "present. Calculated,",
+            "  not measured: gate about 2.55 V at a 1 kHz square wave (2.33 V at 500 Hz); one " "stray edge moves",
+            "  the gate about 0.27 V (below the 0.65 V minimum threshold); the " "relay releases",
+            "  roughly 50-150 ms after toggling stops (100 ms time constant; not a " "guaranteed deadline). Firmware must toggle IO8 " "from the",
+            "  watchdog-supervised safety task as a 1 kHz square wave or faster, never from " "LEDC/hardware",
+            "  PWM or a free-running timer (not implemented; bd precor-9_3x-4uv). " "Until then",
+            "  the relay stays in bypass.",
+            "  The liveness switch is not single-fault tolerant on its own: a C22 " "short, an R34 open,",
+            "  a C23 open or a Q3 drain-source short each defeats it, and each " "needs a second",
+            "  fault to matter. Open bench item: scope the Q1 base, emitter and " "collector when",
+            "  the pulses stop with RELAY_GATE high (BC817 reverse VBE limit is " "5 V).",
             "* **Relay contacts:** K1 uses one transfer pole for serial " "bypass/drive",
             "  and one dry feedback pole for K1_NC_FB/K1_NO_FB. The " "feedback pole",
             "  does not carry or duplicate the serial path.",
@@ -122,7 +142,7 @@ def render_netlist() -> str:
             "  +3V3, and VBUS as powered after their passive entry paths. " "They have",
             "  no footprint and are excluded from BOM/CPL; they add no PCB " "copper.",
             "* **Harness interfaces:** J1 (CONSOLE) and J2 (MOTOR) are the "
-            "same Molex 0441440003/C585890 right-angle SMD 8P8C RJ45 jack, "
+            "same Molex 44144-0003 (441440003, LCSC C585890) right-angle SMD 8P8C RJ45 jack, "
             "one per short board edge (Rev E: J1 left, J2 right). There is "
             "no mechanical keying between them; the CONSOLE/MOTOR "
             "silkscreen beside each jack is the only differentiator. J1/J2 "
@@ -132,7 +152,7 @@ def render_netlist() -> str:
             "PROVISIONAL_REQUIRES_LIVE_BOM_CPL_PROOF; public catalog "
             "identity is not an order-ready placement result.",
             "* **GPIO map:** IO4=K1_NC_FB, IO5=K1_NO_FB, IO6=TREAD_OK_MCU,",
-            "  IO7=VBUS_PRESENT_N, IO15=TX_ENABLE, IO16=UART2 RX,",
+            "  IO7=VBUS_PRESENT_N, IO8=RELAY_PULSE, IO15=TX_ENABLE, IO16=UART2 RX,",
             "  IO17=UART1 TX, IO18=UART1 RX, IO21=RELAY_CMD, " "IO38=status LED.",
             "  Native USB remains on IO19/IO20.",
             "",

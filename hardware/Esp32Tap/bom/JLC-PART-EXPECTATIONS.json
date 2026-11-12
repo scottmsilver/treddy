@@ -45,10 +45,20 @@
       "model": "TPS54202DDCR",
       "package": "SOT-23-6"
     },
+    "C19224": {
+      "footprint": "Diode_SMD:D_SOD-323",
+      "model": "PESD5V0S1BA,115",
+      "package": "SOD-323"
+    },
     "C207065": {
       "footprint": "Fuse:Fuse_1812_4532Metric",
       "model": "1812L075/24DR",
       "package": "1812"
+    },
+    "C20917": {
+      "footprint": "Package_TO_SOT_SMD:SOT-23",
+      "model": "AO3400A",
+      "package": "SOT-23"
     },
     "C21190": {
       "footprint": "Resistor_SMD:R_0603_1608Metric",
@@ -68,6 +78,11 @@
     "C2286": {
       "footprint": "LED_SMD:LED_0603_1608Metric",
       "model": "KT-0603R",
+      "package": "0603"
+    },
+    "C22935": {
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "model": "0603WAF1004T5E",
       "package": "0603"
     },
     "C23138": {
@@ -125,11 +140,6 @@
       "model": "CS3225X7R226K250NRL",
       "package": "1210"
     },
-    "C316020": {
-      "footprint": "Diode_SMD:D_SOD-323",
-      "model": "PESD3V3L1BA-N",
-      "package": "SOD-323"
-    },
     "C31850": {
       "footprint": "Resistor_SMD:R_0603_1608Metric",
       "model": "0603WAF2202T5E",
@@ -169,6 +179,11 @@
       "footprint": "Relay_SMD:Relay_DPDT_Omron_G6K-2F-Y",
       "model": "G6K-2F-Y-TR DC5",
       "package": "SMD,10x6.5mm"
+    },
+    "C47546": {
+      "footprint": "Package_TO_SOT_SMD:SOT-23",
+      "model": "BAT54S,215",
+      "package": "SOT-23"
     },
     "C52801": {
       "footprint": "Package_TO_SOT_SMD:SOT-23",

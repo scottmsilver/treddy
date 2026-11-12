@@ -60,11 +60,11 @@
   },
   "connector_latch_clearance_mm": 6.0,
   "external_cable_bend_service_radius_mm": 18.0,
-  "closure": "TOOL_LESS_SNAP_LATCH_WITH_OPTIONAL_SUPPLIED_M3",
+  "closure": "SCREWS_ONLY_4X_M3_LID_3X_M2_5_BOARD",
   "artifacts": {
-    "enclosure/esp32tap_case.scad": "ba02443d9543224171e3720d0d6bb2451aeeb47edcb41bc75b9b16bdd6017b34",
-    "enclosure/esp32tap_base.stl": "1396a586083f3b1b823eb8254922180e8e63e05e15c8c02b79f6e50b3b2ed718",
-    "enclosure/esp32tap_lid.stl": "8b8c0d8ccc043cdd017fe8340ea51cf5c1c8178e053da94f9642c11eed06a26f"
+    "enclosure/esp32tap_case.scad": "b2e9ab291978d17c0024df74f0724d692d4ff5d641e5cd6a439c16fe9f328564",
+    "enclosure/esp32tap_base.stl": "11f6544635c570b8d2a8f704f282441f2ebaf4a149c0f5f1fd7abad6948a2028",
+    "enclosure/esp32tap_lid.stl": "62ecd790fd69490a734259c40d039920b7ffe5b4421af2522b1ba29010d5879a"
   },
   "physical_gates": [
     "actual board and connector fit",

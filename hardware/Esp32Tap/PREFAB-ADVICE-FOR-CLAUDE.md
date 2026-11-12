@@ -2,8 +2,9 @@
 
 **Archival status:** This audit is retained unchanged for traceability. Its
 findings drove the Rev B redesign; none of its topology, part, fabrication,
-stock, quote, or release statements describe the current package. Use
-`AI-HANDOFF.md` and the generated Rev B evidence instead.
+stock, quote, or release statements describe the current package. For the
+current Rev E package use `AI-HANDOFF.md`, `README.md`, `REPORT.md`,
+`VALIDATION.md` and `ORDER-READY.md`, and the generated Rev E evidence.
 
 **Review date:** 2026-07-23
 

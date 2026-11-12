@@ -61,9 +61,15 @@ REQUIRED_SCALARS = (
     "lip",
     "lip_w",
     "post_d",
+    "post_relief",
+    "lip_clr",
+    "board_pilot_d",
+    "board_pilot_depth",
     "post_wall_overlap",
-    "snap_clearance",
 )
+# SCAD led1/led2 must match the PCB LED1/LED2 centres (board-local mm).
+LED_POSITION_TOLERANCE_MM = 0.05
+LED_REFERENCES = ("LED1", "LED2")
 
 
 class ValidationError(ValueError):
@@ -162,7 +168,7 @@ def expected_dimensions(parameters: dict[str, float]) -> dict[str, float]:
         "base_height_mm": parameters["wall"] + interior_height,
         "antenna_void_mm": parameters["ant_air_gap"],
         "post_wall_overlap_mm": (parameters["post_d"] / 2 - parameters["post_inset"]),
-        "lid_post_relief_mm": parameters["post_d"] + 0.6,
+        "lid_post_relief_mm": parameters["post_d"] + parameters["post_relief"],
     }
 
 
@@ -285,6 +291,10 @@ def derive_board_geometry(report: dict[str, Any]) -> dict[str, Any]:
         tuple(coordinate - origin[index] for index, coordinate in enumerate(_footprint_at(footprints, reference)))
         for reference in ("MH1", "MH2", "MH3")
     )
+    leds = tuple(
+        tuple(coordinate - origin[index] for index, coordinate in enumerate(_footprint_at(footprints, reference)))
+        for reference in LED_REFERENCES
+    )
     antenna_edge, antenna_span = _antenna_geometry(board)
 
     return {
@@ -296,6 +306,7 @@ def derive_board_geometry(report: dict[str, Any]) -> dict[str, Any]:
         "usb_center_x_mm": usb[0] - origin[0],
         "switch_centers_mm": switches,
         "mounting_holes_mm": mounting,
+        "led_centers_mm": leds,
         "antenna_overhang_mm": origin[1] - antenna_edge,
         "antenna_span_x_mm": (
             antenna_span[0] - origin[0],
@@ -399,13 +410,26 @@ def validate_fit(
         raise ValidationError("connector latch clearance is below 6 mm")
     if parameters["cable_bend_radius"] < 18.0:
         raise ValidationError("external cable bend service radius is below 18 mm")
-    _close(parameters["snap_clearance"], 0.3, "snap-latch clearance", 1e-6)
+    for index, actual in enumerate(geometry["led_centers_mm"], start=1):
+        scad = _numeric_pair(source, f"led{index}")
+        for axis in range(2):
+            _close(
+                scad[axis],
+                actual[axis],
+                f"LED{index} SCAD axis {axis}",
+                LED_POSITION_TOLERANCE_MM,
+            )
+    _close(parameters["lip_clr"], 0.4, "lid lip clearance per side", 1e-6)
+    _close(parameters["post_relief"], 0.8, "lid post relief extra diameter", 1e-6)
+    _close(parameters["board_pilot_depth"], 4.0, "board post pilot depth", 1e-6)
+    _close(parameters["board_pilot_d"], 2.0, "board post pilot diameter", 1e-6)
+    if "snap" in source.lower():
+        raise ValidationError("closure is screws only: SCAD must not contain snap latch geometry")
     for module_name in (
         "rj45_wall_aperture",
         "rj45_wall_aperture_right",
         "rj45_plug_service_envelope",
         "rj45_plug_service_envelope_right",
-        "snap_latch",
     ):
         if f"module {module_name}" not in source:
             raise ValidationError(f"SCAD is missing {module_name}")
@@ -420,8 +444,8 @@ def validate_fit(
         raise ValidationError("lid posts must overlap the wall")
     if source.count("wall+post_inset") != 4:
         raise ValidationError("all four lid-post coordinates must derive from post_inset")
-    if not re.search(r"\bd\s*=\s*post_d\s*\+\s*0\.6\b", source):
-        raise ValidationError("lid post relief must be post_d + 0.6")
+    if not re.search(r"\bd\s*=\s*post_d\s*\+\s*post_relief\b", source):
+        raise ValidationError("lid post relief must be post_d + post_relief")
 
     scad_mounting = _numeric_pairs(source, "mh")
     if len(scad_mounting) != 3:
@@ -789,20 +813,26 @@ def validate_functional_geometry(
             [center[0], center[1], wall + parameters["standoff"] / 2],
             [center[0] + 1.8, center[1], wall + parameters["standoff"] / 2],
             [center[0] + 3.3, center[1], wall + parameters["standoff"] / 2],
+            # pilot runs 1.0 mm into the floor (open), 1.5 mm of floor remains under it
+            [center[0], center[1], wall - 0.5],
+            [center[0], center[1], wall - 1.25],
         ]
         _expect_occupancy(
             base,
             points,
-            [False, True, False],
+            [False, True, False, False, True],
             f"MH{index} mounting post",
         )
         inward = 1.0 if mount_x < parameters["board_l"] / 2 else -1.0
         _expect_vertices(
             base,
             [
-                [center[0] + inward * radius, center[1], z]
-                for radius in (1.0, 3.0)
-                for z in (wall, wall + parameters["standoff"])
+                [center[0] + inward * 3.0, center[1], z] for z in (wall, wall + parameters["standoff"])
+            ]
+            + [
+                # 4.0 mm blind pilot: bottom 1.0 mm below the post base, open at the top
+                [center[0] + inward * 1.0, center[1], z]
+                for z in (wall + parameters["standoff"] - parameters["board_pilot_depth"], wall + parameters["standoff"])
             ],
             f"MH{index} mounting post",
         )
@@ -882,7 +912,7 @@ def validate_functional_geometry(
             lid,
             [
                 [
-                    center_x + direction_x * (parameters["post_d"] + 0.6) / 2,
+                    center_x + direction_x * (parameters["post_d"] + parameters["post_relief"]) / 2,
                     center_y,
                     z,
                 ]
@@ -895,31 +925,35 @@ def validate_functional_geometry(
         )
         probe_count += len(base_points) + len(lid_points)
 
-    snap_points_base = [
+    # Screws-only closure: no latch geometry on the base walls or in the lid.
+    no_latch_base = [
         [outer_length / 2, -0.6, base_height - 1.5],
-        [outer_length / 2, outer_width - wall / 2, base_height - 1.5],
+        [outer_length / 2, outer_width + 0.6, base_height - 1.5],
+        [outer_length / 2, wall + 0.6, base_height - 1.5],
+        [outer_length / 2, outer_width - wall - 0.6, base_height - 1.5],
     ]
-    _expect_occupancy(
-        base,
-        snap_points_base,
-        [True, True],
-        "tool-less base latches",
-    )
-    snap_points_lid = [
-        [outer_length / 2, wall - parameters["snap_clearance"], 1.0],
-        [
-            outer_length / 2,
-            outer_width - wall + parameters["snap_clearance"],
-            1.0,
-        ],
+    _expect_occupancy(base, no_latch_base, [False, False, False, False], "no snap latches on base")
+    solid_lid_edge = [
+        [outer_length / 2, wall - 0.3, 1.0],
+        [outer_length / 2, outer_width - wall + 0.3, 1.0],
     ]
-    _expect_occupancy(
-        lid,
-        snap_points_lid,
-        [False, False],
-        "tool-less lid receivers",
-    )
-    probe_count += len(snap_points_base) + len(snap_points_lid)
+    _expect_occupancy(lid, solid_lid_edge, [True, True], "no latch receiver slots in lid")
+    probe_count += len(no_latch_base) + len(solid_lid_edge)
+
+    # Status/power LED light holes: the lid must be open above each LED
+    # (through the plate and through the registration-lip ring) and solid
+    # 2 mm away.
+    for index, (led_x, led_y) in enumerate(geometry["led_centers_mm"], start=1):
+        center_x = board_x + led_x
+        center_y = board_y + led_y
+        led_points = [
+            [center_x, center_y, parameters["lid_t"] / 2],
+            [center_x, center_y, parameters["lid_t"] + parameters["lip"] / 2],
+            [center_x + 2.0, center_y, parameters["lid_t"] / 2],
+            [center_x, center_y + 2.0, parameters["lid_t"] / 2],
+        ]
+        _expect_occupancy(lid, led_points, [False, False, True, True], f"LED{index} light hole")
+        probe_count += len(led_points)
 
     return {
         "probe_count": probe_count,
@@ -956,7 +990,7 @@ def validate_functional_geometry(
                 parameters["j2_cable_exit_direction"],
             )
         ],
-        "closure": "TOOL_LESS_SNAP_LATCH_WITH_OPTIONAL_SUPPLIED_M3",
+        "closure": "SCREWS_ONLY_4X_M3_LID_3X_M2_5_BOARD",
     }
 
 

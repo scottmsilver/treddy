@@ -136,7 +136,9 @@ def validate_geometry(board: dict[str, Any]) -> None:
             )
 
     footprints = board["footprints"]
-    expected_refs = set(design.COMPONENTS) | {"MH1", "MH2", "MH3"}
+    # MH1-3 are mounting holes; FID1-3 are board-only fabrication fiducials
+    # (no BOM/CPL line, not in design.COMPONENTS).
+    expected_refs = set(design.COMPONENTS) | {"MH1", "MH2", "MH3", "FID1", "FID2", "FID3"}
     require(
         set(footprints) == expected_refs,
         "PCB footprint set differs from design.py + mounting holes",
@@ -229,6 +231,7 @@ def validate_connectivity_and_routing(board: dict[str, Any]) -> None:
     require(
         {
             "ESP32_ANTENNA_ALL_COPPER_KEEPOUT",
+            "ESP32_ANTENNA_FRONT_FILL_KEEPOUT",
             "USB_90R_CONTROLLED_CORRIDOR",
             "TP5_TP13_BOTTOM_FIXTURE",
         }

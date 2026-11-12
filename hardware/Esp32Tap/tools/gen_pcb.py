@@ -11,6 +11,7 @@ tables; the checked-in board is never edited as an input.
 from __future__ import annotations
 
 import argparse
+import collections
 import heapq
 import math
 import os
@@ -41,6 +42,7 @@ IN1 = pcbnew.In1_Cu
 IN2 = pcbnew.In2_Cu
 B = pcbnew.B_Cu
 ROUTING_LAYERS = (IN2, B)
+LATE_ROUTING_LAYERS = (IN2, B, F)
 GRID = 0.4
 CLEARANCE = 0.20
 U1_PROFILE_SHIFT_Y = 6.6
@@ -104,6 +106,24 @@ USB_EDGE_GAP = 0.2000
 USB_CENTER_SPACING = USB_CONTROLLED_WIDTH + USB_EDGE_GAP
 USB_UNRELATED_CLEARANCE = 0.80
 ROUTER_VIA_RADIUS = 0.30
+# Parts and nets added after the Rev E routing was qualified (relay
+# liveness switch, UV hysteresis feedback).  The hand-tuned router is
+# order-sensitive: one extra endpoint on an early net reshuffles every
+# later escape.  So the qualified routing is produced exactly as before --
+# late parts are invisible to the early pass except as front-copper
+# obstacles -- and a second pass then connects them using only what the
+# qualified routes left free.
+# JLC's camera wants global fiducials well inside the outline (>= 3.85 mm
+# from an edge) and away from other copper.  Preferred corners, local mm.
+FIDUCIAL_EDGE_MARGIN = 3.85
+FIDUCIAL_ANCHORS = ((6.0, 2.0), (6.0, 50.0), (90.0, 50.0))
+LATE_REFS = frozenset({"Q3", "D8", "C22", "C23", "R33", "R34", "R35"})
+LATE_NETS = ("RELAY_PULSE", "PUMP_IN", "PUMP_AC", "Q3_G", "RELAY_RTN")
+# Q1's emitter used to be a plain GND stitch.  It now returns through Q3,
+# but its stub and via are still emitted at the same point of the stitch
+# sequence (keyed by the pad that took its slot in design.NETS["GND"]) so
+# every later stitch sees the same board state as the qualified routing.
+EARLY_STITCH_SUBSTITUTES = {("Q3", "2"): ("Q1", "2", "RELAY_RTN")}
 MANUAL_NETS = USB_NETS | {
     "GND",
     "+8V_RAW",
@@ -126,6 +146,7 @@ U1_CLUSTER_PRIORITY = tuple(
     and net not in MANUAL_NETS
     and net not in SAFETY_RELAY_PRIORITY
     and net not in {"+8V_RAW", "+8V_F", "VIN", "+3V3"}
+    and net not in LATE_NETS
 )
 WIDTHS = {
     "+8V_RAW": 0.60,
@@ -290,6 +311,18 @@ PLACE = {
     "R7": (64.0, 13.0, 0),
     "R8": (64.0, 10.5, 0),
     "R9": (38.5, 19.0, 90),
+    # Relay liveness switch: RELAY_PULSE -> R35 -> C22 -> D8 -> C23/R34 ->
+    # Q3 gate, with Q3 in Q1's emitter return.  All of it sits in the open
+    # field north-east of Q1 and routes after every pre-existing net, so
+    # the qualified Rev E routing is not disturbed.
+    "R35": (51.0, 8.0, 0),
+    "C22": (47.5, 8.0, 0),
+    "D8": (47.5, 11.0, 0),
+    "C23": (51.0, 11.0, 0),
+    "Q3": (48.3, 14.8, 0),
+    "R34": (51.8, 14.8, 0),
+    # UV hysteresis feedback, between the UV divider and TREAD_OK pull-up.
+    "R33": (31.4, 47.3, 90),
     "R10": (42.0, 18.5, 0),
     "R11": (90.0, 10.0, 0),
     "R12": (44.4, 52.4, 0),
@@ -437,7 +470,7 @@ def slow_net_order() -> list[str]:
     priority = {net: index for index, net in enumerate(SAFETY_RELAY_PRIORITY)}
     cluster = {net: index for index, net in enumerate(U1_CLUSTER_PRIORITY)}
     power = {"+8V_RAW", "+8V_F", "VIN", "+3V3"}
-    nets = [net for net in design.NETS if net not in MANUAL_NETS]
+    nets = [net for net in design.NETS if net not in MANUAL_NETS and net not in LATE_NETS]
     nets.sort(
         key=lambda net: (
             (0 if net in priority else 1 if net in cluster else 2 if net in power else 3),
@@ -584,6 +617,11 @@ class Generator:
             B: set(),
         }
         self.front_pad_obstacles: list[tuple[float, float, float, float, str]] = []
+        self.net_trees: dict[str, set[tuple[int, int, int]]] = {}
+        # Layers whose grid ownership maps are live.  The late pass adds
+        # F.Cu (see build_front_grid).
+        self.grid_layers: tuple[int, ...] = ROUTING_LAYERS
+        self.preplaced_escapes: dict[tuple[str, str], tuple[float, float]] = {}
 
     def custom_switch_footprint(self, name: str) -> Any:
         """Build the exact Alps SKRP land pattern from the official drawing."""
@@ -600,9 +638,13 @@ class Generator:
         # centred at (+/-2.075, +/-1.075) mm.
         pad_data = iter(
             (
+                # The switch joins its terminals along each ROW (Alps
+                # terminals 1-2 and 3-4), so a pad number must span both
+                # x ends of one row.  Numbering by column shorts the two
+                # nets through the switch body.
                 ("1", -2.075, -1.075),
-                ("1", -2.075, 1.075),
-                ("2", 2.075, -1.075),
+                ("1", 2.075, -1.075),
+                ("2", -2.075, 1.075),
                 ("2", 2.075, 1.075),
             )
         )
@@ -847,17 +889,40 @@ class Generator:
         self.add_zone(IN1, "GND", outline, "IN1_SOLID_GND_REFERENCE")
         self.add_zone(B, "GND", outline, "BOTTOM_GND_FILL")
         ax0, ay0, ax1, ay1 = ANTENNA_KEEPOUT
+        # This band is the strip just south of the module's own (stock)
+        # antenna keepout, where U1 pads 1-3 and 38-40 sit.  Planes, vias
+        # and inner/bottom tracks stay out of it; the pads' own F.Cu
+        # fan-out stubs have to cross it, so on the front layer only fills
+        # and vias are excluded.
         self.add_rule_area(
             "ESP32_ANTENNA_ALL_COPPER_KEEPOUT",
             [(ax0, ay0), (ax1, ay0), (ax1, ay1), (ax0, ay1)],
-            (F, IN1, IN2, B),
+            (IN1, IN2, B),
             footprints=False,
             pads=False,
             tracks=True,
             vias=True,
             fills=True,
         )
-        fx0, fy0, fx1, fy1 = FIXTURE_KEEPOUT
+        self.add_rule_area(
+            "ESP32_ANTENNA_FRONT_FILL_KEEPOUT",
+            [(ax0, ay0), (ax1, ay0), (ax1, ay1), (ax0, ay1)],
+            (F,),
+            footprints=False,
+            pads=False,
+            tracks=False,
+            vias=True,
+            fills=True,
+        )
+        # FIXTURE_KEEPOUT bounds route centre-lines (the router blocks grid
+        # cell centres).  Copper reaches half a via (0.30 mm) past a centre
+        # line, so the emitted copper keepout is inset by that much.
+        fx0, fy0, fx1, fy1 = (
+            FIXTURE_KEEPOUT[0] + ROUTER_VIA_RADIUS,
+            FIXTURE_KEEPOUT[1] + ROUTER_VIA_RADIUS,
+            FIXTURE_KEEPOUT[2] - ROUTER_VIA_RADIUS,
+            FIXTURE_KEEPOUT[3] - ROUTER_VIA_RADIUS,
+        )
         self.add_rule_area(
             "TP5_TP13_BOTTOM_FIXTURE",
             [(fx0, fy0), (fx1, fy0), (fx1, fy1), (fx0, fy1)],
@@ -970,6 +1035,14 @@ class Generator:
             0.20,
         )
         self.add_track([uv_junction, uv_cap], "UV_SENSE", 0.20)
+        # R33 (TREAD_OK -> UV_SENSE hysteresis feedback) stands directly
+        # south of C18 so its UV_SENSE end is a 1.5 mm stub off C18.1.
+        uv_feedback = self.pad("R33", "2")
+        self.add_track(
+            [uv_cap, (uv_cap[0], uv_feedback[1]), uv_feedback],
+            "UV_SENSE",
+            0.20,
+        )
 
         ov_top = self.pad("R19", "2")
         ov_bottom = self.pad("R20", "1")
@@ -1143,10 +1216,10 @@ class Generator:
         vbus_east = (a9[0], 45.3)
         self.add_track([a4, vbus_west], "VBUS", 0.30)
         self.add_track([a9, vbus_east], "VBUS", 0.30)
-        u35 = self.pad("U3", "5")
+        # U3.5 is deliberately unconnected (see design.NC); its old via
+        # position is now just a corner of the B.Cu spine.
         u35_via = (73.8, 47.3)
-        self.add_track([u35, u35_via], "VBUS", 0.30)
-        for point in (vbus_west, vbus_east, u35_via):
+        for point in (vbus_west, vbus_east):
             self.add_via(point, "VBUS")
         # B.Cu spine: U3.5 -> south lane (y=49.9, below the connector NPTH
         # keepouts, between the shell-stake rows) -> east riser to the two
@@ -1771,9 +1844,22 @@ class Generator:
     def endpoint_nodes(
         self,
         net: str,
+        late: bool = False,
     ) -> list[tuple[int, int]]:
+        """Escape every pad of ``net`` that belongs to this pass.
+
+        The early pass skips LATE_REFS; the late pass of an early net
+        handles only LATE_REFS; a LATE_NETS net is routed whole in the
+        late pass.
+        """
         endpoints: list[tuple[int, int]] = []
         for ref, number in design.NETS[net]:
+            if net not in LATE_NETS and (ref in LATE_REFS) != late:
+                continue
+            preplaced = self.preplaced_escapes.get((ref, number))
+            if preplaced is not None:
+                endpoints.append((grid_index(preplaced[0]), grid_index(preplaced[1])))
+                continue
             for pad in self.pad_objects[(ref, number)]:
                 target, dogleg = self.outward_escape(ref, pad, net)
                 self.add_track(
@@ -1785,7 +1871,10 @@ class Generator:
                 self.add_via(target, net)
                 node = (grid_index(target[0]), grid_index(target[1]))
                 endpoints.append(node)
-                self.mark_circle(target, 0.50, ROUTING_LAYERS, net)
+                self.mark_circle(target, 0.50, self.grid_layers, net)
+                if F in self.grid_layers:
+                    for start, end in zip(dogleg, dogleg[1:]):
+                        self.mark_segment(start, end, 0.25, (F,), net)
         return endpoints
 
     def astar(
@@ -1901,7 +1990,7 @@ class Generator:
             if index and path[index - 1][2] != layer_index:
                 flush()
                 self.add_via(point, net)
-                self.mark_circle(point, 0.50, ROUTING_LAYERS, net)
+                self.mark_circle(point, 0.50, self.grid_layers, net)
                 previous_direction = None
             direction = None
             if index + 1 < len(path) and path[index + 1][2] == layer_index:
@@ -1923,12 +2012,11 @@ class Generator:
         flush()
         return tree_additions
 
-    def route_net(self, net: str) -> None:
+    def route_net(self, net: str, allowed_layers: tuple[int, ...] = ROUTING_LAYERS) -> None:
         endpoint_nodes = self.endpoint_nodes(net)
         unique = sorted(set(endpoint_nodes))
         if len(unique) < 2:
             return
-        allowed_layers = ROUTING_LAYERS
         tree: set[tuple[int, int, int]] = {(unique[0][0], unique[0][1], index) for index in range(len(allowed_layers))}
         remaining = set(unique[1:])
         while remaining:
@@ -1942,6 +2030,145 @@ class Generator:
             tree.update(additions)
             tree.update((endpoint[0], endpoint[1], index) for index in range(len(allowed_layers)))
             remaining.remove(endpoint)
+        self.net_trees[net] = tree
+
+    def route_late_additions(self) -> None:
+        """Second pass: connect LATE_REFS/LATE_NETS into the leftover space."""
+        for ref, number in design.NETS["GND"]:
+            if ref in LATE_REFS:
+                self.stitch_ground_pad(ref, number)
+        layers = range(len(ROUTING_LAYERS))
+        for net in slow_net_order():
+            if not any(ref in LATE_REFS for ref, _ in design.NETS[net]):
+                continue
+            tree = self.net_trees.get(net)
+            if tree is None:
+                raise RuntimeError(f"late endpoints on {net}, which has no early route to join")
+            for endpoint in sorted(set(self.endpoint_nodes(net, late=True))):
+                starts = {(endpoint[0], endpoint[1], index) for index in layers}
+                path = self.astar(starts, tree, net, ROUTING_LAYERS)
+                tree.update(self.emit_grid_path(path, net, ROUTING_LAYERS))
+                tree.update((endpoint[0], endpoint[1], index) for index in layers)
+        self.build_front_grid()
+        for net in LATE_NETS:
+            self.route_net(net, LATE_ROUTING_LAYERS)
+        self.remove_front_only_late_vias()
+
+    def add_fiducials(self) -> None:
+        """Place three global fiducials for JLC's pick-and-place camera.
+
+        They go in after all routing so they cannot disturb it: each one
+        takes the free front-layer spot nearest its preferred corner.  The
+        three corners are deliberately not symmetric, so a rotated board
+        cannot be mistaken for an upright one.
+        """
+        radius = 1.0 + 0.5  # 2 mm mask opening plus margin
+        cells = math.ceil((radius + 0.3) / GRID)
+        courtyards = []
+        for footprint in self.footprints.values():
+            box = footprint.GetBoundingBox(False)
+            low, high = local(box.GetOrigin()), local(box.GetEnd())
+            courtyards.append((low[0], low[1], high[0], high[1]))
+
+        def clear(point: tuple[float, float]) -> bool:
+            x, y = point
+            if not (FIDUCIAL_EDGE_MARGIN <= x <= BOARD_W - FIDUCIAL_EDGE_MARGIN):
+                return False
+            if not (BOARD_TOP + FIDUCIAL_EDGE_MARGIN <= y <= BOARD_H - FIDUCIAL_EDGE_MARGIN):
+                return False
+            if any(x0 - radius < x < x1 + radius and y0 - radius < y < y1 + radius for x0, y0, x1, y1 in courtyards):
+                return False
+            cx, cy = grid_index(x), grid_index(y)
+            for ix in range(cx - cells, cx + cells + 1):
+                for iy in range(cy - cells, cy + cells + 1):
+                    node = (ix, iy)
+                    if node in self.blocked[F] or self.occupied[F].get(node):
+                        return False
+            return True
+
+        placed: list[tuple[float, float]] = []
+        for index, anchor in enumerate(FIDUCIAL_ANCHORS, start=1):
+            origin = (grid_index(anchor[0]), grid_index(anchor[1]))
+            choices = sorted(
+                (abs(dx) + abs(dy), dx, dy) for dx in range(-120, 121, 2) for dy in range(-120, 121, 2)
+            )
+            for _, dx, dy in choices:
+                point = grid_point((origin[0] + dx, origin[1] + dy))
+                if clear(point) and all(math.dist(point, other) > 20.0 for other in placed):
+                    break
+            else:
+                raise RuntimeError(f"no clear spot for fiducial {index} near {anchor}")
+            placed.append(point)
+            footprint = pcbnew.FootprintLoad(str(FPLIB / "Fiducial.pretty"), "Fiducial_1mm_Mask2mm")
+            if footprint is None:
+                raise ValueError("cannot load fiducial footprint")
+            reference = f"FID{index}"
+            footprint.SetFPIDAsString("Fiducial:Fiducial_1mm_Mask2mm")
+            footprint.SetReference(reference)
+            footprint.SetValue("Fiducial")
+            footprint.SetPosition(absolute(point))
+            footprint.SetBoardOnly(True)
+            footprint.SetExcludedFromBOM(True)
+            footprint.SetExcludedFromPosFiles(True)
+            for field in footprint.GetFields():
+                field.SetVisible(False)
+                field.SetLayer(pcbnew.F_Fab)
+            self.board.Add(footprint)
+            self.footprints[reference] = footprint
+
+    def remove_front_only_late_vias(self) -> None:
+        """Drop late escape vias whose net never left F.Cu at that point.
+
+        Every endpoint gets an escape via before its route is known.  When
+        a late route then runs on the front layer, that via connects
+        nothing below it; leaving it would be a dangling barrel.
+        """
+        late = set(LATE_NETS)
+        inner_ends: set[tuple[str, int, int]] = set()
+        for item in self.board.GetTracks():
+            if item.GetClass() == "PCB_VIA" or item.GetNetname() not in late:
+                continue
+            if item.GetLayer() == F:
+                continue
+            for point in (item.GetStart(), item.GetEnd()):
+                inner_ends.add((item.GetNetname(), point.x, point.y))
+        for item in list(self.board.GetTracks()):
+            if item.GetClass() != "PCB_VIA" or item.GetNetname() not in late:
+                continue
+            position = item.GetPosition()
+            if (item.GetNetname(), position.x, position.y) not in inner_ends:
+                self.board.Remove(item)
+
+    def build_front_grid(self) -> None:
+        """Open F.Cu to the late pass.
+
+        The early router only uses F.Cu for pad doglegs, and by the time
+        the late nets route, In2/B around U1 are fully subscribed.  The
+        front layer is still largely empty, so the late nets may also run
+        there.  Every front obstacle is entered into the same ownership
+        maps the inner layers use: pads, front tracks and all vias are
+        owned by their net, and anything blocked on a routing layer
+        (keepouts, holes) is blocked on the front too.
+        """
+        self.blocked[F] = set().union(*(self.blocked[layer] for layer in ROUTING_LAYERS))
+        self.occupied[F] = collections.defaultdict(set)
+        reach = 0.10 + CLEARANCE + GRID / 2
+        for x, y, half_width, half_height, pad_net in self.front_pad_obstacles:
+            x0, x1 = grid_index(x - half_width - reach), grid_index(x + half_width + reach)
+            y0, y1 = grid_index(y - half_height - reach), grid_index(y + half_height + reach)
+            for ix in range(x0, x1 + 1):
+                for iy in range(y0, y1 + 1):
+                    if pad_net:
+                        self.occupied[F][(ix, iy)].add(pad_net)
+                    else:
+                        self.blocked[F].add((ix, iy))
+        for start, end, track_net, width, layer in self.track_records:
+            if layer == F:
+                self.mark_segment(start, end, width, (F,), track_net)
+        for point, via_net in self.via_records:
+            size, _ = self.via_geometry[(point, via_net)]
+            self.mark_circle(point, size / 2 + 0.10 + CLEARANCE, (F,), via_net)
+        self.grid_layers = LATE_ROUTING_LAYERS
 
     def route_slow_nets(self) -> None:
         # GEN_PCB_DEBUG_DUMP is a router-debugging aid: set it to any value
@@ -1970,22 +2197,30 @@ class Generator:
                             handle.write(f"OWNED\t{layer}\t{grid_point(node)}\t{sorted(owners)}\n")
             raise
 
+    def stitch_ground_pad(self, ref: str, number: str, net: str = "GND") -> None:
+        for pad in self.pad_objects[(ref, number)]:
+            if pad.GetAttribute() == pcbnew.PAD_ATTRIB_PTH:
+                continue
+            point = local(pad.GetPosition())
+            if ref == "U3" and number == "2":
+                target = point
+                dogleg = [point]
+            else:
+                target, dogleg = self.outward_escape(ref, pad, net)
+            self.add_track(dogleg, net, 0.30, F)
+            self.add_via(target, net)
+            self.mark_circle(target, 0.50, ROUTING_LAYERS, net)
+            if net != "GND":
+                self.preplaced_escapes[(ref, number)] = target
+
     def add_ground_connections(self) -> None:
         for ref, number in design.NETS["GND"]:
-            if ref in {"J1", "J2", "J3"}:
+            substitute = EARLY_STITCH_SUBSTITUTES.get((ref, number))
+            if substitute is not None:
+                self.stitch_ground_pad(*substitute)
+            if ref in {"J1", "J2", "J3"} or ref in LATE_REFS:
                 continue
-            for pad in self.pad_objects[(ref, number)]:
-                if pad.GetAttribute() == pcbnew.PAD_ATTRIB_PTH:
-                    continue
-                point = local(pad.GetPosition())
-                if ref == "U3" and number == "2":
-                    target = point
-                    dogleg = [point]
-                else:
-                    target, dogleg = self.outward_escape(ref, pad, "GND")
-                self.add_track(dogleg, "GND", 0.30, F)
-                self.add_via(target, "GND")
-                self.mark_circle(target, 0.50, ROUTING_LAYERS, "GND")
+            self.stitch_ground_pad(ref, number)
 
     def add_silkscreen(self) -> None:
         def text(
@@ -2023,7 +2258,9 @@ class Generator:
         text(36.0, 10.0, "NC", 1.0)
         text(29.5, 37.0, "EMULATE", 1.0)
         text(42.0, 35.0, "NO", 1.0)
-        text(50.0, 8.0, "USB DATA ONLY", 1.0)
+        # The liveness-switch parts took this label's old spot in the open
+        # field; it moves to the bare strip between the title and R13/C10.
+        text(60.5, 5.6, "USB DATA ONLY", 1.0)
         # J1's pad 1 is the TOP of its row (Y=32.55); mark it from the
         # clear pocket north-east of the pad row, west of R25/K1.
         text(21.5, 31.0, "PIN 1", 1.0)
@@ -2095,6 +2332,8 @@ class Generator:
         self.initialise_router_obstacles()
         self.add_ground_connections()
         self.route_slow_nets()
+        self.route_late_additions()
+        self.add_fiducials()
         self.add_silkscreen()
         self.fill_and_save()
 

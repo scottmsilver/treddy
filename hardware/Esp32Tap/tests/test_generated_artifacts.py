@@ -6,6 +6,7 @@ import heapq
 import json
 import math
 import re
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -1306,7 +1307,7 @@ def test_independent_fab_profile_drills_and_antenna_binding(
             archived = zipped.read(name)
             assert hashlib.sha256(archived).digest() == hashlib.sha256(exported).digest()
             binding.update(name.encode("utf-8") + b"\0" + hashlib.sha256(archived).digest())
-        assert binding.hexdigest() == ("021ddfd838259d79d62eba37597278ec33641f47c7340e417d256dd43fc6add1")
+        assert binding.hexdigest() == ("1bfff1bb8f4ccec9af65831ac000f6718ecd1f0f110a6cb3f53904f8348fba54")
 
     # Component bodies are not present in Gerber/Excellon. Bind the
     # inspector's antenna proof to this exact reviewed PCB and fab package.
@@ -1418,9 +1419,25 @@ def test_inspected_board_locks_rev_c_footprints_and_pad_nets(
     }
     assert _pads(kicad_report, "Q1") == {
         "1": "Q1_B",
-        "2": "GND",
+        "2": "RELAY_RTN",
         "3": "RELAY_SW",
     }
+    assert _pads(kicad_report, "Q3") == {
+        "1": "Q3_G",
+        "2": "GND",
+        "3": "RELAY_RTN",
+    }
+    assert _pads(kicad_report, "D8") == {
+        "1": "GND",
+        "2": "Q3_G",
+        "3": "PUMP_AC",
+    }
+    assert _pads(kicad_report, "C22") == {"1": "PUMP_IN", "2": "PUMP_AC"}
+    assert _pads(kicad_report, "C23") == {"1": "Q3_G", "2": "GND"}
+    assert _pads(kicad_report, "R34") == {"1": "Q3_G", "2": "GND"}
+    assert _pads(kicad_report, "R35") == {"1": "RELAY_PULSE", "2": "PUMP_IN"}
+    assert _pads(kicad_report, "R33") == {"1": "TREAD_OK", "2": "UV_SENSE"}
+    assert _pads(kicad_report, "U1")["12"] == "RELAY_PULSE"
     assert _pads(kicad_report, "U4") == {
         "1": "TREAD_OK",
         "2": "GND",
@@ -1545,7 +1562,9 @@ def test_inspected_usb_pair_is_front_copper_only(
         "2": "GND",
         "3": "USB_DP",
         "4": "USB_DP_MCU",
-        "5": "VBUS",
+        # Deliberately open: tied to VBUS it leaked the ESP32 D+ pull-up
+        # onto the VBUS sense net.  KiCad names an unconnected pad net.
+        "5": "unconnected-(U3-VBUS-Pad5)",
         "6": "USB_DN_MCU",
     }
     assert _pads(kicad_report, "R15") == {
@@ -1571,7 +1590,6 @@ def test_inspected_vbus_cannot_reach_vin(
         ("J3", "A9"),
         ("J3", "B4"),
         ("J3", "B9"),
-        ("U3", "5"),
         ("C11", "1"),
         ("R29", "1"),
         ("Q2", "1"),
@@ -1888,13 +1906,28 @@ def test_named_antenna_keepout_is_all_copper_and_explicit_exception(
     keepouts = [area for area in board["rule_areas"] if area["name"] == "ESP32_ANTENNA_ALL_COPPER_KEEPOUT"]
     assert len(keepouts) == 1
     keepout = keepouts[0]
-    assert keepout["layers"] == EXPECTED_LAYERS
+    # F.Cu is split off: U1 pads 1-3 and 38-40 sit in this band and their
+    # fan-out stubs must cross it, so the front layer forbids only fills
+    # and vias (see ESP32_ANTENNA_FRONT_FILL_KEEPOUT).
+    assert keepout["layers"] == ["In1.Cu", "In2.Cu", "B.Cu"]
     assert keepout["forbid_tracks"]
     assert keepout["forbid_vias"]
     assert keepout["forbid_zone_fills"]
     assert not keepout["forbid_footprints"]
     assert not keepout["forbid_pads"]
     assert len(keepout["outline"]) >= 4
+
+    front = [area for area in board["rule_areas"] if area["name"] == "ESP32_ANTENNA_FRONT_FILL_KEEPOUT"]
+    assert len(front) == 1
+    assert front[0]["layers"] == ["F.Cu"]
+    assert front[0]["outline"] == keepout["outline"]
+    assert front[0]["forbid_vias"]
+    assert front[0]["forbid_zone_fills"]
+    assert not front[0]["forbid_tracks"]
+    assert not front[0]["forbid_footprints"]
+    assert not front[0]["forbid_pads"]
+    # Together the two areas cover every copper layer.
+    assert set(keepout["layers"]) | set(front[0]["layers"]) == set(EXPECTED_LAYERS)
 
     in1 = [zone for zone in board["zones"] if zone["layer"] == "In1.Cu" and zone["net"] == "GND"]
     assert len(in1) == 1
@@ -1973,17 +2006,30 @@ def test_no_track_or_via_copper_inside_antenna_keepouts(
     for keepout in named:
         assert keepout["forbid_tracks"]
         assert keepout["forbid_vias"]
-        # U1's pad row lies inside the named apron and pads are explicitly
-        # allowed there, so the short F.Cu escape stubs leaving those pads
-        # have intruded on F.Cu since the area was introduced (identical
-        # at Rev D HEAD).  Hold the named area to zero copper on every
-        # non-F layer, where the grid router and stitcher operate.
+        # U1's pad row lies inside the named apron, so F.Cu fan-out stubs
+        # are allowed there (they live under the separate front fill/via
+        # keepout).  The all-copper area itself now covers only In1/In2/B
+        # and must hold zero tracks and vias on every layer it names.
+        assert "F.Cu" not in keepout["layers"]
         offenders = _copper_keepout_offenders(
             board,
             keepout["outline"],
-            set(keepout["layers"]) - {"F.Cu"},
+            set(keepout["layers"]),
         )
         assert not offenders, f"copper intrudes into {keepout['name']}: {offenders}"
+
+    # The front band forbids vias (tracks are allowed on F.Cu only).
+    front = [area for area in board["rule_areas"] if area["name"] == "ESP32_ANTENNA_FRONT_FILL_KEEPOUT"]
+    assert len(front) == 1
+    xs = [point[0] for point in front[0]["outline"]]
+    ys = [point[1] for point in front[0]["outline"]]
+    in_band = [
+        via["id"]
+        for via in board["vias"]
+        if min(xs) - via["size_mm"] / 2 < via["at"][0] < max(xs) + via["size_mm"] / 2
+        and min(ys) - via["size_mm"] / 2 < via["at"][1] < max(ys) + via["size_mm"] / 2
+    ]
+    assert not in_band, f"vias inside the F.Cu antenna band: {in_band}"
 
 
 def test_antenna_keepout_copper_gate_rejects_planted_track(
@@ -2984,6 +3030,15 @@ def test_fixture_test_pads_have_bottom_no_copper_access(
     assert fixture["forbid_tracks"]
     assert fixture["forbid_vias"]
     assert fixture["forbid_zone_fills"]
+    # Emitted copper keepout is the router's FIXTURE_KEEPOUT (board-local
+    # 47.0,33.8 .. 77.0,38.2) inset 0.30 mm (half a via) on every side;
+    # board origin is (100, 100).
+    assert fixture["outline"] == [
+        [pytest.approx(147.3), pytest.approx(134.1)],
+        [pytest.approx(176.7), pytest.approx(134.1)],
+        [pytest.approx(176.7), pytest.approx(137.9)],
+        [pytest.approx(147.3), pytest.approx(137.9)],
+    ]
     assert all(board["footprints"][ref]["layer"] in {"F.Cu", "F.Courtyard"} for ref in test_refs)
     for ref in test_refs:
         assert board["footprints"][ref].get("fixture_accessible") is True
@@ -2993,10 +3048,11 @@ def test_silkscreen_minimums_and_required_markings(
     kicad_report: dict[str, Any],
 ) -> None:
     board = _board(kicad_report)
-    # Rev D: 307, not 295 -- the RJ45-SMD_441440003 footprint's silkscreen
+    # Rev E: 333 (Rev D: 307, Rev C: 295; the added Q3/D8/C22/C23/R33-35 and
+    # fiducials contribute their own silkscreen) -- the RJ45-SMD_441440003 footprint's silkscreen
     # (front-mating-face marks, courtyard-adjacent outline) has a
     # different graphic count than Rev C's Micro-Fit headers.
-    assert board["footprint_silkscreen_graphic_count"] == 307
+    assert board["footprint_silkscreen_graphic_count"] == 333
     front = [text for text in board["texts"] if text["layer"] in {"F.SilkS", "F.Silkscreen"}]
     expected_labels = {
         "ESP32TAP REV E",
@@ -3038,7 +3094,7 @@ def test_silkscreen_minimums_and_required_markings(
         "MOTOR": ([172.6, 140.6], 90.0),
         "P1": ([174.9, 143.3], 0.0),
         "PIN 1": ([121.5, 131.0], 0.0),
-        "USB DATA ONLY": ([150.0, 108.0], 0.0),
+        "USB DATA ONLY": ([160.5, 105.6], 0.0),
     }
     for label, (position, rotation) in expected_placements.items():
         assert labels[label]["at"] == position
@@ -3157,3 +3213,129 @@ def test_default_python_validator_passes(
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "PASS" in completed.stdout
+
+
+def _kicad_mod_pad_lands(text: str) -> dict[str, list[tuple[float, float]]]:
+    lands: dict[str, list[tuple[float, float]]] = {}
+    for number, x, y in re.findall(r'\(pad "([^"]+)" smd \w+ \(at (-?[\d.]+) (-?[\d.]+)', text):
+        lands.setdefault(number, []).append((float(x), float(y)))
+    return lands
+
+
+def test_sw_footprint_pads_are_numbered_by_row(esp32tap_dir: Path) -> None:
+    """Alps SKRP terminals 1-2 and 3-4 are joined inside the body along each
+    ROW, so the two lands sharing a pad number must share a Y.  The old
+    column numbering shorted EN/IO0 to GND through the switch."""
+    text = (esp32tap_dir / "kicad" / "Button_Switch_SMD.pretty" / "SW_SPST_SKRPACE010.kicad_mod").read_text(
+        encoding="utf-8"
+    )
+    lands = _kicad_mod_pad_lands(text)
+    assert set(lands) == {"1", "2"}
+    assert sorted(lands["1"]) == [(-2.075, -1.075), (2.075, -1.075)]
+    assert sorted(lands["2"]) == [(-2.075, 1.075), (2.075, 1.075)]
+    for number, points in lands.items():
+        assert len(points) == 2
+        assert points[0][1] == points[1][1], f"pad {number} lands differ in Y: {points}"
+        assert points[0][0] != points[1][0]
+    assert lands["1"][0][1] != lands["2"][0][1]
+
+
+@pytest.mark.parametrize("ref,net_a,net_b", [("SW1", "EN", "GND"), ("SW2", "IO0", "GND")])
+def test_board_sw_pad_lands_sharing_a_number_share_y(
+    kicad_report: dict[str, Any],
+    ref: str,
+    net_a: str,
+    net_b: str,
+) -> None:
+    footprint = _board(kicad_report)["footprints"][ref]
+    by_number: dict[str, list[list[float]]] = {}
+    for occurrence in footprint["pad_occurrences"]:
+        by_number.setdefault(occurrence["number"], []).append(occurrence["at"])
+    assert set(by_number) == {"1", "2"}
+    for number, points in by_number.items():
+        assert len(points) == 2, f"{ref} pad {number}"
+        assert points[0][1] == pytest.approx(points[1][1]), f"{ref} pad {number} lands differ in Y: {points}"
+        assert points[0][0] != pytest.approx(points[1][0])
+    assert by_number["1"][0][1] != pytest.approx(by_number["2"][0][1])
+    # The signal net must sit on one row and GND on the other, so pressing
+    # the switch (not the body itself) is what connects them.
+    nets = {number: {o["net"] for o in footprint["pad_occurrences"] if o["number"] == number} for number in by_number}
+    assert nets == {"1": {net_a}, "2": {net_b}} or nets == {"1": {net_b}, "2": {net_a}}
+
+
+def test_footprint_libraries_are_repo_local_and_hash_pinned(esp32tap_dir: Path) -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("esp32tap_design_fplib", esp32tap_dir / "tools" / "design.py")
+    assert spec is not None and spec.loader is not None
+    design = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(design)
+
+    repo_root = esp32tap_dir.parent.parent.resolve()
+    stock = (esp32tap_dir / "tools" / "footprint_sources" / "stock").resolve()
+    fplib = Path(design.FPLIB).resolve()
+    assert fplib == stock
+    assert fplib.is_relative_to(repo_root)
+    assert not str(design.FPLIB).startswith("/usr/")
+
+    manifest = json.loads((stock / "MANIFEST.json").read_text(encoding="utf-8"))
+    for key, entry in manifest.items():
+        library, name = key.split(":", 1)
+        path = stock / f"{library}.pretty" / f"{name}.kicad_mod"
+        assert path.is_file(), f"MANIFEST entry {key} has no file"
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"], f"{key} differs from MANIFEST"
+    on_disk = {
+        f"{path.parent.name[: -len('.pretty')]}:{path.stem}" for path in stock.glob("*.pretty/*.kicad_mod")
+    }
+    assert on_disk == set(manifest), "stock footprint files and MANIFEST.json disagree"
+
+    local = {
+        f"{path.parent.name[: -len('.pretty')]}:{path.stem}"
+        for path in (esp32tap_dir / "kicad").glob("*.pretty/*.kicad_mod")
+    }
+    for ref, component in design.COMPONENTS.items():
+        key = f"{component[1]}:{component[2]}"
+        assert key in local or key in manifest, f"{ref} footprint {key} is not repo-local"
+    # Footprints the board generator loads outside design.COMPONENTS.
+    assert "Fiducial:Fiducial_1mm_Mask2mm" in manifest
+
+    table = (esp32tap_dir / "kicad" / "fp-lib-table").read_text(encoding="utf-8")
+    assert "/usr/share/kicad" not in table
+
+
+@pytest.mark.skipif(shutil.which("kicad-cli") is None, reason="kicad-cli is not installed")
+def test_kicad_drc_with_schematic_parity_is_clean(esp32tap_dir: Path, tmp_path: Path) -> None:
+    """Full KiCad DRC on an isolated copy: 0 violations, 0 unconnected pads,
+    0 footprint errors, and schematic parity.  ${KIPRJMOD}/../tools must
+    resolve (footprint library table), hence the tools symlink."""
+    project = tmp_path / "Esp32Tap"
+    project.mkdir()
+    shutil.copytree(esp32tap_dir / "kicad", project / "kicad")
+    (project / "tools").symlink_to(esp32tap_dir / "tools")
+    report = tmp_path / "drc.rpt"
+    completed = subprocess.run(
+        [
+            "kicad-cli",
+            "pcb",
+            "drc",
+            "--severity-all",
+            "--schematic-parity",
+            "--output",
+            str(report),
+            str(project / "kicad" / "Esp32Tap.kicad_pcb"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert completed.returncode == 0, completed.stderr
+    text = report.read_text(encoding="utf-8")
+    for label, pattern in {
+        "DRC violations": r"\*\* Found (\d+) DRC violations \*\*",
+        "unconnected pads": r"\*\* Found (\d+) unconnected pads \*\*",
+        "Footprint errors": r"\*\* Found (\d+) Footprint errors \*\*",
+    }.items():
+        matches = re.findall(pattern, text)
+        assert len(matches) == 1, f"DRC report lacks a single '{label}' summary"
+        assert int(matches[0]) == 0, f"{label}: {matches[0]}\n{text[:3000]}"

@@ -1,0 +1,86 @@
+{
+  "Button_Switch_SMD:SW_Push_1P1T_NO_CK_KMR2": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "170dc3645d90d71b6e8e282a81ff14ea1f65aede70ebd5a9f0694d9a053e458c"
+  },
+  "Capacitor_SMD:C_0603_1608Metric": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "fe0dbfefbb181a0466f93a8de52d84ba7b00fcd9acdbb69575f4128a0af4e405"
+  },
+  "Capacitor_SMD:C_0805_2012Metric": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "62775a51fe74ba7f1b572de327bdbd3fc92582721b2abcaa47787865590d89cb"
+  },
+  "Capacitor_SMD:C_1206_3216Metric": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "b2e4a08e3aaf40bc587090190c0e3969e962d7ae962c172cce0581ae8327651c"
+  },
+  "Capacitor_SMD:C_1210_3225Metric": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "e1dae516e079b70c4736d001fb81bfb4ef5f9c2a37c8175223a44f83a04ff75f"
+  },
+  "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12": {
+    "origin": "recovered-from-committed-Rev-E-board; shell stakes given F.Paste and thermal zone connection",
+    "sha256": "c358b557f9fba736e61fb89630dafe450c575a223b4440f5f6e410435198c756"
+  },
+  "Diode_SMD:D_SMA": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "f7cba3b52ed8b34dce89170722de58324eac04e9e61a095e0eab37b9ca93cb7f"
+  },
+  "Diode_SMD:D_SMB": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "e25e9f4acef5b55585afebc48c685e151fd0d2f33a5c3c61f9fdf0389e19ae67"
+  },
+  "Diode_SMD:D_SOD-323": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "03669ee95335b8ad49c3458e5262e7c2fd7ace6fe481bfd00f46b6f2f32abc8a"
+  },
+  "Fiducial:Fiducial_1mm_Mask2mm": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "ef0adfb15b51d4657524802277f1f3703f6d1d0f06998df4ee7dda8179dd48bd"
+  },
+  "Fuse:Fuse_1812_4532Metric": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "b2bd7adcbcc58fa3957f88eedc5c2c057055a8e1737142fc9ffea5afdb68f6e3"
+  },
+  "Inductor_SMD:L_Sunlord_SWPA4030S": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "7e210a0a609cf6b1a704c5f4873867ede37908006751b0c1fad3b1ea70f249a7"
+  },
+  "LED_SMD:LED_0603_1608Metric": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "7931ed1efba34cb13c8d74a60eb1dca4b0be57d950c38e08c3e7f007db500a1c"
+  },
+  "MountingHole:MountingHole_2.7mm_M2.5": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "d28d0215a45e6dd7c7ea0a27ffc55c41e75cd87ce37ab43b84c6cbe6abfe67d8"
+  },
+  "Package_SO:SSOP-8_2.95x2.8mm_P0.65mm": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "8b77f3d670a43e2ddda2c7ac3dc5b3cb8b4511e0ba48bd68220a59679cf2344c"
+  },
+  "Package_TO_SOT_SMD:SOT-23": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "0d88c86c1b6d8c1aae4aa8c09386264c089d4451a128b6ccd63ed253f4300b15"
+  },
+  "Package_TO_SOT_SMD:SOT-23-5": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "455a3f7c3e5eb5b8847eaa5df23e18651e78ab9f75afd09a0883758a0d901761"
+  },
+  "Package_TO_SOT_SMD:SOT-23-6": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "f341c73aac9dcb553456f68bf3fee3d26eb14acf6d8a1cae82b50418fe1d71ca"
+  },
+  "Relay_SMD:Relay_DPDT_Omron_G6K-2F-Y": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "bc113f9f6d13578d72708cbf19059d65e243b373fc3f4f1d9f9c830093102d22"
+  },
+  "Resistor_SMD:R_0603_1608Metric": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "7190ac4a00125b807e54129ef0d87d87f2a658eeb74d025a7028203419b09f23"
+  },
+  "TestPoint:TestPoint_Pad_1.5x1.5mm": {
+    "origin": "kicad-footprints-10.0.5",
+    "sha256": "3bc6d5e42ac6570be508f2534022843f8bf6e4a94c2c0e3f784ba2aef27fcb90"
+  }
+}

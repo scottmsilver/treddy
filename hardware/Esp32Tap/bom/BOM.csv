@@ -11,13 +11,15 @@ SN74LVC2G08DCTR,U6,SSOP-8_2.95x2.8mm_P0.65mm,C352973,Extended,1,0.160,0.160,Dual
 SN74LVC1G126DBVR,U7,SOT-23-5,C7834,Extended,1,0.110,0.110,Single tri-state buffer with partial-power-down support
 G6K-2F-Y-TR DC5,K1,Relay_DPDT_Omron_G6K-2F-Y,C47190,Extended,1,1.500,1.500,"DPDT signal relay, 5VDC coil, SMD — pole A provides fail-safe serial bypass and pole B provides dry-contact armature feedback"
 "BC817-40,215",Q1,SOT-23,C52801,Extended,1,0.030,0.030,45V NPN relay coil driver
+AO3400A,Q3,SOT-23,C20917,Basic,1,0.030,0.030,"30V logic-level N-MOSFET (Vgs(th) 0.65-1.45V) in series with Q1's emitter: the relay liveness switch. Its gate is fed only by the RELAY_PULSE charge pump, so the coil return path exists only while firmware keeps toggling that pin (1 kHz square wave or faster: the gate then sits near 2.5 V, the AO3400A's specified drive level)"
 2N7002,Q2,SOT-23,C8545,Basic,1,0.020,0.020,"N-channel MOSFET, active-low VBUS-present detector"
 SS34,D1,D_SMA,C8678,Basic,1,0.050,0.050,Series Schottky providing reverse-polarity protection for local VIN
 SMBJ10A,D3,D_SMB,C151250,Extended,1,0.050,0.050,"TVS, Littelfuse SMBJ10A — protected-VIN transient clamp"
 SMAJ6.0CA,D4,D_SMA,C80275,Extended,1,0.050,0.050,Bidirectional TVS directly across the relay coil for fast release
-PESD3V3L1BA-N,D5,D_SOD-323,C316020,Extended,1,0.061,0.061,"Bidirectional ESD clamp to GND (NOT rail-referenced — stays inert when the board is unpowered), console pin-6 line (BORN PESD3V3L1BA-N; drop-in for Nexperia C51450 which showed 0 stock at validation 2026-07-23)"
-PESD3V3L1BA-N,D6,D_SOD-323,C316020,Extended,1,0.061,0.061,"Bidirectional ESD clamp, motor pin-6 line"
-PESD3V3L1BA-N,D7,D_SOD-323,C316020,Extended,1,0.061,0.061,"Bidirectional ESD clamp, pin-3 tap line"
+"PESD5V0S1BA,115",D5,D_SOD-323,C19224,Extended,1,0.050,0.050,"Bidirectional ESD clamp to GND (NOT rail-referenced), console pin-6 line. 5V standoff: the treadmill bus level has never been measured, and this clamp sits on the console-to-motor path even in unpowered bypass, so it must stay inert on a 5V bus as well as a 3.3V one (Nexperia PESD5V0S1BA, 35pF)"
+"PESD5V0S1BA,115",D6,D_SOD-323,C19224,Extended,1,0.050,0.050,"Bidirectional 5V-standoff ESD clamp, motor pin-6 line"
+"PESD5V0S1BA,115",D7,D_SOD-323,C19224,Extended,1,0.050,0.050,"Bidirectional 5V-standoff ESD clamp, pin-3 tap line"
+"BAT54S,215",D8,SOT-23,C47546,Extended,1,0.030,0.030,"Series Schottky pair: relay liveness charge-pump rectifier (pin 1 anode to GND, pin 3 common to the pump capacitor, pin 2 cathode to the Q3 gate)"
 XL-1608UGC-04,LED1,LED_0603_1608Metric,C965804,Extended,1,0.005,0.005,"Status LED green (GPIO38; XL-1608UGC-04, 5.2M stock at validation 2026-07-23; replaces C72043 stock=6)"
 RED-0603,LED2,LED_0603_1608Metric,C2286,Basic,1,0.020,0.020,3V3 power LED
 SKRPACE010,SW1,SW_SPST_SKRPACE010,C139797,Extended,1,0.060,0.060,ALPSALPINE SKRPACE010 reel SMD tactile switch — reset (EN); PROVISIONAL_REQUIRES_LIVE_BOM_CPL_PROOF
@@ -56,6 +58,9 @@ SKRPACE010,SW2,SW_SPST_SKRPACE010,C139797,Extended,1,0.060,0.060,ALPSALPINE SKRP
 10k,R30,R_0603_1608Metric,C25804,Basic,1,0.002,0.002,VBUS_PRESENT_N pull-up
 10k,R31,R_0603_1608Metric,C25804,Basic,1,0.002,0.002,GPIO0 boot pull-up
 4.7k,R32,R_0603_1608Metric,C23162,Basic,1,0.002,0.002,TREAD_OK→IO6 series isolation: keeps a misconfigured GPIO from overriding the U4 window or contending with its open-drain (review finding B2)
+1M,R33,R_0603_1608Metric,C22935,Basic,1,0.002,0.002,Undervoltage hysteresis: positive feedback from TREAD_OK to UV_SENSE adds about 0.45V of VIN-referred hysteresis so load bursts near the UV threshold cannot chatter the relay
+100k,R34,R_0603_1608Metric,C25803,Basic,1,0.002,0.002,"Q3 gate bleed: holds the liveness switch off at boot/reset and opens it roughly 50-150 ms after RELAY_PULSE stops toggling (100 ms time constant with C23; calculated, not measured)"
+560R,R35,R_0603_1608Metric,C23204,Basic,1,0.002,0.002,Relay liveness charge-pump series resistor (limits the RELAY_PULSE pin edge current into C22)
 22uF/25V X7R 1210,C1,C_1210_3225Metric,C2918511,Extended,1,0.080,0.080,"Input bulk cap: JLC has no in-stock electrolytic for CP_Elec_6.3x7.7, so this reuses the C6/C7 1210 22uF/25V ceramic (SAMWHA CS3225X7R226K250NRL) — non-polarized, machine-placeable, and the board already carries 20uF+ of ceramic front-end bulk across C2/C3/C6/C7"
 10uF/25V X7R 1206,C2,C_1206_3216Metric,C14860,Extended,1,0.040,0.040,Input ceramic
 10uF/25V X7R 1206,C3,C_1206_3216Metric,C14860,Extended,1,0.040,0.040,Buck VIN ceramic (at pin)
@@ -74,3 +79,5 @@ SKRPACE010,SW2,SW_SPST_SKRPACE010,C139797,Extended,1,0.060,0.060,ALPSALPINE SKRP
 1nF/50V C0G 0603,C19,C_0603_1608Metric,C342541,Extended,1,0.004,0.004,Overvoltage-sense filter
 100nF,C20,C_0603_1608Metric,C14663,Basic,1,0.004,0.004,U6 logic-supply decoupling
 100nF,C21,C_0603_1608Metric,C14663,Basic,1,0.004,0.004,U7 buffer-supply decoupling
+100nF,C22,C_0603_1608Metric,C14663,Basic,1,0.004,0.004,"Relay liveness charge-pump coupling capacitor (blocks DC, so a stuck-high or stuck-low RELAY_PULSE pin cannot hold Q3 on)"
+1uF,C23,C_0603_1608Metric,C15849,Basic,1,0.006,0.006,"Q3 gate hold capacitor (10x C22, so one stray edge moves the gate only about 0.27V, below the 0.65V minimum threshold)"
